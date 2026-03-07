@@ -30,6 +30,36 @@ from backend.services.pet_leveling import get_pet_level
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 
+async def _effective_streak(db: AsyncSession, user: User) -> int:
+    """Return the user's streak adjusted for the current date.
+
+    If the user hasn't completed anything today or yesterday (and the
+    gap days aren't all vacation days), the streak is effectively 0.
+    This ensures the UI shows the correct value between daily resets.
+    """
+    if user.current_streak <= 0 or user.last_streak_date is None:
+        return 0
+
+    today = date.today()
+    if user.last_streak_date >= today:
+        return user.current_streak
+
+    yesterday = today - timedelta(days=1)
+    if user.last_streak_date >= yesterday:
+        return user.current_streak
+
+    # Gap > 1 day — check vacation days
+    from backend.routers.vacation import is_vacation_day
+
+    gap = (today - user.last_streak_date).days
+    for offset in range(1, gap):
+        gap_day = user.last_streak_date + timedelta(days=offset)
+        if not await is_vacation_day(db, gap_day):
+            return 0
+
+    return user.current_streak
+
+
 # ---------------------------------------------------------------------------
 # Static routes FIRST (before parameterised /{user_id})
 # ---------------------------------------------------------------------------
@@ -71,10 +101,12 @@ async def get_my_stats(
     else:
         interactions_remaining = 3
 
+    effective = await _effective_streak(db, current_user)
+
     return {
         "points_balance": current_user.points_balance,
         "total_points_earned": current_user.total_points_earned,
-        "current_streak": current_user.current_streak,
+        "current_streak": effective,
         "longest_streak": current_user.longest_streak,
         "achievements_count": achievements_count,
         "completion_rate": rate_30d,
@@ -212,12 +244,13 @@ async def get_party(
             pet = get_pet_level(pet_xp)
         else:
             pet = None
+        effective = await _effective_streak(db, u)
         member = {
             "id": u.id,
             "display_name": u.display_name or u.username,
             "role": u.role.value,
             "avatar_config": u.avatar_config,
-            "current_streak": u.current_streak,
+            "current_streak": effective,
             "total_points_earned": u.total_points_earned,
             "rank": rank,
             "pet": pet,
@@ -269,13 +302,14 @@ async def get_kid_detail(
     )
     assignments = result.scalars().all()
 
+    effective = await _effective_streak(db, kid)
     return {
         "kid": {
             "id": kid.id,
             "display_name": kid.display_name,
             "avatar_config": kid.avatar_config,
             "points_balance": kid.points_balance,
-            "current_streak": kid.current_streak,
+            "current_streak": effective,
         },
         "assignments": [_build_kid_assignment(a) for a in assignments],
     }
@@ -307,18 +341,19 @@ async def get_family_stats(
         db, kid_ids, today, completed_only=True,
     )
 
-    return [
-        {
+    family_list = []
+    for kid in kids:
+        effective = await _effective_streak(db, kid)
+        family_list.append({
             "id": kid.id,
             "display_name": kid.display_name,
             "avatar_config": kid.avatar_config,
             "points_balance": kid.points_balance,
-            "current_streak": kid.current_streak,
+            "current_streak": effective,
             "today_completed": today_completed.get(kid.id, 0),
             "today_total": today_totals.get(kid.id, 0),
-        }
-        for kid in kids
-    ]
+        })
+    return family_list
 
 
 @router.get("/leaderboard")
@@ -380,16 +415,21 @@ async def get_leaderboard(
     seen_ids: set[int] = set()
     rank = 1
 
+    # Pre-compute effective streaks for all kids
+    effective_streaks = {}
+    for kid in kid_map.values():
+        effective_streaks[kid.id] = await _effective_streak(db, kid)
+
     for row in xp_rows:
         kid = kid_map.get(row.user_id)
         if kid:
-            leaderboard.append(_build_leaderboard_entry(kid, rank, row.weekly_xp or 0, quests_map))
+            leaderboard.append(_build_leaderboard_entry(kid, rank, row.weekly_xp or 0, quests_map, effective_streaks))
             seen_ids.add(kid.id)
             rank += 1
 
     for kid_id, kid in kid_map.items():
         if kid_id not in seen_ids:
-            leaderboard.append(_build_leaderboard_entry(kid, rank, 0, quests_map))
+            leaderboard.append(_build_leaderboard_entry(kid, rank, 0, quests_map, effective_streaks))
             rank += 1
 
     return leaderboard
@@ -577,8 +617,10 @@ async def _count_today_assignments_by_kid(
 
 
 def _build_leaderboard_entry(
-    kid: User, rank: int, weekly_xp: int, quests_map: dict[int, int]
+    kid: User, rank: int, weekly_xp: int, quests_map: dict[int, int],
+    effective_streaks: dict[int, int] | None = None,
 ) -> dict:
+    streak = (effective_streaks or {}).get(kid.id, kid.current_streak or 0)
     return {
         "rank": rank,
         "id": kid.id,
@@ -587,7 +629,7 @@ def _build_leaderboard_entry(
         "weekly_xp": weekly_xp,
         "total_xp": kid.total_points_earned or 0,
         "quests_completed": quests_map.get(kid.id, 0),
-        "current_streak": kid.current_streak or 0,
+        "current_streak": streak,
     }
 
 
