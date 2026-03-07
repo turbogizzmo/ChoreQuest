@@ -9,20 +9,69 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from backend.config import settings
 from backend.database import init_db, async_session
 from backend.seed import seed_database
 from backend.auth import decode_access_token
 from backend.websocket_manager import ws_manager
-from backend.models import RefreshToken
+from backend.models import RefreshToken, User, UserRole
 from backend.services.assignment_generator import generate_daily_assignments
 from backend.services.push_hook import install_push_hooks
 
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
+
+
+async def reset_stale_streaks(db, today: date):
+    """Reset streaks for kids who didn't complete any quest yesterday.
+
+    Accounts for vacation days — if yesterday was a vacation day, the
+    streak is preserved.  Streak freezes are NOT consumed here because
+    they are consumed at completion-time (see chores.py verify logic).
+    """
+    from backend.routers.vacation import is_vacation_day
+
+    yesterday = today - timedelta(days=1)
+    result = await db.execute(
+        select(User).where(
+            User.role == UserRole.kid,
+            User.is_active == True,
+            User.current_streak > 0,
+        )
+    )
+    kids = result.scalars().all()
+
+    for kid in kids:
+        if kid.last_streak_date is None:
+            kid.current_streak = 0
+            continue
+
+        # If they already completed something today, skip
+        if kid.last_streak_date >= today:
+            continue
+
+        # If last completion was yesterday, streak is still valid
+        if kid.last_streak_date >= yesterday:
+            continue
+
+        # Gap is > 1 day. Check if all gap days were vacation days.
+        gap = (today - kid.last_streak_date).days
+        all_vacation = True
+        for offset in range(1, gap):
+            gap_day = kid.last_streak_date + timedelta(days=offset)
+            if not await is_vacation_day(db, gap_day):
+                all_vacation = False
+                break
+
+        if not all_vacation:
+            logger.info(
+                "Resetting streak for user %s (was %d, last_streak_date=%s)",
+                kid.username, kid.current_streak, kid.last_streak_date,
+            )
+            kid.current_streak = 0
 
 
 async def daily_reset_task():
@@ -46,6 +95,9 @@ async def daily_reset_task():
                 today = date.today()
 
                 await generate_daily_assignments(db, today)
+
+                # Reset streaks for kids who missed yesterday
+                await reset_stale_streaks(db, today)
 
                 # Clean up expired refresh tokens
                 await db.execute(
