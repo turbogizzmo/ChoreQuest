@@ -104,7 +104,7 @@ function UsersTab() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 size={28} className="text-sky animate-spin" />
+        <Loader2 size={28} className="text-accent animate-spin" />
       </div>
     );
   }
@@ -112,19 +112,19 @@ function UsersTab() {
   return (
     <div>
       {error && (
-        <div className="mb-4 p-3 rounded border-2 border-crimson/40 bg-crimson/10 text-crimson text-sm">
+        <div className="mb-4 p-3 rounded border border-crimson/40 bg-crimson/10 text-crimson text-sm">
           {error}
         </div>
       )}
 
       {users.length === 0 ? (
         <p className="text-muted text-center py-8 text-sm">
-          No heroes in the realm yet.
+          No users yet.
         </p>
       ) : (
         <div className="space-y-3">
           {users.map((usr) => (
-            <div key={usr.id} className="p-3 rounded-lg bg-surface-raised/30 border border-border space-y-2">
+            <div key={usr.id} className="p-3 rounded-md bg-surface-raised/30 border border-border space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-cream text-sm font-medium truncate">{usr.username}</p>
@@ -256,7 +256,7 @@ function ApiKeysTab() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 size={28} className="text-sky animate-spin" />
+        <Loader2 size={28} className="text-accent animate-spin" />
       </div>
     );
   }
@@ -264,7 +264,7 @@ function ApiKeysTab() {
   return (
     <div>
       {error && (
-        <div className="mb-4 p-3 rounded border-2 border-crimson/40 bg-crimson/10 text-crimson text-sm">
+        <div className="mb-4 p-3 rounded border border-crimson/40 bg-crimson/10 text-crimson text-sm">
           {error}
         </div>
       )}
@@ -281,12 +281,12 @@ function ApiKeysTab() {
 
       {keys.length === 0 ? (
         <p className="text-muted text-center py-8 text-sm">
-          No API keys forged yet.
+          No API keys yet.
         </p>
       ) : (
         <div className="space-y-3">
           {keys.map((k) => (
-            <div key={k.id} className="p-3 rounded-lg bg-surface-raised/30 border border-border">
+            <div key={k.id} className="p-3 rounded-md bg-surface-raised/30 border border-border">
               <div className="flex items-center justify-between gap-2 mb-1">
                 <p className="text-cream text-sm font-medium truncate min-w-0">
                   {k.name}
@@ -301,7 +301,7 @@ function ApiKeysTab() {
               </div>
               <div className="flex flex-wrap gap-x-3 gap-y-1">
                 <span className="text-muted text-xs">
-                  Prefix: <span className="text-sky">{k.prefix || k.key_prefix || '***'}</span>
+                  Prefix: <span className="text-accent">{k.prefix || k.key_prefix || '***'}</span>
                 </span>
                 {k.scopes && (
                   <span className="text-muted text-xs">
@@ -349,7 +349,7 @@ function ApiKeysTab() {
               Copy this key now. It will not be shown again!
             </p>
             <div className="flex gap-2">
-              <code className="flex-1 bg-navy p-3 rounded border border-sky/30 text-sky text-sm break-all">
+              <code className="flex-1 bg-navy p-3 rounded border border-accent/30 text-accent text-sm break-all">
                 {newKeyValue}
               </code>
               <button
@@ -442,7 +442,7 @@ function InviteCodesTab() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 size={28} className="text-sky animate-spin" />
+        <Loader2 size={28} className="text-accent animate-spin" />
       </div>
     );
   }
@@ -450,7 +450,7 @@ function InviteCodesTab() {
   return (
     <div>
       {error && (
-        <div className="mb-4 p-3 rounded border-2 border-crimson/40 bg-crimson/10 text-crimson text-sm">
+        <div className="mb-4 p-3 rounded border border-crimson/40 bg-crimson/10 text-crimson text-sm">
           {error}
         </div>
       )}
@@ -467,14 +467,14 @@ function InviteCodesTab() {
 
       {codes.length === 0 ? (
         <p className="text-muted text-center py-8 text-sm">
-          No invite scrolls crafted yet.
+          No invite codes yet.
         </p>
       ) : (
         <div className="space-y-3">
           {codes.map((c) => (
-            <div key={c.id} className="p-3 rounded-lg bg-surface-raised/30 border border-border">
+            <div key={c.id} className="p-3 rounded-md bg-surface-raised/30 border border-border">
               <div className="flex items-center justify-between gap-2 mb-1">
-                <p className="text-cream text-sm font-bold tracking-wider truncate min-w-0">
+                <p className="text-cream text-sm font-medium truncate min-w-0">
                   {c.code}
                 </p>
                 <button
@@ -491,7 +491,7 @@ function InviteCodesTab() {
                 </span>
                 <span className="text-muted text-xs">
                   Uses:{' '}
-                  <span className="text-sky">
+                  <span className="text-accent">
                     {c.times_used ?? 0}
                     {c.max_uses ? ` / ${c.max_uses}` : ' / ∞'}
                   </span>
@@ -594,7 +594,7 @@ function AuditLogTab() {
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 size={28} className="text-sky animate-spin" />
+        <Loader2 size={28} className="text-accent animate-spin" />
       </div>
     );
   }
@@ -602,21 +602,21 @@ function AuditLogTab() {
   return (
     <div>
       {error && (
-        <div className="mb-4 p-3 rounded border-2 border-crimson/40 bg-crimson/10 text-crimson text-sm">
+        <div className="mb-4 p-3 rounded border border-crimson/40 bg-crimson/10 text-crimson text-sm">
           {error}
         </div>
       )}
 
       {entries.length === 0 ? (
         <p className="text-muted text-center py-8 text-sm">
-          The chronicle is empty. No deeds recorded yet.
+          No audit log entries yet.
         </p>
       ) : (
         <div className="space-y-2">
           {entries.map((entry, idx) => (
-            <div key={entry.id || idx} className="p-3 rounded-lg bg-surface-raised/30 border border-border">
+            <div key={entry.id || idx} className="p-3 rounded-md bg-surface-raised/30 border border-border">
               <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="text-sky text-xs font-medium">{entry.action}</span>
+                <span className="text-accent text-xs font-medium">{entry.action}</span>
                 <span className="text-muted text-[10px] flex-shrink-0">{formatTimestamp(entry.created_at)}</span>
               </div>
               <p className="text-muted text-xs break-all">
@@ -676,11 +676,11 @@ export default function AdminDashboard() {
     return (
       <div className="max-w-xl mx-auto text-center py-20">
         <Shield size={48} className="text-crimson/30 mx-auto mb-4" />
-        <h1 className="text-cream text-xl font-extrabold mb-2">
+        <h1 className="text-cream text-base font-semibold mb-2">
           Access Denied
         </h1>
         <p className="text-muted text-sm">
-          Only realm administrators may enter this sanctum.
+          Only administrators can access this page.
         </p>
       </div>
     );
@@ -697,8 +697,8 @@ export default function AdminDashboard() {
         Profile
       </button>
       <div className="flex items-center gap-3 mb-6">
-        <Shield size={24} className="text-sky" />
-        <h1 className="text-cream text-lg font-extrabold">
+        <Shield size={24} className="text-accent" />
+        <h1 className="text-cream text-lg font-semibold">
           Admin Dashboard
         </h1>
       </div>
@@ -712,9 +712,9 @@ export default function AdminDashboard() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex flex-col items-center gap-1 px-1 py-2.5 rounded-lg border transition-colors text-[10px] sm:text-[11px] font-medium overflow-hidden ${
+              className={`flex flex-col items-center gap-1 px-1 py-2.5 rounded-md border transition-colors text-[10px] sm:text-[11px] font-medium overflow-hidden ${
                 isActive
-                  ? 'bg-sky/10 border-sky/30 text-sky'
+                  ? 'bg-accent/10 border-accent/30 text-accent'
                   : 'border-border text-muted hover:text-cream hover:border-border-light'
               }`}
             >

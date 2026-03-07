@@ -80,15 +80,14 @@ export default function Inventory() {
     <div className="max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <Package size={28} className="text-sky" />
-        <h1 className="text-cream text-xl font-extrabold leading-relaxed">
+        <h1 className="text-cream text-lg font-semibold">
           {isKid ? 'My Inventory' : 'Reward Inventory'}
         </h1>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 rounded border-2 border-crimson/40 bg-crimson/10 text-crimson text-sm text-center">
+        <div className="mb-4 p-3 rounded border border-crimson/40 bg-crimson/10 text-crimson text-sm text-center">
           {error}
         </div>
       )}
@@ -96,7 +95,7 @@ export default function Inventory() {
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={32} className="text-sky animate-spin" />
+          <Loader2 size={24} className="text-accent animate-spin" />
         </div>
       )}
 
@@ -106,13 +105,8 @@ export default function Inventory() {
           {activeLoot.length === 0 && pendingLoot.length === 0 && (
             <div className="text-center py-16">
               <Package size={48} className="text-muted mx-auto mb-4" />
-              <p className="text-cream text-lg font-bold">
+              <p className="text-cream text-sm font-medium">
                 {isKid ? 'No loot yet!' : 'No claimed rewards'}
-              </p>
-              <p className="text-muted text-sm mt-2">
-                {isKid
-                  ? 'Complete quests, earn XP, and redeem rewards to fill your inventory.'
-                  : 'When kids redeem rewards, they\'ll appear here.'}
               </p>
             </div>
           )}
@@ -122,7 +116,7 @@ export default function Inventory() {
             <div className="space-y-6">
               {activeLoot.length > 0 && (
                 <div>
-                  <p className="text-muted text-[11px] font-semibold uppercase tracking-widest mb-3">
+                  <p className="text-muted text-[11px] font-medium mb-3">
                     Ready to collect
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -135,7 +129,7 @@ export default function Inventory() {
 
               {pendingLoot.length > 0 && (
                 <div>
-                  <p className="text-muted text-[11px] font-semibold uppercase tracking-widest mb-3">
+                  <p className="text-muted text-[11px] font-medium mb-3">
                     Awaiting approval
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -153,12 +147,12 @@ export default function Inventory() {
             <div className="space-y-6">
               {activeLoot.length > 0 && (
                 <div>
-                  <p className="text-muted text-[11px] font-semibold uppercase tracking-widest mb-3">
+                  <p className="text-muted text-[11px] font-medium mb-3">
                     Waiting to be given out
                   </p>
                   {groupByKid(activeLoot).map(([kidName, items]) => (
                     <div key={kidName} className="mb-5">
-                      <p className="text-cream text-sm font-bold mb-2">
+                      <p className="text-cream text-sm font-medium mb-2">
                         {kidName}
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -180,12 +174,12 @@ export default function Inventory() {
 
               {pendingLoot.length > 0 && (
                 <div>
-                  <p className="text-muted text-[11px] font-semibold uppercase tracking-widest mb-3">
+                  <p className="text-muted text-[11px] font-medium mb-3">
                     Pending approval
                   </p>
                   {groupByKid(pendingLoot).map(([kidName, items]) => (
                     <div key={kidName} className="mb-5">
-                      <p className="text-cream text-sm font-bold mb-2">
+                      <p className="text-cream text-sm font-medium mb-2">
                         {kidName}
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -211,7 +205,7 @@ function LootCard({ redemption, status, showFulfill, onFulfill, fulfilling }) {
 
   return (
     <div
-      className={`game-panel !border-2 p-4 flex items-center gap-3 ${
+      className={`game-panel !border p-4 flex items-center gap-3 ${
         status === 'approved'
           ? 'border-emerald/40 bg-emerald/5'
           : 'border-border bg-surface-raised/30'
@@ -219,7 +213,7 @@ function LootCard({ redemption, status, showFulfill, onFulfill, fulfilling }) {
     >
       <div className="text-2xl flex-shrink-0">{icon}</div>
       <div className="min-w-0 flex-1">
-        <p className="text-cream text-sm font-bold truncate">
+        <p className="text-cream text-sm font-medium truncate">
           {reward?.title || 'Reward'}
         </p>
         <div className="flex items-center gap-2 mt-1">

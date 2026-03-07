@@ -59,7 +59,7 @@ function ProgressRing({ completed, total, size = 72 }) {
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          className={progress >= 1 ? 'text-emerald' : 'text-sky'}
+          className={progress >= 1 ? 'text-emerald' : 'text-accent'}
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       )}
@@ -129,11 +129,8 @@ export default function Party() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Users size={48} className="text-purple animate-pulse" />
-        <p className="text-cream text-lg font-bold animate-pulse">
-          Assembling the party...
-        </p>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="animate-spin text-accent" size={24} />
       </div>
     );
   }
@@ -156,11 +153,11 @@ export default function Party() {
       {/* Header */}
       <div className="game-panel p-4">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="font-heading text-cream text-lg font-extrabold flex items-center gap-2">
+          <h1 className="text-cream text-lg font-semibold flex items-center gap-2">
             <Users size={20} className="text-purple" />
             The Party
           </h1>
-          <div className="flex items-center gap-1 text-gold text-sm font-bold">
+          <div className="flex items-center gap-1 text-gold text-sm font-medium">
             <Star size={14} className="fill-gold" />
             {family_total_xp.toLocaleString()} XP
           </div>
@@ -188,7 +185,7 @@ export default function Party() {
 
       {/* Members */}
       <div className="game-panel p-4">
-        <h2 className="text-cream text-sm font-bold mb-3">Heroes</h2>
+        <h2 className="text-cream text-sm font-semibold mb-3">Heroes</h2>
         <div className="flex flex-wrap justify-center gap-4">
           {kids.map((kid) => {
             const ringSize = 72;
@@ -210,7 +207,7 @@ export default function Party() {
                 {/* Rank badge */}
                 {kid.rank && <RankBadge rank={kid.rank} size="sm" />}
                 <div className="flex flex-col items-center gap-0.5">
-                  <span className="flex items-center gap-1 text-gold text-xs font-bold">
+                  <span className="flex items-center gap-1 text-gold text-xs font-medium">
                     <Star size={10} className="fill-gold" />
                     {kid.points_balance} XP
                   </span>
@@ -253,14 +250,14 @@ export default function Party() {
       {/* Bulletin Board */}
       <div className="game-panel p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-cream text-sm font-bold flex items-center gap-2">
-            <Megaphone size={14} className="text-sky" />
+          <h2 className="text-cream text-sm font-semibold flex items-center gap-2">
+            <Megaphone size={14} className="text-accent" />
             Bulletin Board
           </h2>
           {isParent && (
             <button
               onClick={() => setShowNewAnnouncement(v => !v)}
-              className="text-sky text-xs hover:text-sky/80 flex items-center gap-1"
+              className="text-accent text-xs hover:text-accent/80 flex items-center gap-1"
             >
               <Plus size={12} />
               Post
@@ -319,14 +316,14 @@ export default function Party() {
             {announcements.map(a => (
               <div
                 key={a.id}
-                className={`px-3 py-2.5 rounded-lg border ${
-                  a.is_pinned ? 'border-sky/30 bg-sky/5' : 'border-border/50 bg-surface-raised/20'
+                className={`px-3 py-2.5 rounded-md border ${
+                  a.is_pinned ? 'border-accent/30 bg-accent/5' : 'border-border/50 bg-surface-raised/20'
                 }`}
               >
                 <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      {a.is_pinned && <Pin size={10} className="text-sky flex-shrink-0" />}
+                      {a.is_pinned && <Pin size={10} className="text-accent flex-shrink-0" />}
                       <p className="text-cream text-sm font-medium truncate">{a.title}</p>
                     </div>
                     <p className="text-muted text-xs mt-1">{a.message}</p>
@@ -353,7 +350,7 @@ export default function Party() {
 
       {/* Activity Feed */}
       <div className="game-panel p-4">
-        <h2 className="text-cream text-sm font-bold mb-3 flex items-center gap-2">
+        <h2 className="text-cream text-sm font-semibold mb-3 flex items-center gap-2">
           <Sparkles size={14} className="text-gold" />
           Recent Activity
         </h2>
@@ -367,13 +364,13 @@ export default function Party() {
             {activity.map((a, i) => (
               <div
                 key={i}
-                className="flex items-start gap-3 px-3 py-2.5 rounded-lg border border-border/50 bg-surface-raised/20"
+                className="flex items-start gap-3 px-3 py-2.5 rounded-md border border-border/50 bg-surface-raised/20"
               >
                 <div className="mt-0.5 flex-shrink-0">
                   {a.type === 'avatar_drop' ? (
                     <Sparkles size={14} className="text-purple" />
                   ) : (
-                    <Swords size={14} className="text-sky" />
+                    <Swords size={14} className="text-accent" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -386,7 +383,7 @@ export default function Party() {
                       <>
                         <span className="text-muted">{a.description}</span>
                         {a.xp && (
-                          <span className="text-gold font-bold ml-1">+{a.xp} XP</span>
+                          <span className="text-gold font-medium ml-1">+{a.xp} XP</span>
                         )}
                       </>
                     )}

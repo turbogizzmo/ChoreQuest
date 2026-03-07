@@ -15,7 +15,7 @@ const flickerAnimation = {
 
 function getFlameProps(streak) {
   if (streak >= 30) {
-    return { size: 28, className: 'text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.5)]' };
+    return { size: 28, className: 'text-orange-400' };
   }
   if (streak >= 7) {
     return { size: 22, className: 'text-orange-400' };
@@ -50,7 +50,7 @@ export default function StreakDisplay({ streak = 0, longest = 0 }) {
 
       {/* Tooltip */}
       {showTooltip && (
-        <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-surface-raised border border-border rounded-lg text-center whitespace-nowrap z-10 shadow-lg">
+        <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-surface-raised border border-border rounded-lg text-center whitespace-nowrap z-10">
           <p className="text-cream text-xs font-medium">
             {streak} day streak
           </p>

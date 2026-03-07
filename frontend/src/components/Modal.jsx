@@ -8,14 +8,12 @@ const overlayVariants = {
 };
 
 const panelVariants = {
-  hidden: { opacity: 0, scale: 0.95, y: 10 },
+  hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: { type: 'spring', damping: 30, stiffness: 400 },
+    transition: { duration: 0.15 },
   },
-  exit: { opacity: 0, scale: 0.95, y: 10, transition: { duration: 0.12 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
 };
 
 export default function Modal({ isOpen, onClose, title, children, actions }) {
@@ -31,7 +29,6 @@ export default function Modal({ isOpen, onClose, title, children, actions }) {
 
     document.addEventListener('keydown', handleKeyDown);
 
-    // Lock body scroll by fixing it in place, preserving scroll position
     const alreadyLocked = document.body.style.position === 'fixed';
     const scrollY = alreadyLocked
       ? -parseInt(document.body.style.top || '0', 10)
@@ -65,17 +62,17 @@ export default function Modal({ isOpen, onClose, title, children, actions }) {
           initial="hidden"
           animate="visible"
           exit="hidden"
-          transition={{ duration: 0.15 }}
+          transition={{ duration: 0.12 }}
         >
           {/* Backdrop */}
           <motion.div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50"
             onClick={onClose}
           />
 
           {/* Panel */}
           <motion.div
-            className="game-panel relative z-10 w-full max-w-md max-h-[85vh] overflow-y-auto overscroll-contain p-6"
+            className="game-panel relative z-10 w-full max-w-md max-h-[85vh] overflow-y-auto overscroll-contain p-5"
             variants={panelVariants}
             initial="hidden"
             animate="visible"
@@ -83,18 +80,18 @@ export default function Modal({ isOpen, onClose, title, children, actions }) {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-start justify-between gap-3 mb-5">
+            <div className="flex items-start justify-between gap-3 mb-4">
               {title && (
-                <h2 className="font-heading text-cream text-lg font-bold">
+                <h2 className="text-cream text-base font-semibold">
                   {title}
                 </h2>
               )}
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-surface-raised transition-colors text-muted hover:text-cream flex-shrink-0"
+                className="p-1 rounded-md hover:bg-surface-raised transition-colors text-muted hover:text-cream flex-shrink-0"
                 aria-label="Close"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
 
@@ -103,7 +100,7 @@ export default function Modal({ isOpen, onClose, title, children, actions }) {
 
             {/* Actions */}
             {actions && actions.length > 0 && (
-              <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-border">
+              <div className="flex items-center justify-end gap-2 mt-5 pt-3 border-t border-border">
                 {actions.map((action, idx) => (
                   <button
                     key={idx}

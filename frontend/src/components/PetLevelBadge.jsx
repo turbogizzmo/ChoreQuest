@@ -4,7 +4,7 @@ const LEVEL_COLORS = [
   '', // 0 unused
   'text-slate-400',    // 1 Hatchling
   'text-emerald',      // 2 Youngling
-  'text-sky',          // 3 Companion
+  'text-accent',       // 3 Companion
   'text-purple',       // 4 Loyal
   'text-gold',         // 5 Brave
   'text-orange-400',   // 6 Mighty

@@ -5,7 +5,6 @@ import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
 import { themedTitle, themedDescription } from '../utils/questThemeText';
 import {
-  Swords,
   ArrowLeft,
   Star,
   RefreshCw,
@@ -16,7 +15,7 @@ import {
   Calendar,
   Clock,
   Shield,
-  ScrollText,
+  Loader2,
   RotateCw,
   Trash2,
   ChevronRight,
@@ -28,19 +27,19 @@ const DIFFICULTY_LABELS = ['Trivial', 'Easy', 'Medium', 'Hard', 'Legendary'];
 const DIFFICULTY_COLORS = [
   'text-muted',
   'text-emerald',
-  'text-sky',
+  'text-accent',
   'text-purple',
   'text-gold',
 ];
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const CATEGORY_COLORS = {
-  cleaning: 'bg-sky/20 text-sky border-sky/40',
+  cleaning: 'bg-accent/20 text-accent border-accent/40',
   cooking: 'bg-gold/20 text-gold border-gold/40',
   outdoor: 'bg-emerald/20 text-emerald border-emerald/40',
   homework: 'bg-purple/20 text-purple border-purple/40',
   pet_care: 'bg-crimson/20 text-crimson border-crimson/40',
-  laundry: 'bg-sky/20 text-sky border-sky/40',
+  laundry: 'bg-accent/20 text-accent border-accent/40',
   errands: 'bg-gold/20 text-gold border-gold/40',
   default: 'bg-cream/10 text-muted border-border',
 };
@@ -68,13 +67,13 @@ function StatusBadge({ status }) {
   const styles = {
     pending: 'bg-gold/20 text-gold border-gold/40',
     completed: 'bg-emerald/20 text-emerald border-emerald/40',
-    verified: 'bg-sky/20 text-sky border-sky/40',
+    verified: 'bg-accent/20 text-accent border-accent/40',
     skipped: 'bg-cream/10 text-muted border-border',
     missed: 'bg-crimson/20 text-crimson border-crimson/40',
   };
   return (
     <span
-      className={`inline-block px-2 py-0.5 rounded-full text-sm border capitalize ${
+      className={`inline-block px-2 py-0.5 rounded-md text-sm border capitalize ${
         styles[status] || styles.pending
       }`}
     >
@@ -278,11 +277,8 @@ export default function ChoreDetail() {
   // Loading
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <ScrollText size={48} className="text-sky animate-pulse" />
-        <p className="text-cream text-lg font-bold animate-pulse">
-          Unrolling the quest scroll...
-        </p>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="animate-spin text-accent" size={24} />
       </div>
     );
   }
@@ -300,7 +296,7 @@ export default function ChoreDetail() {
         </button>
         <div className="game-panel p-10 text-center">
           <XCircle size={48} className="mx-auto text-crimson mb-4" />
-          <p className="text-cream text-xl font-extrabold mb-2">Quest Not Found</p>
+          <p className="text-cream text-base font-semibold mb-2">Not Found</p>
           <p className="text-muted text-sm">{error}</p>
         </div>
       </div>
@@ -338,9 +334,8 @@ export default function ChoreDetail() {
       <div className="game-panel p-6 space-y-5">
         {/* Title */}
         <div className="flex items-start gap-3">
-          <Swords size={28} className="text-sky flex-shrink-0 mt-1" />
           <div className="flex-1">
-            <h1 className="text-cream text-xl font-extrabold leading-relaxed">
+            <h1 className="text-cream text-lg font-semibold leading-relaxed">
               {themedTitle(chore.title, colorTheme)}
             </h1>
           </div>
@@ -356,18 +351,18 @@ export default function ChoreDetail() {
         )}
 
         {/* Divider */}
-        <div className="mx-auto w-full h-[1px] bg-gradient-to-r from-transparent via-border to-transparent" />
+        <div className="mx-auto w-full h-[1px] bg-border" />
 
         {/* Stats grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* XP */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gold/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-md bg-gold/10 flex items-center justify-center">
               <span className="text-gold text-xl">&#9733;</span>
             </div>
             <div>
               <p className="text-muted text-xs font-medium">XP Reward</p>
-              <p className="text-gold text-lg font-bold">{chore.points} XP</p>
+              <p className="text-gold text-lg font-medium">{chore.points} XP</p>
             </div>
           </div>
 
@@ -379,13 +374,13 @@ export default function ChoreDetail() {
 
           {/* Category */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-surface-raised flex items-center justify-center">
+            <div className="w-10 h-10 rounded-md bg-surface-raised flex items-center justify-center">
               <Shield size={18} className="text-muted" />
             </div>
             <div>
               <p className="text-muted text-xs font-medium">Category</p>
               <span
-                className={`inline-block px-2 py-0.5 rounded-full text-sm border capitalize ${categoryColorClass}`}
+                className={`inline-block px-2 py-0.5 rounded-md text-sm border capitalize ${categoryColorClass}`}
               >
                 {categoryName || 'General'}
               </span>
@@ -394,7 +389,7 @@ export default function ChoreDetail() {
 
           {/* Recurrence */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-surface-raised flex items-center justify-center">
+            <div className="w-10 h-10 rounded-md bg-surface-raised flex items-center justify-center">
               <RefreshCw size={18} className="text-muted" />
             </div>
             <div>
@@ -426,7 +421,7 @@ export default function ChoreDetail() {
       {/* Action Message */}
       {actionMessage && (
         <div
-          className={`p-3 rounded border-2 text-sm text-center ${
+          className={`p-3 rounded border text-sm text-center ${
             actionMessage.toLowerCase().includes('fail') || actionMessage.toLowerCase().includes('could not')
               ? 'border-crimson/40 bg-crimson/10 text-crimson'
               : 'border-emerald/40 bg-emerald/10 text-emerald'
@@ -441,10 +436,7 @@ export default function ChoreDetail() {
         <div className="game-panel p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-cream text-lg font-bold mb-1">Today's Quest</p>
-              <p className="text-muted text-xs">
-                This quest awaits your courage, adventurer!
-              </p>
+              <p className="text-cream text-sm font-semibold mb-1">Today's Quest</p>
             </div>
             <button
               onClick={handleComplete}
@@ -463,7 +455,7 @@ export default function ChoreDetail() {
       {/* Actions for parents */}
       {isParent && (
         <div className="game-panel p-5">
-          <p className="text-cream text-lg font-bold mb-3">Guild Master Actions</p>
+          <p className="text-cream text-sm font-semibold mb-3">Actions</p>
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => handleVerify(todayAssignment?.id)}
@@ -503,8 +495,8 @@ export default function ChoreDetail() {
       {isParent && assignmentRules.length > 0 && (
         <div className="game-panel p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <Users size={18} className="text-sky" />
-            <h2 className="text-cream text-lg font-bold">Assigned Heroes</h2>
+            <Users size={18} className="text-accent" />
+            <h2 className="text-cream text-sm font-semibold">Assigned To</h2>
           </div>
           <div className="space-y-2">
             {assignmentRules.map((rule) => {
@@ -512,7 +504,7 @@ export default function ChoreDetail() {
               return (
                 <div
                   key={rule.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-border bg-surface-raised/20"
+                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-border bg-surface-raised/20"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-cream text-sm font-medium truncate">
@@ -543,7 +535,7 @@ export default function ChoreDetail() {
         <div className="game-panel p-5 space-y-3">
           <div className="flex items-center gap-2">
             <RotateCw size={18} className="text-purple" />
-            <h2 className="text-cream text-lg font-bold">Kid Rotation</h2>
+            <h2 className="text-cream text-sm font-semibold">Kid Rotation</h2>
           </div>
 
           {rotation ? (
@@ -554,7 +546,7 @@ export default function ChoreDetail() {
                   value={rotation.cadence}
                   onChange={(e) => handleUpdateCadence(e.target.value)}
                   disabled={actionLoading === 'rotation'}
-                  className="bg-surface-raised text-cream text-sm rounded-lg border border-border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple"
+                  className="bg-surface-raised text-cream text-sm rounded-md border border-border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple"
                 >
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
@@ -569,7 +561,7 @@ export default function ChoreDetail() {
                   return (
                     <span
                       key={kidId}
-                      className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                      className={`px-3 py-1 rounded-md text-xs font-medium border ${
                         isCurrent
                           ? 'border-purple bg-purple/20 text-purple'
                           : 'border-border text-muted'
@@ -610,7 +602,7 @@ export default function ChoreDetail() {
                 <select
                   value={selectedCadence}
                   onChange={(e) => setSelectedCadence(e.target.value)}
-                  className="bg-surface-raised text-cream text-sm rounded-lg border border-border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple"
+                  className="bg-surface-raised text-cream text-sm rounded-md border border-border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple"
                 >
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
@@ -635,8 +627,8 @@ export default function ChoreDetail() {
       {recentAssignments.length > 0 && (
         <div className="game-panel p-5 space-y-4">
           <div className="flex items-center gap-2">
-            <Calendar size={18} className="text-sky" />
-            <h2 className="text-cream text-lg font-bold">Quest Log</h2>
+            <Calendar size={18} className="text-accent" />
+            <h2 className="text-cream text-sm font-semibold">History</h2>
           </div>
 
           <div className="space-y-2">

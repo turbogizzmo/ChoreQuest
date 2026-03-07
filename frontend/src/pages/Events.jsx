@@ -142,8 +142,7 @@ export default function Events() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
-          <Sparkles size={28} className="text-gold" />
-          <h1 className="text-cream text-xl font-extrabold leading-relaxed">
+          <h1 className="text-cream text-lg font-semibold">
             Seasonal Events
           </h1>
         </div>
@@ -157,24 +156,21 @@ export default function Events() {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded border-2 border-crimson/40 bg-crimson/10 text-crimson text-sm text-center">
+        <div className="mb-4 p-3 rounded border border-crimson/40 bg-crimson/10 text-crimson text-sm text-center">
           {error}
         </div>
       )}
 
       {loading && (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={32} className="text-gold animate-spin" />
+          <Loader2 size={24} className="text-accent animate-spin" />
         </div>
       )}
 
       {!loading && events.length === 0 && (
         <div className="text-center py-16">
           <Sparkles size={48} className="text-muted mx-auto mb-4" />
-          <p className="text-cream text-lg font-bold">No events yet</p>
-          <p className="text-muted text-sm mt-2">
-            Create a seasonal event to boost XP with a multiplier.
-          </p>
+          <p className="text-cream text-sm font-medium">No events yet</p>
         </div>
       )}
 
@@ -191,9 +187,9 @@ export default function Events() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-cream text-sm font-bold truncate">{event.title}</p>
+                    <p className="text-cream text-sm font-medium truncate">{event.title}</p>
                     {event.is_active && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider bg-gold/20 text-gold px-2 py-0.5 rounded">
+                      <span className="text-[10px] font-medium bg-gold/20 text-gold px-2 py-0.5 rounded">
                         Active
                       </span>
                     )}
@@ -202,7 +198,7 @@ export default function Events() {
                     <p className="text-muted text-xs mt-1">{event.description}</p>
                   )}
                   <div className="flex items-center gap-4 mt-2 text-xs text-muted">
-                    <span className="text-gold font-bold">{event.multiplier}x XP</span>
+                    <span className="text-gold font-medium">{event.multiplier}x XP</span>
                     <span>{formatDate(event.start_date)} — {formatDate(event.end_date)}</span>
                   </div>
                 </div>
@@ -258,7 +254,7 @@ export default function Events() {
           )}
 
           <div>
-            <label className="block text-gold text-sm font-medium mb-1">Title</label>
+            <label className="block text-cream text-sm font-medium mb-1">Title</label>
             <input
               type="text"
               value={title}
@@ -269,7 +265,7 @@ export default function Events() {
           </div>
 
           <div>
-            <label className="block text-gold text-sm font-medium mb-1">Description (optional)</label>
+            <label className="block text-cream text-sm font-medium mb-1">Description (optional)</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -280,7 +276,7 @@ export default function Events() {
           </div>
 
           <div>
-            <label className="block text-gold text-sm font-medium mb-1">XP Multiplier</label>
+            <label className="block text-cream text-sm font-medium mb-1">XP Multiplier</label>
             <input
               type="number"
               min="1.1"
@@ -295,7 +291,7 @@ export default function Events() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-gold text-sm font-medium mb-1">Start Date</label>
+              <label className="block text-cream text-sm font-medium mb-1">Start Date</label>
               <input
                 type="date"
                 value={startDate}
@@ -304,7 +300,7 @@ export default function Events() {
               />
             </div>
             <div>
-              <label className="block text-gold text-sm font-medium mb-1">End Date</label>
+              <label className="block text-cream text-sm font-medium mb-1">End Date</label>
               <input
                 type="date"
                 value={endDate}

@@ -53,15 +53,12 @@ export default function Layout({ children }) {
   const { syncFromUser } = useTheme();
   const { notifications, unreadCount, markRead, markAllRead, refresh } = useNotifications();
 
-  // Pull-to-refresh: dispatch a global event that page components listen for
   const handlePullRefresh = useCallback(async () => {
     window.dispatchEvent(new CustomEvent('ws:message', { detail: { type: 'pull_refresh' } }));
-    // Small delay so the pages' fetchData calls have time to fire
     await new Promise((r) => setTimeout(r, 600));
   }, []);
   const { pulling, pullDistance, refreshing } = usePullToRefresh(handlePullRefresh);
 
-  // Sync color theme from server on login
   useEffect(() => {
     if (user) syncFromUser(user);
   }, [user, syncFromUser]);
@@ -70,7 +67,6 @@ export default function Layout({ children }) {
   const panelRef = useRef(null);
   const moreRef = useRef(null);
 
-  // Close panel on outside click
   useEffect(() => {
     if (!showNotifs) return;
     const handler = (e) => {
@@ -82,7 +78,6 @@ export default function Layout({ children }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [showNotifs]);
 
-  // Close More menu on outside click
   useEffect(() => {
     if (!showMore) return;
     const handler = (e) => {
@@ -94,7 +89,6 @@ export default function Layout({ children }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [showMore]);
 
-  // Close panels on route change
   useEffect(() => {
     setShowNotifs(false);
     setShowMore(false);
@@ -114,19 +108,19 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-navy flex overflow-x-clip max-w-[100vw]">
-      {/* ─── Desktop Sidebar ─── */}
-      <aside className="hidden md:flex flex-col w-60 bg-surface border-r border-border min-h-screen fixed left-0 top-0 z-30">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex flex-col w-[248px] bg-surface border-r border-border min-h-screen fixed left-0 top-0 z-30">
         <div
-          className="flex items-center gap-3 px-5 py-5 cursor-pointer"
+          className="flex items-center gap-2.5 px-4 py-4 cursor-pointer"
           onClick={() => navigate('/')}
         >
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky to-accent-light flex items-center justify-center">
-            <Swords size={16} className="text-white" />
+          <div className="w-7 h-7 rounded-md bg-accent flex items-center justify-center">
+            <Swords size={14} className="text-navy" />
           </div>
-          <span className="font-heading text-cream text-lg font-extrabold tracking-tight">ChoreQuest</span>
+          <span className="text-cream text-[15px] font-semibold">ChoreQuest</span>
         </div>
 
-        <nav className="flex flex-col gap-0.5 px-3 mt-2 flex-1">
+        <nav className="flex flex-col gap-0.5 px-3 mt-1 flex-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
@@ -134,14 +128,14 @@ export default function Layout({ children }) {
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left ${
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-md transition-colors text-left text-sm ${
                   active
-                    ? 'bg-sky/10 text-sky border border-sky/20'
-                    : 'text-muted hover:text-cream hover:bg-surface-raised border border-transparent'
+                    ? 'bg-surface-raised text-cream'
+                    : 'text-muted hover:text-cream hover:bg-surface-raised'
                 }`}
               >
-                <Icon size={18} className={active ? 'text-sky' : ''} />
-                <span className="font-medium text-sm">{item.label}</span>
+                <Icon size={16} className={active ? 'text-accent' : ''} />
+                <span className="font-medium">{item.label}</span>
               </button>
             );
           })}
@@ -149,7 +143,7 @@ export default function Layout({ children }) {
 
         {user && (
           <div
-            className="flex items-center gap-3 px-4 py-4 border-t border-border cursor-pointer hover:bg-surface-raised transition-colors mx-2 mb-2 rounded-lg"
+            className="flex items-center gap-2.5 px-4 py-3 border-t border-border cursor-pointer hover:bg-surface-raised transition-colors"
             onClick={() => navigate('/profile')}
           >
             <AvatarDisplay
@@ -168,33 +162,33 @@ export default function Layout({ children }) {
         )}
       </aside>
 
-      {/* ─── Main Content Area ─── */}
-      <div className="flex-1 flex flex-col md:ml-60 min-h-screen min-w-0">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col md:ml-[248px] min-h-screen min-w-0">
         {/* Top Bar */}
-        <header className="sticky top-0 z-20 bg-surface/90 backdrop-blur-md border-b border-border px-4 py-3 flex items-center justify-between">
+        <header className="sticky top-0 z-20 bg-surface border-b border-border px-4 py-2.5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             {!isHome && (
               <button
                 onClick={() => navigate(-1)}
-                className="p-1.5 rounded-lg hover:bg-surface-raised transition-colors text-muted hover:text-cream"
+                className="p-1.5 rounded-md hover:bg-surface-raised transition-colors text-muted hover:text-cream"
                 aria-label="Go back"
               >
-                <ArrowLeft size={20} />
+                <ArrowLeft size={18} />
               </button>
             )}
             <div
               className="flex items-center gap-2 cursor-pointer md:hidden"
               onClick={() => navigate('/')}
             >
-              <div className="w-7 h-7 rounded-md bg-gradient-to-br from-sky to-accent-light flex items-center justify-center">
-                <Swords size={14} className="text-white" />
+              <div className="w-6 h-6 rounded bg-accent flex items-center justify-center">
+                <Swords size={12} className="text-navy" />
               </div>
-              <span className="font-heading text-cream text-base font-extrabold tracking-tight">ChoreQuest</span>
+              <span className="text-cream text-sm font-semibold">ChoreQuest</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Notification Bell + Dropdown */}
+          <div className="flex items-center gap-1.5">
+            {/* Notification Bell */}
             <div className="relative" ref={panelRef}>
               <button
                 onClick={() => {
@@ -203,12 +197,12 @@ export default function Layout({ children }) {
                     return !v;
                   });
                 }}
-                className="relative p-2 rounded-lg hover:bg-surface-raised transition-colors"
+                className="relative p-2 rounded-md hover:bg-surface-raised transition-colors"
                 aria-label="Notifications"
               >
-                <Bell size={20} className="text-muted hover:text-cream transition-colors" />
+                <Bell size={18} className="text-muted hover:text-cream transition-colors" />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-crimson text-white text-[10px] font-bold min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 leading-none">
+                  <span className="absolute -top-0.5 -right-0.5 bg-crimson text-white text-[10px] font-bold min-w-[16px] h-[16px] flex items-center justify-center rounded-full px-1 leading-none">
                     {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 )}
@@ -216,10 +210,9 @@ export default function Layout({ children }) {
 
               {/* Notification Panel */}
               {showNotifs && (
-                <div className="fixed right-2 left-2 sm:left-auto sm:absolute sm:right-0 top-14 sm:top-full sm:mt-2 sm:w-80 max-h-96 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden z-50">
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                    <span className="font-heading text-cream text-sm font-bold">Notifications</span>
+                <div className="fixed right-2 left-2 sm:left-auto sm:absolute sm:right-0 top-12 sm:top-full sm:mt-1 sm:w-80 max-h-96 bg-surface border border-border rounded-md overflow-hidden z-50">
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
+                    <span className="text-cream text-sm font-semibold">Notifications</span>
                     <div className="flex items-center gap-1">
                       {unreadCount > 0 && (
                         <button
@@ -227,19 +220,18 @@ export default function Layout({ children }) {
                           className="text-muted hover:text-cream text-xs flex items-center justify-center gap-1 transition-colors min-w-[44px] min-h-[44px]"
                           title="Mark all read"
                         >
-                          <CheckCheck size={20} />
+                          <CheckCheck size={18} />
                         </button>
                       )}
                       <button
                         onClick={() => setShowNotifs(false)}
                         className="text-muted hover:text-cream transition-colors flex items-center justify-center min-w-[44px] min-h-[44px]"
                       >
-                        <X size={22} />
+                        <X size={18} />
                       </button>
                     </div>
                   </div>
 
-                  {/* Notification List */}
                   <div className="overflow-y-auto max-h-80">
                     {notifications.length === 0 ? (
                       <div className="p-6 text-center text-muted text-sm">
@@ -252,13 +244,13 @@ export default function Layout({ children }) {
                           <div
                             key={n.id}
                             onClick={() => { if (!n.is_read && !isTrade) markRead(n.id); }}
-                            className={`w-full text-left px-4 py-3.5 border-b border-border/50 hover:bg-surface-raised transition-colors cursor-pointer ${
-                              !n.is_read ? 'bg-sky/5' : ''
+                            className={`w-full text-left px-4 py-3 border-b border-border/50 hover:bg-surface-raised transition-colors cursor-pointer ${
+                              !n.is_read ? 'bg-accent/5' : ''
                             }`}
                           >
                             <div className="flex items-start gap-2">
                               {!n.is_read && (
-                                <span className="mt-1.5 w-2 h-2 rounded-full bg-sky flex-shrink-0" />
+                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />
                               )}
                               <div className="min-w-0 flex-1">
                                 <p className="text-cream text-sm font-medium truncate">
@@ -332,8 +324,8 @@ export default function Layout({ children }) {
             style={{ height: refreshing ? 48 : pullDistance }}
           >
             <Loader2
-              size={22}
-              className={`text-sky ${refreshing ? 'animate-spin' : ''}`}
+              size={20}
+              className={`text-accent ${refreshing ? 'animate-spin' : ''}`}
               style={{
                 opacity: refreshing ? 1 : Math.min(pullDistance / 40, 1),
                 transform: refreshing ? 'none' : `rotate(${pullDistance * 3}deg)`,
@@ -345,11 +337,10 @@ export default function Layout({ children }) {
         <main className="flex-1 p-4 pb-24 md:pb-6 overflow-x-clip">{children}</main>
       </div>
 
-      {/* ─── Mobile Bottom Nav ─── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-surface/90 backdrop-blur-md border-t border-border" ref={moreRef}>
-        {/* More slide-up menu */}
+      {/* Mobile Bottom Nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-surface border-t border-border" ref={moreRef}>
         {showMore && moreNavItems.length > 0 && (
-          <div className="absolute bottom-full left-0 right-0 bg-surface border-t border-border rounded-t-xl shadow-2xl">
+          <div className="absolute bottom-full left-0 right-0 bg-surface border-t border-border">
             {moreNavItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
@@ -357,21 +348,21 @@ export default function Layout({ children }) {
                 <button
                   key={item.path}
                   onClick={() => { navigate(item.path); setShowMore(false); }}
-                  className={`flex items-center gap-3 w-full px-5 py-3.5 transition-colors text-left ${
+                  className={`flex items-center gap-3 w-full px-5 py-3 transition-colors text-left text-sm ${
                     active
-                      ? 'bg-sky/10 text-sky'
+                      ? 'bg-surface-raised text-cream'
                       : 'text-muted hover:text-cream hover:bg-surface-raised'
                   }`}
                 >
-                  <Icon size={18} className={active ? 'text-sky' : ''} />
-                  <span className="font-medium text-sm">{item.label}</span>
+                  <Icon size={16} className={active ? 'text-accent' : ''} />
+                  <span className="font-medium">{item.label}</span>
                 </button>
               );
             })}
           </div>
         )}
 
-        <div className="flex items-center justify-around h-16 px-1">
+        <div className="flex items-center justify-around h-14 px-1">
           {primaryNavItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
@@ -379,11 +370,11 @@ export default function Layout({ children }) {
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
-                className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-lg transition-all min-w-0 ${
-                  active ? 'text-sky' : 'text-muted'
+                className={`flex flex-col items-center gap-0.5 py-1.5 px-3 rounded-md transition-colors min-w-0 ${
+                  active ? 'text-accent' : 'text-muted'
                 }`}
               >
-                <Icon size={20} />
+                <Icon size={18} />
                 <span className="text-[10px] font-medium leading-none truncate">
                   {item.label}
                 </span>
@@ -391,17 +382,16 @@ export default function Layout({ children }) {
             );
           })}
 
-          {/* More button */}
           {moreNavItems.length > 0 && (
             <button
               onClick={() => setShowMore((v) => !v)}
-              className={`flex flex-col items-center gap-1 py-1.5 px-3 rounded-lg transition-all min-w-0 ${
+              className={`flex flex-col items-center gap-0.5 py-1.5 px-3 rounded-md transition-colors min-w-0 ${
                 showMore || moreNavItems.some((item) => isActive(item.path))
-                  ? 'text-sky'
+                  ? 'text-accent'
                   : 'text-muted'
               }`}
             >
-              <MoreHorizontal size={20} />
+              <MoreHorizontal size={18} />
               <span className="text-[10px] font-medium leading-none truncate">
                 More
               </span>

@@ -141,7 +141,7 @@ export default function Wishlist() {
           {isConverted ? (
             <Check size={18} className="text-emerald" />
           ) : (
-            <Star size={18} className="text-sky" />
+            <Star size={18} className="text-accent" />
           )}
         </div>
 
@@ -155,7 +155,7 @@ export default function Wishlist() {
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sky text-xs flex items-center gap-1 mt-1 hover:text-sky/80 transition-colors"
+              className="text-accent text-xs flex items-center gap-1 mt-1 hover:text-accent/80 transition-colors"
             >
               <ExternalLink size={12} />
               <span className="truncate">{item.url}</span>
@@ -201,8 +201,7 @@ export default function Wishlist() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
-          <Star size={28} className="text-sky" />
-          <h1 className="text-cream text-xl font-extrabold leading-relaxed">
+          <h1 className="text-cream text-lg font-semibold">
             Wish List
           </h1>
         </div>
@@ -221,7 +220,7 @@ export default function Wishlist() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 rounded border-2 border-crimson/40 bg-crimson/10 text-crimson text-sm text-center">
+        <div className="mb-4 p-3 rounded border border-crimson/40 bg-crimson/10 text-crimson text-sm text-center">
           {error}
         </div>
       )}
@@ -229,7 +228,7 @@ export default function Wishlist() {
       {/* Add form (kid) */}
       {isKid && showAddForm && (
         <div className="game-panel p-5 mb-6 space-y-3">
-          <h3 className="text-cream text-lg font-bold tracking-wide mb-3">
+          <h3 className="text-cream text-sm font-semibold mb-3">
             New Wish
           </h3>
           <input
@@ -274,7 +273,7 @@ export default function Wishlist() {
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={32} className="text-sky animate-spin" />
+          <Loader2 size={24} className="text-accent animate-spin" />
         </div>
       )}
 
@@ -284,11 +283,8 @@ export default function Wishlist() {
           {items.length === 0 ? (
             <div className="text-center py-16">
               <Star size={48} className="text-muted mx-auto mb-4" />
-              <p className="text-cream text-lg font-bold">
-                Your wish list is empty
-              </p>
-              <p className="text-muted text-sm mt-2">
-                Every hero has dreams. Add your first wish!
+              <p className="text-cream text-sm font-semibold">
+                No items yet.
               </p>
             </div>
           ) : (
@@ -303,18 +299,15 @@ export default function Wishlist() {
           {Object.keys(groupedByKid).length === 0 ? (
             <div className="text-center py-16">
               <Star size={48} className="text-muted mx-auto mb-4" />
-              <p className="text-cream text-lg font-bold">
-                No wishes yet
-              </p>
-              <p className="text-muted text-sm mt-2">
-                Your heroes haven't made any wishes yet. Encourage them to dream!
+              <p className="text-cream text-sm font-semibold">
+                No items yet.
               </p>
             </div>
           ) : (
             Object.entries(groupedByKid).map(([kidName, kidItems]) => (
               <div key={kidName}>
-                <h2 className="text-cream text-lg font-bold mb-3 tracking-wide flex items-center gap-2">
-                  <Star size={14} className="text-sky" />
+                <h2 className="text-cream text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Star size={14} className="text-accent" />
                   {kidName}'s Wishes
                 </h2>
                 <div className="space-y-3">
@@ -348,7 +341,7 @@ export default function Wishlist() {
         <div className="space-y-4">
           <p className="text-muted text-sm">
             Convert{' '}
-            <span className="text-cream font-bold">
+            <span className="text-cream font-medium">
               {convertItem?.title}
             </span>{' '}
             into a redeemable reward:
@@ -361,7 +354,7 @@ export default function Wishlist() {
           )}
 
           <div>
-            <label className="block text-gold text-sm font-medium mb-2 tracking-wide">
+            <label className="block text-gold text-sm font-medium mb-2">
               Point Cost (XP)
             </label>
             <input

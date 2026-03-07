@@ -14,7 +14,7 @@ import {
 
 const RARITY_COLORS = {
   common: 'border-border text-muted',
-  uncommon: 'border-sky/40 text-sky',
+  uncommon: 'border-accent/40 text-accent',
   rare: 'border-purple/40 text-purple',
   epic: 'border-gold/40 text-gold',
   legendary: 'border-crimson/40 text-crimson',
@@ -22,7 +22,7 @@ const RARITY_COLORS = {
 
 const RARITY_BG = {
   common: 'bg-surface-raised/30',
-  uncommon: 'bg-sky/5',
+  uncommon: 'bg-accent/5',
   rare: 'bg-purple/5',
   epic: 'bg-gold/5',
   legendary: 'bg-crimson/5',
@@ -30,7 +30,7 @@ const RARITY_BG = {
 
 const RARITY_BADGE = {
   common: 'bg-border text-muted',
-  uncommon: 'bg-sky/20 text-sky',
+  uncommon: 'bg-accent/20 text-accent',
   rare: 'bg-purple/20 text-purple',
   epic: 'bg-gold/20 text-gold',
   legendary: 'bg-crimson/20 text-crimson',
@@ -139,11 +139,8 @@ export default function AvatarShop() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Sparkles size={48} className="text-purple animate-pulse" />
-        <p className="text-cream text-lg font-bold animate-pulse">
-          Loading avatar items...
-        </p>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="animate-spin text-accent" size={24} />
       </div>
     );
   }
@@ -178,8 +175,8 @@ export default function AvatarShop() {
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setFilter('all')}
-          className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
-            filter === 'all' ? 'border-sky bg-sky/15 text-sky' : 'border-border text-muted hover:text-cream'
+          className={`px-3 py-1.5 rounded-md border text-xs font-medium transition-all ${
+            filter === 'all' ? 'border-accent bg-accent/15 text-accent' : 'border-border text-muted hover:text-cream'
           }`}
         >
           All
@@ -191,8 +188,8 @@ export default function AvatarShop() {
             <button
               key={cat}
               onClick={() => setFilter(cat)}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
-                filter === cat ? 'border-sky bg-sky/15 text-sky' : 'border-border text-muted hover:text-cream'
+              className={`px-3 py-1.5 rounded-md border text-xs font-medium transition-all ${
+                filter === cat ? 'border-accent bg-accent/15 text-accent' : 'border-border text-muted hover:text-cream'
               }`}
             >
               {CATEGORY_LABELS[cat] || cat}
@@ -208,7 +205,7 @@ export default function AvatarShop() {
 
         return (
           <div key={cat}>
-            <h3 className="text-cream text-sm font-bold mb-2">
+            <h3 className="text-cream text-sm font-semibold mb-2">
               {CATEGORY_LABELS[cat] || cat}
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -220,7 +217,7 @@ export default function AvatarShop() {
                 return (
                   <div
                     key={item.id}
-                    className={`rounded-lg border p-3 transition-all ${RARITY_COLORS[item.rarity]} ${RARITY_BG[item.rarity]} ${
+                    className={`rounded-md border p-3 transition-all ${RARITY_COLORS[item.rarity]} ${RARITY_BG[item.rarity]} ${
                       owned ? 'opacity-70' : ''
                     }`}
                   >
@@ -228,7 +225,7 @@ export default function AvatarShop() {
                       <span className="text-cream text-xs font-medium leading-tight">
                         {item.display_name}
                       </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${RARITY_BADGE[item.rarity]}`}>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${RARITY_BADGE[item.rarity]}`}>
                         {item.rarity}
                       </span>
                     </div>

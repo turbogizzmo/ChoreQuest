@@ -230,12 +230,9 @@ export default function Calendar() {
     <div className="max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-3">
-          <CalendarDays size={28} className="text-sky" />
-          <h1 className="text-cream text-xl font-extrabold leading-relaxed">
-            Quest Calendar
-          </h1>
-        </div>
+        <h1 className="text-cream text-lg font-semibold">
+          Calendar
+        </h1>
 
         {/* Week navigation */}
         <div className="flex flex-wrap items-center gap-2">
@@ -287,14 +284,14 @@ export default function Calendar() {
 
       {/* Cleanup success message */}
       {cleanMsg && (
-        <div className="mb-4 p-3 rounded border-2 border-emerald/40 bg-emerald/10 text-emerald text-sm text-center">
+        <div className="mb-4 p-3 rounded-md border border-emerald/30 bg-emerald/10 text-emerald text-sm text-center">
           {cleanMsg}
         </div>
       )}
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 rounded border-2 border-crimson/40 bg-crimson/10 text-crimson text-sm text-center">
+        <div className="mb-4 p-3 rounded-md border border-crimson/30 bg-crimson/10 text-crimson text-sm text-center">
           {error}
         </div>
       )}
@@ -302,7 +299,7 @@ export default function Calendar() {
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={32} className="text-sky animate-spin" />
+          <Loader2 size={24} className="text-accent animate-spin" />
         </div>
       )}
 
@@ -323,13 +320,13 @@ export default function Calendar() {
               <div key={dayStr} className="min-w-0">
                 {/* Day header */}
                 <div
-                  className={`text-center py-2 px-1 rounded-t-md border-b-2 ${
+                  className={`text-center py-2 px-1 rounded-t-md border-b ${
                     isToday
-                      ? 'bg-sky/10 border-sky text-sky'
+                      ? 'bg-accent/10 border-accent text-accent'
                       : 'bg-surface-raised/30 border-border text-muted'
                   }`}
                 >
-                  <div className="text-xs font-bold tracking-wider">
+                  <div className="text-xs font-medium">
                     {label}
                   </div>
                   <div className="text-sm mt-1">
@@ -349,7 +346,7 @@ export default function Calendar() {
                     return (
                       <div
                         key={a.id}
-                        className={`game-panel !border-2 ${style.border} ${style.bg} p-2 cursor-pointer hover:brightness-110 transition-all`}
+                        className={`game-panel !border ${style.border} ${style.bg} p-2 cursor-pointer hover:border-accent/40 transition-colors`}
                         onClick={() =>
                           navigate(`/chores/${a.chore_id || a.id}`)
                         }
@@ -380,7 +377,7 @@ export default function Calendar() {
                               e.stopPropagation();
                               openTrade(a);
                             }}
-                            className="mt-1.5 flex items-center gap-1 text-xs font-medium text-sky hover:text-sky/80 transition-colors"
+                            className="mt-1.5 flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
                           >
                             <ArrowRightLeft size={12} />
                             Trade
@@ -425,12 +422,8 @@ export default function Calendar() {
         !error &&
         Object.values(assignments).every((arr) => arr.length === 0) && (
           <div className="text-center py-16">
-            <CalendarDays size={48} className="text-muted mx-auto mb-4" />
-            <p className="text-cream text-lg font-bold">
-              No quests scheduled this week
-            </p>
-            <p className="text-muted text-sm mt-2">
-              The quest board is empty. Time to plan new adventures!
+            <p className="text-muted text-sm">
+              No tasks scheduled this week.
             </p>
           </div>
         )}
@@ -457,10 +450,10 @@ export default function Calendar() {
         <div className="space-y-4">
           <p className="text-muted text-sm">
             Trade{' '}
-            <span className="text-cream font-bold">
+            <span className="text-cream font-medium">
               {themedTitle(tradeAssignment?.chore?.title || tradeAssignment?.chore_title || 'Quest', colorTheme)}
             </span>{' '}
-            with another hero:
+            with another member:
           </p>
 
           {tradeError && (
@@ -471,7 +464,7 @@ export default function Calendar() {
 
           {familyKids.length === 0 ? (
             <p className="text-muted text-sm">
-              No other heroes found in your party.
+              No other members found in your family.
             </p>
           ) : (
             <div className="space-y-2">
@@ -479,9 +472,9 @@ export default function Calendar() {
                 <button
                   key={kid.id}
                   onClick={() => setSelectedKid(kid.id)}
-                  className={`w-full text-left p-3 rounded border-2 transition-colors ${
+                  className={`w-full text-left p-3 rounded-md border transition-colors ${
                     selectedKid === kid.id
-                      ? 'border-sky bg-sky/10 text-sky'
+                      ? 'border-accent bg-accent/10 text-accent'
                       : 'border-border text-muted hover:border-cream/30'
                   }`}
                 >
@@ -522,8 +515,8 @@ export default function Calendar() {
           <span className="text-cream font-bold">
             {themedTitle(removeTarget?.chore?.title || 'Quest', colorTheme)}
           </span>{' '}
-          is a recurring quest{removeTarget?.user?.display_name ? ` for ${removeTarget.user.display_name}` : ''}.
-          Remove just this one instance, or all future pending instances for this kid?
+          is recurring{removeTarget?.user?.display_name ? ` for ${removeTarget.user.display_name}` : ''}.
+          Remove just this instance, or all future pending instances?
         </p>
       </Modal>
     </div>

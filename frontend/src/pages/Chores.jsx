@@ -37,8 +37,8 @@ const DIFFICULTY_LEVEL = { easy: 1, medium: 2, hard: 3, expert: 4 };
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const selectClass =
-  'bg-navy-light border-2 border-border text-cream p-2 rounded text-sm ' +
-  'focus:border-sky focus:outline-none transition-colors';
+  'bg-navy-light border border-border text-cream p-2 rounded-md text-sm ' +
+  'focus:border-accent focus:outline-none transition-colors';
 
 function DifficultyStars({ level }) {
   const numLevel = typeof level === 'string' ? (DIFFICULTY_LEVEL[level] || 1) : (level || 1);
@@ -47,7 +47,7 @@ function DifficultyStars({ level }) {
       {[1, 2, 3, 4].map((i) => (
         <Star
           key={i}
-          size={14}
+          size={12}
           className={i <= numLevel ? 'text-gold fill-gold' : 'text-muted'}
         />
       ))}
@@ -58,7 +58,7 @@ function DifficultyStars({ level }) {
 function CategoryBadge({ category }) {
   const catName = typeof category === 'object' ? category?.name : category;
   return (
-    <span className="inline-block px-2 py-0.5 rounded-full text-xs border bg-cream/10 text-muted border-border capitalize">
+    <span className="inline-block px-2 py-0.5 rounded-md text-xs border bg-surface-raised text-muted border-border capitalize">
       {catName || 'General'}
     </span>
   );
@@ -68,7 +68,7 @@ function RecurrenceIndicator({ recurrence, customDays }) {
   if (!recurrence || recurrence === 'once') return null;
   return (
     <div className="flex items-center gap-1 text-muted text-xs">
-      <RefreshCw size={12} />
+      <RefreshCw size={11} />
       <span className="capitalize">{recurrence}</span>
       {recurrence === 'custom' && customDays?.length > 0 && (
         <span className="text-muted">
@@ -99,7 +99,6 @@ export default function Chores() {
   const isParent = user?.role === 'parent' || user?.role === 'admin';
   const isKid = user?.role === 'kid';
 
-  // Data state
   const [chores, setChores] = useState([]);
   const [categories, setCategories] = useState([]);
   const [kids, setKids] = useState([]);
@@ -107,24 +106,19 @@ export default function Chores() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Tab state (parent only)
   const [activeTab, setActiveTab] = useState('library');
 
-  // Filter state
   const [filterCategory, setFilterCategory] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState('');
   const [showCompleted, setShowCompleted] = useState(false);
 
-  // Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingChore, setEditingChore] = useState(null);
   const [assigningChore, setAssigningChore] = useState(null);
 
-  // Delete confirm state
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Kid completion state
   const [completingId, setCompletingId] = useState(null);
   const [photoFiles, setPhotoFiles] = useState({});
 
@@ -134,7 +128,7 @@ export default function Chores() {
       const data = await api('/api/chores');
       setChores(Array.isArray(data) ? data : data.chores || data.items || []);
     } catch (err) {
-      setError(err.message || 'Failed to load quests from the guild board.');
+      setError(err.message || 'Failed to load quests.');
     }
   }, []);
 
@@ -184,14 +178,12 @@ export default function Chores() {
     fetchAll().finally(() => setLoading(false));
   }, [fetchAll]);
 
-  // Live updates via WebSocket
   useEffect(() => {
     const handler = () => { fetchChores(); fetchAssignments(); };
     window.addEventListener('ws:message', handler);
     return () => window.removeEventListener('ws:message', handler);
   }, [fetchChores, fetchAssignments]);
 
-  // Kid: complete quest handler
   const handleKidComplete = async (chore) => {
     const choreId = chore.id;
     if (chore.requires_photo && !photoFiles[choreId]) return;
@@ -214,7 +206,6 @@ export default function Chores() {
     }
   };
 
-  // Build assignment status map for kids
   const assignmentStatusMap = {};
   if (isKid) {
     for (const a of todayAssignments) {
@@ -223,11 +214,9 @@ export default function Chores() {
     }
   }
 
-  // Split chores for parent tabs
-  const libraryChores = chores; // all quests
+  const libraryChores = chores;
   const activeChores = chores.filter((c) => (c.assignment_count || 0) > 0);
 
-  // Filtering (applies to whichever tab is shown)
   const currentChores = isParent
     ? (activeTab === 'library' ? libraryChores : activeChores)
     : chores;
@@ -260,44 +249,37 @@ export default function Chores() {
     }
   };
 
-  // Loading state
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <Swords size={48} className="text-sky animate-pulse" />
-        <p className="text-cream text-lg font-bold animate-pulse">
-          Loading quests from the guild board...
-        </p>
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="text-accent animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Swords size={28} className="text-sky" />
-          <h1 className="text-cream text-xl font-extrabold leading-relaxed">
-            {isParent ? 'Quest Management' : 'My Quests'}
-          </h1>
-        </div>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <h1 className="text-cream text-lg font-semibold">
+          {isParent ? 'Quest Management' : 'My Quests'}
+        </h1>
+        <div className="flex items-center gap-2">
           {isKid && completedCount > 0 && (
             <button
               onClick={() => setShowCompleted((v) => !v)}
               className="flex items-center gap-1.5 text-muted hover:text-cream text-sm transition-colors"
             >
-              {showCompleted ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showCompleted ? <EyeOff size={14} /> : <Eye size={14} />}
               {showCompleted ? 'Hide' : 'Show'} completed ({completedCount})
             </button>
           )}
           {isParent && (
             <button
               onClick={() => { setEditingChore(null); setShowCreateModal(true); }}
-              className="game-btn game-btn-blue flex items-center gap-2"
+              className="game-btn game-btn-blue flex items-center gap-1.5"
             >
-              <Plus size={16} />
+              <Plus size={14} />
               Create Quest
             </button>
           )}
@@ -306,46 +288,46 @@ export default function Chores() {
 
       {/* Error */}
       {error && (
-        <div className="p-3 rounded border-2 border-crimson/40 bg-crimson/10 text-crimson text-sm text-center">
+        <div className="p-2.5 rounded-md border border-crimson/40 bg-crimson/10 text-crimson text-sm">
           {error}
         </div>
       )}
 
       {/* Parent Tabs */}
       {isParent && (
-        <div className="flex gap-1 bg-surface-raised/50 rounded-lg p-1">
+        <div className="flex gap-0.5 border-b border-border">
           <button
             onClick={() => setActiveTab('library')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
               activeTab === 'library'
-                ? 'bg-sky/20 text-sky border border-sky/30'
-                : 'text-muted hover:text-cream'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-muted hover:text-cream'
             }`}
           >
-            <ScrollText size={16} />
-            Quest Library
-            <span className="text-xs opacity-70">({libraryChores.length})</span>
+            <ScrollText size={14} />
+            Library
+            <span className="text-xs text-muted">({libraryChores.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('active')}
-            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
               activeTab === 'active'
-                ? 'bg-emerald/20 text-emerald border border-emerald/30'
-                : 'text-muted hover:text-cream'
+                ? 'border-emerald text-emerald'
+                : 'border-transparent text-muted hover:text-cream'
             }`}
           >
-            <Zap size={16} />
-            Active Quests
-            <span className="text-xs opacity-70">({activeChores.length})</span>
+            <Zap size={14} />
+            Active
+            <span className="text-xs text-muted">({activeChores.length})</span>
           </button>
         </div>
       )}
 
       {/* Filter Bar */}
-      <div className="game-panel p-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="flex items-center gap-2 text-muted">
-            <Filter size={16} />
+      <div className="game-panel p-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="flex items-center gap-1.5 text-muted">
+            <Filter size={14} />
             <span className="text-sm">Filters:</span>
           </div>
           <select
@@ -373,27 +355,26 @@ export default function Chores() {
 
       {/* Chore List */}
       {filteredChores.length === 0 ? (
-        <div className="game-panel p-10 text-center">
-          <Swords size={40} className="mx-auto text-muted mb-4" />
+        <div className="game-panel p-8 text-center">
           <p className="text-muted text-sm">
             {chores.length === 0
-              ? 'The quest board is empty. No adventures await... yet!'
+              ? 'No quests created yet.'
               : isParent && activeTab === 'active'
-              ? 'No active quests. Assign some from the Quest Library!'
-              : 'No quests match your search. Try adjusting the filters.'}
+              ? 'No active quests. Assign some from the Library.'
+              : 'No quests match your filters.'}
           </p>
           {isParent && chores.length === 0 && (
             <button
               onClick={() => { setEditingChore(null); setShowCreateModal(true); }}
-              className="game-btn game-btn-blue mt-4 inline-flex items-center gap-2"
+              className="game-btn game-btn-blue mt-3 inline-flex items-center gap-1.5"
             >
-              <Plus size={16} />
-              Post First Quest
+              <Plus size={14} />
+              Create first quest
             </button>
           )}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filteredChores.map((chore) => {
             const kidStatus = isKid ? assignmentStatusMap[chore.id] : null;
             const isDone = kidStatus === 'completed' || kidStatus === 'verified';
@@ -404,7 +385,7 @@ export default function Chores() {
             return (
               <div
                 key={chore.id}
-                className={`game-panel p-4 flex flex-col gap-3 cursor-pointer hover:border-sky/40 transition-colors ${
+                className={`game-panel p-3 flex flex-col gap-2 cursor-pointer hover:border-accent/40 transition-colors ${
                   isDone ? 'opacity-50' : ''
                 }`}
                 onClick={() => {
@@ -417,57 +398,57 @@ export default function Chores() {
               >
                 {/* Title row */}
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-cream text-lg font-bold leading-relaxed flex-1">
+                  <h3 className="text-cream text-sm font-medium flex-1">
                     {themedTitle(chore.title, colorTheme)}
                   </h3>
                   {isParent && (
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingChore(chore);
                           setShowCreateModal(true);
                         }}
-                        className="p-1.5 rounded hover:bg-surface-raised transition-colors text-muted hover:text-sky"
+                        className="p-1 rounded-md hover:bg-surface-raised transition-colors text-muted hover:text-accent"
                         aria-label="Edit quest"
                       >
-                        <Pencil size={14} />
+                        <Pencil size={13} />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setDeleteTarget(chore);
                         }}
-                        className="p-1.5 rounded hover:bg-surface-raised transition-colors text-muted hover:text-crimson"
+                        className="p-1 rounded-md hover:bg-surface-raised transition-colors text-muted hover:text-crimson"
                         aria-label="Delete quest"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   )}
                   {isDone && (
-                    <CheckCircle2 size={18} className="text-emerald flex-shrink-0" />
+                    <CheckCircle2 size={16} className="text-emerald flex-shrink-0" />
                   )}
                 </div>
 
                 {/* Description */}
                 {chore.description && (
-                  <p className="text-muted text-sm line-clamp-2">
+                  <p className="text-muted text-xs line-clamp-2">
                     {themedDescription(chore.title, chore.description, colorTheme)}
                   </p>
                 )}
 
                 {/* Meta row */}
                 <div className="flex items-center flex-wrap gap-2 mt-auto">
-                  <span className="flex items-center gap-1 text-gold font-bold text-sm">
-                    <span className="text-lg">&#9733;</span>
+                  <span className="flex items-center gap-1 text-gold font-medium text-sm">
+                    <Star size={12} fill="currentColor" />
                     {chore.points} XP
                   </span>
                   <DifficultyStars level={chore.difficulty || 1} />
                 </div>
 
                 {/* Bottom row */}
-                <div className="flex items-center flex-wrap gap-2">
+                <div className="flex items-center flex-wrap gap-1.5">
                   <CategoryBadge category={chore.category} />
                   <RecurrenceIndicator
                     recurrence={chore.recurrence}
@@ -475,61 +456,59 @@ export default function Chores() {
                   />
                   {chore.requires_photo && (
                     <span className="flex items-center gap-1 text-muted text-xs">
-                      <Camera size={12} />
+                      <Camera size={11} />
                       Photo
                     </span>
                   )}
-                  {/* Assignment badge (parent only) */}
                   {isParent && assignCount > 0 && (
                     <span className="flex items-center gap-1 text-emerald text-xs font-medium">
-                      <Users size={12} />
-                      {assignCount} {assignCount === 1 ? 'hero' : 'heroes'}
+                      <Users size={11} />
+                      {assignCount} assigned
                     </span>
                   )}
                   {isParent && assignCount === 0 && (
-                    <span className="text-muted/60 text-xs italic">
-                      Not assigned
+                    <span className="text-muted/60 text-xs">
+                      Unassigned
                     </span>
                   )}
                 </div>
 
-                {/* Parent: assign button for unassigned quests in library tab */}
+                {/* Parent: assign button */}
                 {isParent && activeTab === 'library' && assignCount === 0 && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setAssigningChore(chore);
                     }}
-                    className="game-btn game-btn-gold w-full flex items-center justify-center gap-2 !text-xs !py-1.5"
+                    className="game-btn game-btn-gold w-full flex items-center justify-center gap-1.5 !text-xs !py-1.5"
                   >
-                    <Users size={14} />
-                    Assign to Heroes
+                    <Users size={12} />
+                    Assign
                   </button>
                 )}
 
-                {/* Parent: manage button for assigned quests */}
                 {isParent && assignCount > 0 && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setAssigningChore(chore);
                     }}
-                    className="game-btn game-btn-purple w-full flex items-center justify-center gap-2 !text-xs !py-1.5"
+                    className="game-btn game-btn-purple w-full flex items-center justify-center gap-1.5 !text-xs !py-1.5"
                   >
-                    <Users size={14} />
-                    Manage Assignments
+                    <Users size={12} />
+                    Manage
                   </button>
                 )}
 
-                {/* Kid: photo upload + complete button */}
+                {/* Kid: photo upload + complete */}
                 {isPending && (
                   <div
-                    className="mt-1 space-y-2"
+                    className="mt-1 space-y-1.5"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {chore.requires_photo && (
-                      <label className="inline-flex items-center gap-1.5 text-xs text-muted cursor-pointer hover:text-cream transition-colors bg-surface-raised px-3 py-1.5 rounded-lg border border-border">
-                        <Camera size={14} />
+                      <label className="inline-flex items-center gap-1.5 text-xs text-muted cursor-pointer hover:text-cream transition-colors bg-surface-raised px-2.5 py-1.5 rounded-md border border-border">
+                        <Camera size={12} />
                         <span>
                           {photoFiles[chore.id]
                             ? photoFiles[chore.id].name
@@ -554,7 +533,7 @@ export default function Chores() {
                         isCompleting ||
                         (chore.requires_photo && !photoFiles[chore.id])
                       }
-                      className={`game-btn game-btn-blue w-full flex items-center justify-center gap-2 ${
+                      className={`game-btn game-btn-blue w-full flex items-center justify-center gap-1.5 ${
                         isCompleting ? 'opacity-60 cursor-wait' : ''
                       } ${
                         chore.requires_photo && !photoFiles[chore.id]
@@ -564,12 +543,12 @@ export default function Chores() {
                     >
                       {isCompleting ? (
                         <>
-                          <Loader2 size={14} className="animate-spin" />
+                          <Loader2 size={12} className="animate-spin" />
                           Completing...
                         </>
                       ) : (
                         <>
-                          <CheckCircle2 size={14} />
+                          <CheckCircle2 size={12} />
                           Complete Quest
                         </>
                       )}
@@ -582,7 +561,6 @@ export default function Chores() {
         </div>
       )}
 
-      {/* Create/Edit Modal */}
       <QuestCreateModal
         isOpen={showCreateModal}
         onClose={() => { setShowCreateModal(false); setEditingChore(null); }}
@@ -591,7 +569,6 @@ export default function Chores() {
         editingChore={editingChore}
       />
 
-      {/* Assignment Modal */}
       <QuestAssignModal
         isOpen={!!assigningChore}
         onClose={() => setAssigningChore(null)}
@@ -600,19 +577,18 @@ export default function Chores() {
         kids={kids}
       />
 
-      {/* Delete Confirmation Modal */}
       <Modal
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Abandon Quest?"
+        title="Remove Quest"
         actions={[
           {
-            label: 'Keep Quest',
+            label: 'Cancel',
             onClick: () => setDeleteTarget(null),
             className: 'game-btn game-btn-blue',
           },
           {
-            label: deleting ? 'Removing...' : 'Remove Quest',
+            label: deleting ? 'Removing...' : 'Remove',
             onClick: handleDelete,
             className: 'game-btn game-btn-red',
             disabled: deleting,
@@ -620,11 +596,11 @@ export default function Chores() {
         ]}
       >
         <p className="text-muted">
-          Are you sure you want to remove the quest{' '}
-          <span className="text-cream text-lg font-bold">
+          Are you sure you want to remove{' '}
+          <span className="text-cream font-medium">
             "{themedTitle(deleteTarget?.title || '', colorTheme)}"
           </span>
-          ? This action cannot be undone. All associated records will be archived.
+          ? This action cannot be undone.
         </p>
       </Modal>
     </div>
