@@ -79,7 +79,7 @@ export default function ProgressCharts() {
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <Loader2 size={20} className="text-sky animate-spin" />
+        <Loader2 size={20} className="text-accent animate-spin" />
       </div>
     );
   }
@@ -99,15 +99,15 @@ export default function ProgressCharts() {
       {/* Summary Row */}
       <div className="grid grid-cols-3 gap-3">
         <div className="text-center">
-          <p className="text-gold text-lg font-bold">{summary.total_xp}</p>
+          <p className="text-gold text-sm font-semibold">{summary.total_xp}</p>
           <p className="text-muted text-[10px]">XP Earned</p>
         </div>
         <div className="text-center">
-          <p className="text-emerald text-lg font-bold">{summary.total_completed}</p>
+          <p className="text-emerald text-sm font-semibold">{summary.total_completed}</p>
           <p className="text-muted text-[10px]">Quests Done</p>
         </div>
         <div className="text-center">
-          <p className="text-sky text-lg font-bold">{Math.round(summary.completion_rate * 100)}%</p>
+          <p className="text-accent text-sm font-semibold">{Math.round(summary.completion_rate * 100)}%</p>
           <p className="text-muted text-[10px]">Completion</p>
         </div>
       </div>
@@ -145,11 +145,11 @@ export default function ProgressCharts() {
       {/* Completion Rate Line */}
       <div className="game-panel p-4">
         <h3 className="text-cream text-xs font-bold mb-2 flex items-center gap-1.5">
-          <BarChart3 size={12} className="text-sky" />
+          <BarChart3 size={12} className="text-accent" />
           Completion Rate
         </h3>
         <div className="h-16 overflow-hidden">
-          <SparkLine data={days} dataKey="rate" color="#3b82f6" height={60} />
+          <SparkLine data={days} dataKey="rate" color="#14b8a6" height={60} />
         </div>
         <div className="flex justify-between mt-1">
           <span className="text-muted text-[9px]">{days[0]?.date?.slice(5)}</span>

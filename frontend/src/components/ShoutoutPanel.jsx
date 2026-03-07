@@ -77,13 +77,13 @@ export default function ShoutoutPanel({ members }) {
   return (
     <div className="game-panel p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-cream text-sm font-bold flex items-center gap-2">
+        <h2 className="text-cream text-sm font-semibold flex items-center gap-2">
           <Megaphone size={14} className="text-gold" />
           Shoutouts
         </h2>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="text-xs text-sky hover:text-accent-light transition-colors font-medium"
+          className="text-xs text-accent hover:text-accent-light transition-colors font-medium"
         >
           {showForm ? 'Cancel' : '+ Give Shoutout'}
         </button>
@@ -117,7 +117,7 @@ export default function ShoutoutPanel({ members }) {
                 onClick={() => setEmoji(e.id)}
                 className={`w-8 h-8 rounded-lg text-base transition-all ${
                   emoji === e.id
-                    ? 'bg-sky/20 border border-sky/40 scale-110'
+                    ? 'bg-accent/20 border border-accent/40'
                     : 'bg-surface-raised border border-border/50 hover:border-border-light'
                 }`}
               >

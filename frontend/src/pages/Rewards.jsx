@@ -18,6 +18,7 @@ import {
   Star,
   Palette,
   Filter,
+  Loader2,
 } from 'lucide-react';
 
 const emptyForm = {
@@ -46,7 +47,6 @@ export default function Rewards() {
   const activeTab = searchParams.get('tab') || 'shop';
   const setTab = (key) => setSearchParams(key === 'shop' ? {} : { tab: key }, { replace: true });
 
-  // All hooks must be declared before any early returns (React rules of hooks)
   const [rewards, setRewards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -72,7 +72,7 @@ export default function Rewards() {
       const data = await api('/api/rewards');
       setRewards(Array.isArray(data) ? data : data.rewards || data.items || []);
     } catch (err) {
-      setError(err.message || 'The treasure shop is temporarily closed.');
+      setError(err.message || 'Failed to load rewards.');
     }
   }, []);
 
@@ -80,17 +80,15 @@ export default function Rewards() {
     fetchRewards().finally(() => setLoading(false));
   }, [fetchRewards]);
 
-  // Live updates via WebSocket
   useEffect(() => {
     const handler = () => { fetchRewards(); };
     window.addEventListener('ws:message', handler);
     return () => window.removeEventListener('ws:message', handler);
   }, [fetchRewards]);
 
-  // Render sub-pages (after all hooks)
   if (activeTab === 'avatar') {
     return (
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-4">
         <TabBar activeTab={activeTab} setTab={setTab} />
         <AvatarShop />
       </div>
@@ -98,7 +96,7 @@ export default function Rewards() {
   }
   if (activeTab === 'inventory') {
     return (
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-4">
         <TabBar activeTab={activeTab} setTab={setTab} />
         <Inventory />
       </div>
@@ -106,14 +104,13 @@ export default function Rewards() {
   }
   if (activeTab === 'wishlist') {
     return (
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-4">
         <TabBar activeTab={activeTab} setTab={setTab} />
         <Wishlist />
       </div>
     );
   }
 
-  // Form handlers
   const openCreateModal = () => {
     setEditingReward(null);
     setForm({ ...emptyForm });
@@ -147,11 +144,11 @@ export default function Rewards() {
 
   const handleSubmit = async () => {
     if (!form.title.trim()) {
-      setFormError('Every treasure needs a name!');
+      setFormError('Name is required.');
       return;
     }
     if (Number(form.point_cost) < 1) {
-      setFormError('The cost must be at least 1 XP.');
+      setFormError('Cost must be at least 1 XP.');
       return;
     }
 
@@ -179,7 +176,7 @@ export default function Rewards() {
       closeModal();
       await fetchRewards();
     } catch (err) {
-      setFormError(err.message || 'Could not save the treasure.');
+      setFormError(err.message || 'Could not save the reward.');
     } finally {
       setSubmitting(false);
     }
@@ -193,7 +190,7 @@ export default function Rewards() {
       setDeleteTarget(null);
       await fetchRewards();
     } catch (err) {
-      setError(err.message || 'Failed to remove the treasure.');
+      setError(err.message || 'Failed to remove the reward.');
     } finally {
       setDeleting(false);
     }
@@ -206,10 +203,10 @@ export default function Rewards() {
       await api(`/api/rewards/${reward.id}/redeem`, { method: 'POST' });
       const cost = reward.point_cost ?? reward.cost ?? 0;
       updateUser({ points_balance: (user?.points_balance ?? 0) - cost });
-      setRedeemMessage(`You claimed "${reward.title}"! Check your inventory, hero!`);
+      setRedeemMessage(`Claimed "${reward.title}". Check your inventory.`);
       await fetchRewards();
     } catch (err) {
-      setRedeemMessage(err.message || 'Redemption failed. The shopkeeper is confused.');
+      setRedeemMessage(err.message || 'Redemption failed.');
     } finally {
       setRedeemingId(null);
     }
@@ -223,75 +220,62 @@ export default function Rewards() {
     return reward.stock != null && reward.stock <= 0;
   };
 
-  // Loading
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <ShoppingBag size={48} className="text-sky animate-pulse" />
-        <p className="text-cream text-lg font-bold animate-pulse">
-          The shopkeeper is arranging the treasures...
-        </p>
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="text-accent animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-4">
       <TabBar activeTab={activeTab} setTab={setTab} />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <ShoppingBag size={28} className="text-sky" />
-          <h1 className="text-cream text-xl font-extrabold leading-relaxed">
-            Treasure Shop
-          </h1>
-        </div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <h1 className="text-cream text-lg font-semibold">
+          Rewards Shop
+        </h1>
         {isParent && (
           <button
             onClick={openCreateModal}
-            className="game-btn game-btn-blue flex items-center gap-2"
+            className="game-btn game-btn-blue flex items-center gap-1.5"
           >
-            <Plus size={16} />
-            Add Treasure
+            <Plus size={14} />
+            Add Reward
           </button>
         )}
       </div>
 
-      {/* Kid XP Balance */}
       {isKid && (
-        <div className="game-panel p-5">
-          <div className="flex items-center justify-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-gold/20 border-2 border-gold/40 flex items-center justify-center">
-              <Coins size={28} className="text-gold" />
-            </div>
-            <div className="text-center">
-              <p className="text-muted text-sm">Your XP Balance</p>
-              <p className="text-gold text-xl font-extrabold">{userXp.toLocaleString()} XP</p>
+        <div className="game-panel p-4">
+          <div className="flex items-center gap-3">
+            <Coins size={20} className="text-gold" />
+            <div>
+              <p className="text-muted text-xs">Your balance</p>
+              <p className="text-gold text-base font-semibold">{userXp.toLocaleString()} XP</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Error */}
       {error && (
-        <div className="p-3 rounded border-2 border-crimson/40 bg-crimson/10 text-crimson text-sm text-center">
+        <div className="p-2.5 rounded-md border border-crimson/40 bg-crimson/10 text-crimson text-sm">
           {error}
         </div>
       )}
 
-      {/* Category Filter */}
       {(() => {
         const categories = [...new Set(rewards.map(r => r.category).filter(Boolean))];
         if (categories.length === 0) return null;
         return (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <Filter size={14} className="text-muted flex-shrink-0" />
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <Filter size={13} className="text-muted flex-shrink-0" />
             <button
               onClick={() => setCategoryFilter('all')}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+              className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors whitespace-nowrap ${
                 categoryFilter === 'all'
-                  ? 'bg-sky/15 text-sky border-sky/25'
+                  ? 'bg-accent/15 text-accent border-accent/25'
                   : 'text-muted border-border hover:text-cream'
               }`}
             >
@@ -301,9 +285,9 @@ export default function Rewards() {
               <button
                 key={cat}
                 onClick={() => setCategoryFilter(cat)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+                className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors whitespace-nowrap ${
                   categoryFilter === cat
-                    ? 'bg-sky/15 text-sky border-sky/25'
+                    ? 'bg-accent/15 text-accent border-accent/25'
                     : 'text-muted border-border hover:text-cream'
                 }`}
               >
@@ -314,12 +298,10 @@ export default function Rewards() {
         );
       })()}
 
-      {/* Redeem Message */}
       {redeemMessage && (
         <div
-          className={`p-3 rounded border-2 text-sm text-center ${
+          className={`p-2.5 rounded-md border text-sm ${
             redeemMessage.toLowerCase().includes('fail') ||
-            redeemMessage.toLowerCase().includes('confused') ||
             redeemMessage.toLowerCase().includes('insufficient')
               ? 'border-crimson/40 bg-crimson/10 text-crimson'
               : 'border-emerald/40 bg-emerald/10 text-emerald'
@@ -327,11 +309,10 @@ export default function Rewards() {
         >
           {redeemMessage}{' '}
           {!redeemMessage.toLowerCase().includes('fail') &&
-            !redeemMessage.toLowerCase().includes('confused') &&
             !redeemMessage.toLowerCase().includes('insufficient') && (
               <button
                 onClick={() => setTab('inventory')}
-                className="underline font-bold hover:brightness-125 transition-all"
+                className="underline font-medium hover:opacity-80 transition-opacity"
               >
                 View Inventory
               </button>
@@ -339,41 +320,34 @@ export default function Rewards() {
         </div>
       )}
 
-      {/* Rewards Grid */}
       {(() => {
         const filtered = categoryFilter === 'all' ? rewards : rewards.filter(r => r.category === categoryFilter);
         return filtered;
       })().length === 0 && rewards.length > 0 ? (
-        <div className="game-panel p-10 text-center">
-          <Gift size={48} className="mx-auto text-cream/20 mb-4" />
-          <p className="text-muted text-sm">
-            No treasures in this category.
-          </p>
+        <div className="game-panel p-8 text-center">
+          <p className="text-muted text-sm">No rewards in this category.</p>
           <button
             onClick={() => setCategoryFilter('all')}
-            className="text-sky text-xs mt-2 hover:underline"
+            className="text-accent text-xs mt-2 hover:underline"
           >
             Show all
           </button>
         </div>
       ) : rewards.length === 0 ? (
-        <div className="game-panel p-10 text-center">
-          <Gift size={48} className="mx-auto text-cream/20 mb-4" />
-          <p className="text-muted text-sm">
-            The treasure shop is empty. No loot to be found... yet!
-          </p>
+        <div className="game-panel p-8 text-center">
+          <p className="text-muted text-sm">No rewards available yet.</p>
           {isParent && (
             <button
               onClick={openCreateModal}
-              className="game-btn game-btn-blue mt-4 inline-flex items-center gap-2"
+              className="game-btn game-btn-blue mt-3 inline-flex items-center gap-1.5"
             >
-              <Plus size={16} />
-              Stock First Treasure
+              <Plus size={14} />
+              Add first reward
             </button>
           )}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {(categoryFilter === 'all' ? rewards : rewards.filter(r => r.category === categoryFilter)).map((reward) => {
             const outOfStock = isOutOfStock(reward);
             const affordable = canAfford(reward);
@@ -382,73 +356,57 @@ export default function Rewards() {
             return (
               <div
                 key={reward.id}
-                className={`game-panel p-5 flex flex-col gap-3 relative ${
-                  outOfStock ? 'opacity-60' : ''
-                }`}
+                className={`game-panel p-4 flex flex-col gap-2 ${outOfStock ? 'opacity-60' : ''}`}
               >
-                {/* Icon & Title */}
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-sky/10 border border-sky/20 flex items-center justify-center flex-shrink-0">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-10 h-10 rounded-md bg-surface-raised border border-border flex items-center justify-center flex-shrink-0">
                     {reward.icon ? (
-                      <span className="text-2xl">{reward.icon}</span>
+                      <span className="text-xl">{reward.icon}</span>
                     ) : (
-                      <Sparkles size={22} className="text-sky" />
+                      <Sparkles size={18} className="text-accent" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-cream text-lg font-bold leading-relaxed">
-                      {reward.title}
-                    </h3>
+                    <h3 className="text-cream text-sm font-medium">{reward.title}</h3>
                     {reward.description && (
-                      <p className="text-muted text-sm mt-1 line-clamp-2">
-                        {reward.description}
-                      </p>
+                      <p className="text-muted text-xs mt-0.5 line-clamp-2">{reward.description}</p>
                     )}
                   </div>
                 </div>
 
-                {/* Cost + Category */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-1">
-                    <Coins size={16} className="text-gold" />
-                    <span className="text-gold text-sm font-bold">{cost} XP</span>
+                    <Coins size={14} className="text-gold" />
+                    <span className="text-gold text-sm font-medium">{cost} XP</span>
                   </div>
                   {reward.category && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium border border-purple/30 bg-purple/10 text-purple">
+                    <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium border border-border bg-surface-raised text-muted">
                       {reward.category}
                     </span>
                   )}
                 </div>
 
-                {/* Stock indicator */}
                 {reward.stock != null && (
                   <div className="flex items-center gap-1.5">
-                    <Package size={14} className={outOfStock ? 'text-crimson' : 'text-muted'} />
+                    <Package size={12} className={outOfStock ? 'text-crimson' : 'text-muted'} />
                     {outOfStock ? (
-                      <span className="text-crimson text-xs font-bold">Sold Out</span>
+                      <span className="text-crimson text-xs font-medium">Sold Out</span>
                     ) : (
-                      <span className="text-muted text-xs">
-                        {reward.stock} left
-                      </span>
+                      <span className="text-muted text-xs">{reward.stock} left</span>
                     )}
                   </div>
                 )}
 
-                {/* Actions */}
-                <div className="flex items-center gap-2 mt-auto pt-2">
+                <div className="flex items-center gap-1.5 mt-auto pt-1">
                   {isKid && (
                     <button
                       onClick={() => handleRedeem(reward)}
-                      disabled={
-                        !affordable || outOfStock || redeemingId === reward.id
-                      }
-                      className={`game-btn game-btn-gold flex-1 flex items-center justify-center gap-2 ${
-                        !affordable || outOfStock
-                          ? 'opacity-40 cursor-not-allowed'
-                          : ''
+                      disabled={!affordable || outOfStock || redeemingId === reward.id}
+                      className={`game-btn game-btn-gold flex-1 flex items-center justify-center gap-1.5 ${
+                        !affordable || outOfStock ? 'opacity-40 cursor-not-allowed' : ''
                       } ${redeemingId === reward.id ? 'opacity-60 cursor-wait' : ''}`}
                     >
-                      <Coins size={14} />
+                      <Coins size={12} />
                       {redeemingId === reward.id
                         ? 'Claiming...'
                         : !affordable
@@ -458,22 +416,21 @@ export default function Rewards() {
                         : 'Redeem'}
                     </button>
                   )}
-
                   {isParent && (
                     <>
                       <button
                         onClick={() => openEditModal(reward)}
-                        className="p-2 rounded hover:bg-surface-raised transition-colors text-muted hover:text-sky"
+                        className="p-1.5 rounded-md hover:bg-surface-raised transition-colors text-muted hover:text-accent"
                         aria-label="Edit reward"
                       >
-                        <Pencil size={16} />
+                        <Pencil size={14} />
                       </button>
                       <button
                         onClick={() => setDeleteTarget(reward)}
-                        className="p-2 rounded hover:bg-surface-raised transition-colors text-muted hover:text-crimson"
+                        className="p-1.5 rounded-md hover:bg-surface-raised transition-colors text-muted hover:text-crimson"
                         aria-label="Delete reward"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={14} />
                       </button>
                     </>
                   )}
@@ -484,152 +441,63 @@ export default function Rewards() {
         </div>
       )}
 
-      {/* Create/Edit Reward Modal */}
       <Modal
         isOpen={showModal}
         onClose={closeModal}
-        title={editingReward ? 'Edit Treasure' : 'New Treasure'}
+        title={editingReward ? 'Edit Reward' : 'New Reward'}
         actions={[
+          { label: 'Cancel', onClick: closeModal, className: 'game-btn game-btn-red' },
           {
-            label: 'Cancel',
-            onClick: closeModal,
-            className: 'game-btn game-btn-blue',
-          },
-          {
-            label: submitting
-              ? 'Saving...'
-              : editingReward
-              ? 'Update Treasure'
-              : 'Add Treasure',
+            label: submitting ? 'Saving...' : editingReward ? 'Update' : 'Add Reward',
             onClick: handleSubmit,
             className: 'game-btn game-btn-gold',
             disabled: submitting,
           },
         ]}
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           {formError && (
-            <div className="p-2 rounded border border-crimson/40 bg-crimson/10 text-crimson text-sm">
-              {formError}
-            </div>
+            <div className="p-2 rounded-md border border-crimson/40 bg-crimson/10 text-crimson text-sm">{formError}</div>
           )}
-
-          {/* Title */}
           <div>
-            <label className="block text-cream text-sm font-medium mb-1 tracking-wide">
-              Treasure Name
-            </label>
-            <input
-              type="text"
-              value={form.title}
-              onChange={(e) => updateForm('title', e.target.value)}
-              placeholder="Extra Screen Time"
-              className="field-input"
-            />
+            <label className="block text-cream text-sm font-medium mb-1">Name</label>
+            <input type="text" value={form.title} onChange={(e) => updateForm('title', e.target.value)} placeholder="Extra Screen Time" className="field-input" />
           </div>
-
-          {/* Description */}
           <div>
-            <label className="block text-cream text-sm font-medium mb-1 tracking-wide">
-              Description
-            </label>
-            <textarea
-              value={form.description}
-              onChange={(e) => updateForm('description', e.target.value)}
-              placeholder="What does this treasure grant?"
-              rows={3}
-              className="field-input resize-none"
-            />
+            <label className="block text-cream text-sm font-medium mb-1">Description</label>
+            <textarea value={form.description} onChange={(e) => updateForm('description', e.target.value)} placeholder="What does this reward grant?" rows={3} className="field-input resize-none" />
           </div>
-
-          {/* Cost */}
           <div>
-            <label className="block text-cream text-sm font-medium mb-1 tracking-wide">
-              Cost (XP)
-            </label>
-            <input
-              type="number"
-              min={1}
-              value={form.point_cost}
-              onChange={(e) => updateForm('point_cost', e.target.value)}
-              className="field-input"
-            />
+            <label className="block text-cream text-sm font-medium mb-1">Cost (XP)</label>
+            <input type="number" min={1} value={form.point_cost} onChange={(e) => updateForm('point_cost', e.target.value)} className="field-input" />
           </div>
-
-          {/* Icon */}
           <div>
-            <label className="block text-cream text-sm font-medium mb-1 tracking-wide">
-              Icon (Emoji)
-            </label>
-            <input
-              type="text"
-              value={form.icon}
-              onChange={(e) => updateForm('icon', e.target.value)}
-              placeholder="e.g. trophy, star, gift"
-              className="field-input"
-            />
+            <label className="block text-cream text-sm font-medium mb-1">Icon (Emoji)</label>
+            <input type="text" value={form.icon} onChange={(e) => updateForm('icon', e.target.value)} placeholder="e.g. trophy, star, gift" className="field-input" />
           </div>
-
-          {/* Category */}
           <div>
-            <label className="block text-cream text-sm font-medium mb-1 tracking-wide">
-              Category (Optional)
-            </label>
-            <input
-              type="text"
-              value={form.category}
-              onChange={(e) => updateForm('category', e.target.value)}
-              placeholder="e.g. Treats, Experiences, Toys"
-              className="field-input"
-            />
+            <label className="block text-cream text-sm font-medium mb-1">Category (Optional)</label>
+            <input type="text" value={form.category} onChange={(e) => updateForm('category', e.target.value)} placeholder="e.g. Treats, Experiences" className="field-input" />
           </div>
-
-          {/* Stock */}
           <div>
-            <label className="block text-cream text-sm font-medium mb-1 tracking-wide">
-              Stock (Optional)
-            </label>
-            <input
-              type="number"
-              min={0}
-              value={form.stock}
-              onChange={(e) => updateForm('stock', e.target.value)}
-              placeholder="Leave empty for unlimited"
-              className="field-input"
-            />
-            <p className="text-muted text-xs mt-1">
-              Leave empty for unlimited supply.
-            </p>
+            <label className="block text-cream text-sm font-medium mb-1">Stock (Optional)</label>
+            <input type="number" min={0} value={form.stock} onChange={(e) => updateForm('stock', e.target.value)} placeholder="Leave empty for unlimited" className="field-input" />
+            <p className="text-muted text-xs mt-1">Leave empty for unlimited supply.</p>
           </div>
-
         </div>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
       <Modal
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Remove Treasure?"
+        title="Remove Reward"
         actions={[
-          {
-            label: 'Keep Treasure',
-            onClick: () => setDeleteTarget(null),
-            className: 'game-btn game-btn-blue',
-          },
-          {
-            label: deleting ? 'Removing...' : 'Remove Treasure',
-            onClick: handleDelete,
-            className: 'game-btn game-btn-red',
-            disabled: deleting,
-          },
+          { label: 'Cancel', onClick: () => setDeleteTarget(null), className: 'game-btn game-btn-blue' },
+          { label: deleting ? 'Removing...' : 'Remove', onClick: handleDelete, className: 'game-btn game-btn-red', disabled: deleting },
         ]}
       >
         <p className="text-muted">
-          Are you sure you want to remove{' '}
-          <span className="text-gold font-bold">
-            "{deleteTarget?.title}"
-          </span>{' '}
-          from the treasure shop? Heroes can no longer redeem this reward.
+          Remove <span className="text-gold font-medium">"{deleteTarget?.title}"</span> from the shop?
         </p>
       </Modal>
     </div>
@@ -638,19 +506,19 @@ export default function Rewards() {
 
 function TabBar({ activeTab, setTab }) {
   return (
-    <div className="flex gap-1 bg-surface-raised rounded-lg p-1">
+    <div className="flex gap-0.5 border-b border-border">
       {TABS.map(({ key, label, icon: Icon }) => (
         <button
           key={key}
           onClick={() => setTab(key)}
-          className={`flex-1 flex items-center justify-center gap-1 sm:gap-2 py-2.5 px-1.5 sm:px-3 rounded-md text-xs sm:text-sm font-semibold transition-all ${
+          className={`flex items-center gap-1.5 py-2 px-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
             activeTab === key
-              ? 'bg-sky/15 text-sky border border-sky/25'
-              : 'text-muted hover:text-cream border border-transparent'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-muted hover:text-cream'
           }`}
         >
-          <Icon size={16} className="shrink-0" />
-          <span className="truncate">{label}</span>
+          <Icon size={14} className="shrink-0" />
+          <span>{label}</span>
         </button>
       ))}
     </div>

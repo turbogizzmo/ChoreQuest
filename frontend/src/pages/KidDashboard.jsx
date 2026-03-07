@@ -63,17 +63,11 @@ function difficultyLabel(difficulty) {
 // ---------- card animation variants ----------
 
 const cardVariants = {
-  hidden: { opacity: 0, y: 12 },
+  hidden: { opacity: 0 },
   visible: (i) => ({
     opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.05, type: 'spring', stiffness: 300, damping: 28 },
+    transition: { delay: i * 0.04, duration: 0.15 },
   }),
-};
-
-const completeButtonVariants = {
-  idle: { scale: 1 },
-  tap: { scale: 0.96 },
 };
 
 // ---------- component ----------
@@ -202,7 +196,7 @@ export default function KidDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="animate-spin text-sky" size={28} />
+        <Loader2 className="animate-spin text-accent" size={24} />
       </div>
     );
   }
@@ -232,7 +226,7 @@ export default function KidDashboard() {
         <div className="relative z-10">
         <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
           <div className="flex items-center gap-2">
-            <h1 className="font-heading text-cream text-xl font-extrabold">
+            <h1 className="text-cream text-lg font-semibold">
               <QuestBoardTitle themeId={boardTheme}>Quest Board</QuestBoardTitle>
             </h1>
             <button
@@ -264,11 +258,9 @@ export default function KidDashboard() {
               <span className="text-cream text-xs font-bold">{completedCount}/{totalCount}</span>
             </div>
             <div className="xp-bar">
-              <motion.div
+              <div
                 className="xp-bar-fill"
-                initial={{ width: 0 }}
-                animate={{ width: `${progressPct}%` }}
-                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                style={{ width: `${progressPct}%`, transition: 'width 0.3s ease' }}
               />
             </div>
           </div>
@@ -279,13 +271,13 @@ export default function KidDashboard() {
       {/* ── Board Theme Picker ── */}
       {showThemePicker && (
         <div className="game-panel p-4">
-          <h3 className="text-cream text-xs font-bold mb-3">Choose Board Theme</h3>
+          <h3 className="text-cream text-xs font-medium mb-3">Choose Board Theme</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {BOARD_THEMES.map((t) => (
               <button
                 key={t.id}
                 onClick={() => changeBoardTheme(t.id)}
-                className={`flex items-center gap-2 p-3 rounded-lg border transition-all text-left ${
+                className={`flex items-center gap-2 p-3 rounded-md border transition-all text-left ${
                   boardTheme === t.id
                     ? 'border-accent bg-accent/10'
                     : 'border-border/50 bg-surface-raised/30 hover:border-border-light'
@@ -340,12 +332,12 @@ export default function KidDashboard() {
               if (!chore) return null;
 
               const diff = difficultyLabel(chore.difficulty);
-              const categoryColor = chore.category?.colour || '#3b82f6';
+              const categoryColor = chore.category?.colour || '#14b8a6';
 
               return (
                 <motion.div
                   key={assignment.id}
-                  className="game-panel p-4 transition-all cursor-pointer hover:border-sky/40"
+                  className="game-panel p-4 transition-all cursor-pointer hover:border-accent/40"
                   style={activeTheme.cardAccent ? {
                     borderColor: `${activeTheme.cardAccent}25`,
                     boxShadow: `0 0 12px ${activeTheme.cardAccent}10, inset 0 1px 0 ${activeTheme.cardAccent}08`,
@@ -382,7 +374,7 @@ export default function KidDashboard() {
                         </span>
 
                         {/* Difficulty */}
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${diff.color}`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${diff.color}`}>
                           {diff.text}
                         </span>
 
@@ -425,7 +417,7 @@ export default function KidDashboard() {
         return (
         <div className="game-panel p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-cream text-sm font-bold flex items-center gap-2">
+            <h3 className="text-cream text-sm font-semibold flex items-center gap-2">
               <Heart size={14} className="text-crimson" />
               Pet Care
             </h3>
@@ -552,7 +544,7 @@ export default function KidDashboard() {
       {/* ── Streak Freeze Indicator ── */}
       {myStats?.streak_freeze_available && (
         <div className="game-panel p-3 flex items-center gap-3">
-          <ShieldOff size={16} className="text-sky flex-shrink-0" />
+          <ShieldOff size={16} className="text-accent flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-cream text-xs font-medium">Streak Freeze Available</p>
             <p className="text-muted text-[10px]">Your streak will be saved once if you miss a day this month</p>

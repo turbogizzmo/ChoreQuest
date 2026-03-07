@@ -12,10 +12,10 @@ function resolveMode(preference) {
 
 export const COLOR_THEMES = [
   // ── Boy themes ──
-  { id: 'default',  label: 'Quest Blue',        group: 'boy',  accent: '#3b82f6', secondary: '#60a5fa', tertiary: '#f59e0b' },
+  { id: 'default',  label: 'Classic',            group: 'boy',  accent: '#14b8a6', secondary: '#2dd4bf', tertiary: '#f59e0b' },
   { id: 'dragon',   label: 'Dragon Fire',       group: 'boy',  accent: '#ef4444', secondary: '#f87171', tertiary: '#f59e0b' },
   { id: 'forest',   label: 'Enchanted Forest',  group: 'boy',  accent: '#10b981', secondary: '#34d399', tertiary: '#f59e0b' },
-  { id: 'arctic',   label: 'Arctic',            group: 'boy',  accent: '#06b6d4', secondary: '#22d3ee', tertiary: '#3b82f6' },
+  { id: 'arctic',   label: 'Arctic',            group: 'boy',  accent: '#06b6d4', secondary: '#22d3ee', tertiary: '#14b8a6' },
   // ── Girl themes ──
   { id: 'rose',     label: 'Rose Gold',         group: 'girl', accent: '#ec4899', secondary: '#f472b6', tertiary: '#a855f7' },
   { id: 'galaxy',   label: 'Galaxy',            group: 'girl', accent: '#a855f7', secondary: '#c084fc', tertiary: '#ec4899' },

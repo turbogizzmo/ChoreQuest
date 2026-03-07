@@ -59,34 +59,30 @@ export default function Register() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10 bg-navy">
-      {/* Subtle gradient background */}
-      <div className="pointer-events-none fixed inset-0 bg-gradient-to-br from-sky/5 via-transparent to-purple/5" />
-
       <form
         onSubmit={handleSubmit}
-        className="game-panel w-full max-w-md p-8 relative z-10"
+        className="game-panel w-full max-w-sm p-6"
       >
-        {/* Logo + Title */}
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky to-accent-light flex items-center justify-center mx-auto mb-4">
-            <Swords size={28} className="text-white" />
+        {/* Logo */}
+        <div className="flex items-center gap-2 mb-6">
+          <div className="w-8 h-8 rounded-md bg-accent flex items-center justify-center">
+            <Swords size={16} className="text-navy" />
           </div>
-          <h1 className="font-heading text-cream text-2xl font-extrabold tracking-tight mb-1">
-            Create Account
+          <h1 className="text-cream text-lg font-semibold">
+            Create account
           </h1>
-          <p className="text-muted text-sm">Join ChoreQuest and start your journey</p>
         </div>
 
-        {/* Error display */}
+        {/* Error */}
         {error && (
-          <div className="mb-5 p-3 rounded-lg border border-crimson/30 bg-crimson/10 text-crimson text-sm text-center">
+          <div className="mb-4 p-2.5 rounded-md border border-crimson/30 bg-crimson/10 text-crimson text-sm">
             {error}
           </div>
         )}
 
         {/* Username */}
-        <div className="mb-4">
-          <label className="block text-cream/80 text-sm font-medium mb-1.5">
+        <div className="mb-3">
+          <label className="block text-cream text-sm font-medium mb-1">
             Username
           </label>
           <input
@@ -100,8 +96,8 @@ export default function Register() {
         </div>
 
         {/* Password */}
-        <div className="mb-4">
-          <label className="block text-cream/80 text-sm font-medium mb-1.5">
+        <div className="mb-3">
+          <label className="block text-cream text-sm font-medium mb-1">
             Password
           </label>
           <input
@@ -115,8 +111,8 @@ export default function Register() {
         </div>
 
         {/* Display Name */}
-        <div className="mb-4">
-          <label className="block text-cream/80 text-sm font-medium mb-1.5">
+        <div className="mb-3">
+          <label className="block text-cream text-sm font-medium mb-1">
             Display Name
           </label>
           <input
@@ -131,8 +127,8 @@ export default function Register() {
         </div>
 
         {/* Role */}
-        <div className="mb-4">
-          <label className="block text-cream/80 text-sm font-medium mb-1.5">
+        <div className="mb-3">
+          <label className="block text-cream text-sm font-medium mb-1">
             Role
           </label>
           <div className="relative">
@@ -153,8 +149,8 @@ export default function Register() {
         </div>
 
         {/* Invite Code */}
-        <div className="mb-6">
-          <label className="block text-cream/80 text-sm font-medium mb-1.5">
+        <div className="mb-5">
+          <label className="block text-cream text-sm font-medium mb-1">
             Invite Code
           </label>
           <input
@@ -165,7 +161,7 @@ export default function Register() {
             autoComplete="off"
             className="field-input"
           />
-          <p className="text-muted text-xs mt-1.5">
+          <p className="text-muted text-xs mt-1">
             Required unless you're the first user
           </p>
         </div>
@@ -174,15 +170,15 @@ export default function Register() {
         <button
           type="submit"
           disabled={submitting}
-          className={`game-btn game-btn-blue w-full text-base ${submitting ? 'opacity-60 cursor-wait' : ''}`}
+          className={`game-btn game-btn-blue w-full text-sm ${submitting ? 'opacity-60 cursor-wait' : ''}`}
         >
-          {submitting ? 'Creating account...' : 'Create Account'}
+          {submitting ? 'Creating account...' : 'Create account'}
         </button>
 
         {/* Login link */}
-        <p className="text-center mt-6 text-muted text-sm">
+        <p className="text-center mt-5 text-muted text-sm">
           Already have an account?{' '}
-          <Link to="/login" className="text-sky hover:text-accent-light font-medium transition-colors">
+          <Link to="/login" className="text-accent hover:text-accent-light font-medium transition-colors">
             Sign in
           </Link>
         </p>

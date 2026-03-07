@@ -17,8 +17,8 @@ const DIFFICULTY_OPTIONS = [
 ];
 
 const selectClass =
-  'bg-navy-light border-2 border-border text-cream p-2 rounded text-sm ' +
-  'focus:border-sky focus:outline-none transition-colors';
+  'bg-navy-light border border-border text-cream p-2 rounded text-sm ' +
+  'focus:border-accent focus:outline-none transition-colors';
 
 const emptyForm = {
   title: '',
@@ -166,7 +166,7 @@ export default function QuestCreateModal({
             <button
               type="button"
               onClick={() => setShowTemplates(!showTemplates)}
-              className="flex items-center gap-2 text-sky text-sm hover:text-sky/80 transition-colors"
+              className="flex items-center gap-2 text-accent text-sm hover:text-accent/80 transition-colors"
             >
               <BookTemplate size={14} />
               {showTemplates ? 'Hide templates' : 'Choose from Quest Templates'}
@@ -176,7 +176,7 @@ export default function QuestCreateModal({
               <div className="mt-3 max-h-60 overflow-y-auto space-y-3 border border-border rounded-lg p-3 bg-surface-raised/30">
                 {Object.entries(templatesByCategory).map(([cat, tpls]) => (
                   <div key={cat}>
-                    <p className="text-muted text-xs font-bold uppercase tracking-wider mb-1">
+                    <p className="text-muted text-xs font-bold mb-1">
                       {cat}
                     </p>
                     <div className="space-y-1">
@@ -184,7 +184,7 @@ export default function QuestCreateModal({
                         <button
                           key={tpl.id}
                           onClick={() => applyTemplate(tpl)}
-                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-raised transition-colors border border-transparent hover:border-sky/30"
+                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-raised transition-colors border border-transparent hover:border-accent/30"
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-cream text-sm font-medium">

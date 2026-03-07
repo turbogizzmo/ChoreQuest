@@ -66,7 +66,7 @@ export default function VacationSettings() {
         </h2>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="text-xs text-sky hover:text-accent-light transition-colors font-medium flex items-center gap-1"
+          className="text-xs text-accent hover:text-accent-light transition-colors font-medium flex items-center gap-1"
         >
           <Plus size={12} />
           {showForm ? 'Cancel' : 'Schedule'}
@@ -115,7 +115,7 @@ export default function VacationSettings() {
 
       {loading ? (
         <div className="flex justify-center py-4">
-          <Loader2 size={16} className="text-sky animate-spin" />
+          <Loader2 size={16} className="text-accent animate-spin" />
         </div>
       ) : vacations.length === 0 ? (
         <p className="text-muted text-xs text-center py-2">

@@ -31,8 +31,8 @@ const ROTATION_CADENCE_OPTIONS = [
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const selectClass =
-  'bg-navy-light border-2 border-border text-cream p-2 rounded text-sm ' +
-  'focus:border-sky focus:outline-none transition-colors';
+  'bg-navy-light border border-border text-cream p-2 rounded text-sm ' +
+  'focus:border-accent focus:outline-none transition-colors';
 
 export default function QuestAssignModal({
   isOpen,
@@ -301,7 +301,7 @@ export default function QuestAssignModal({
                 <div
                   key={kid.id}
                   className={`rounded-lg border transition-colors ${
-                    isSelected ? 'border-sky/40 bg-sky/5' : 'border-border'
+                    isSelected ? 'border-accent/40 bg-accent/5' : 'border-border'
                   }`}
                 >
                   <div className="flex items-center gap-3 p-3">
@@ -309,7 +309,7 @@ export default function QuestAssignModal({
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => toggleKid(kid.id)}
-                      className="w-4 h-4 accent-sky flex-shrink-0"
+                      className="w-4 h-4 accent-accent flex-shrink-0"
                     />
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <AvatarDisplay
@@ -323,7 +323,7 @@ export default function QuestAssignModal({
                       </span>
                     </div>
                     {isSelected && config.requires_photo && (
-                      <Camera size={14} className="text-sky flex-shrink-0" />
+                      <Camera size={14} className="text-accent flex-shrink-0" />
                     )}
                     {isSelected && (
                       <button
@@ -352,16 +352,16 @@ export default function QuestAssignModal({
                               [kid.id]: { ...prev[kid.id], requires_photo: !config.requires_photo },
                             }))
                           }
-                          className={`relative w-10 h-5 rounded-full border-2 transition-colors ${
+                          className={`relative w-10 h-5 rounded-full border transition-colors ${
                             config.requires_photo
-                              ? 'bg-sky/20 border-sky'
+                              ? 'bg-accent/20 border-accent'
                               : 'bg-navy-light border-border'
                           }`}
                         >
                           <div
                             className={`absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all ${
                               config.requires_photo
-                                ? 'left-5 bg-sky'
+                                ? 'left-5 bg-accent'
                                 : 'left-0.5 bg-muted'
                             }`}
                           />
@@ -395,7 +395,7 @@ export default function QuestAssignModal({
               <label className="block text-muted text-xs font-medium mb-1">
                 Frequency
                 {hasDaysSelected && (
-                  <span className="text-sky ml-1">(overridden by quest days)</span>
+                  <span className="text-accent ml-1">(overridden by quest days)</span>
                 )}
               </label>
               <select
@@ -426,7 +426,7 @@ export default function QuestAssignModal({
                     onClick={() => toggleScheduleDay(idx)}
                     className={`px-2.5 py-1.5 rounded border text-xs font-medium transition-colors ${
                       scheduleDays.includes(idx)
-                        ? 'border-sky bg-sky/20 text-sky'
+                        ? 'border-accent bg-accent/20 text-accent'
                         : 'border-border text-muted hover:border-cream/30'
                     }`}
                   >
@@ -454,20 +454,20 @@ export default function QuestAssignModal({
               <button
                 type="button"
                 onClick={togglePhotoAll}
-                className={`relative w-12 h-6 rounded-full border-2 transition-colors ${
+                className={`relative w-12 h-6 rounded-full border transition-colors ${
                   allSelectedHavePhoto
-                    ? 'bg-sky/20 border-sky'
+                    ? 'bg-accent/20 border-accent'
                     : someSelectedHavePhoto
-                    ? 'bg-sky/10 border-sky/50'
+                    ? 'bg-accent/10 border-accent/50'
                     : 'bg-navy-light border-border'
                 }`}
               >
                 <div
                   className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${
                     allSelectedHavePhoto
-                      ? 'left-6 bg-sky'
+                      ? 'left-6 bg-accent'
                       : someSelectedHavePhoto
-                      ? 'left-6 bg-sky/50'
+                      ? 'left-6 bg-accent/50'
                       : 'left-0.5 bg-muted'
                   }`}
                 />
@@ -494,7 +494,7 @@ export default function QuestAssignModal({
               <button
                 type="button"
                 onClick={() => setRotationEnabled(!rotationEnabled)}
-                className={`relative w-12 h-6 rounded-full border-2 transition-colors ${
+                className={`relative w-12 h-6 rounded-full border transition-colors ${
                   rotationEnabled
                     ? 'bg-purple/20 border-purple'
                     : 'bg-navy-light border-border'
@@ -542,7 +542,7 @@ export default function QuestAssignModal({
                           key={kidId}
                           type="button"
                           onClick={() => setRotationFirstKid(Number(kidId))}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-colors text-sm ${
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${
                             isFirst
                               ? 'border-purple bg-purple/15 text-purple'
                               : 'border-border text-muted hover:border-cream/30'

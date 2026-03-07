@@ -41,7 +41,7 @@ export const BOARD_THEMES = [
     description: 'Missions from orbit',
     headerGradient: 'linear-gradient(135deg, rgba(30,58,138,0.30) 0%, rgba(88,28,135,0.20) 50%, rgba(15,23,42,0.35) 100%)',
     pageGradient: 'radial-gradient(ellipse at top, rgba(30,58,138,0.12) 0%, transparent 70%)',
-    cardAccent: '#3b82f6',
+    cardAccent: '#14b8a6',
     particleEmojis: ['\uD83D\uDE80', '\uD83C\uDF1F', '\uD83E\uDE90', '\uD83D\uDEF8', '\u2B50'],
   },
   {
@@ -90,7 +90,7 @@ export function QuestBoardOverlay({ themeId }) {
 
   return (
     <div
-      className="absolute inset-0 rounded-xl pointer-events-none z-0"
+      className="absolute inset-0 rounded-md pointer-events-none z-0"
       style={{ background: theme.headerGradient }}
     />
   );
@@ -102,7 +102,7 @@ export function QuestBoardParticles({ themeId }) {
   if (!theme.particleEmojis) return null;
 
   return (
-    <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none z-0">
+    <div className="absolute inset-0 overflow-hidden rounded-md pointer-events-none z-0">
       {theme.particleEmojis.map((emoji, i) => (
         <span
           key={i}

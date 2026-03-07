@@ -266,7 +266,7 @@ function ColorSwatch({ colors, selected, onSelect }) {
           key={c}
           onClick={() => onSelect(c)}
           className={`w-7 h-7 rounded-full border-2 transition-all ${
-            selected === c ? 'border-sky scale-110' : 'border-transparent hover:border-border-light'
+            selected === c ? 'border-accent' : 'border-transparent hover:border-border-light'
           }`}
           style={{ backgroundColor: c }}
           aria-label={c}
@@ -294,7 +294,7 @@ function ShapeSelector({ options, selected, onSelect, lockedItems, configKey, on
               isLocked
                 ? 'border-amber-500/30 text-muted/60 bg-amber-500/5'
                 : selected === opt.id
-                ? 'border-sky bg-sky/10 text-sky'
+                ? 'border-accent bg-accent/10 text-accent'
                 : 'border-border text-muted hover:border-border-light hover:text-cream'
             }`}
             style={isLocked ? { WebkitTouchCallout: 'none', touchAction: 'manipulation' } : undefined}
@@ -329,7 +329,7 @@ function MultiShapeSelector({ options, selected, onToggle, lockedItems, configKe
               isLocked
                 ? 'border-amber-500/30 text-muted/60 bg-amber-500/5'
                 : isActive
-                ? 'border-sky bg-sky/10 text-sky'
+                ? 'border-accent bg-accent/10 text-accent'
                 : 'border-border text-muted hover:border-border-light hover:text-cream'
             }`}
             style={isLocked ? { WebkitTouchCallout: 'none', touchAction: 'manipulation' } : undefined}
@@ -399,13 +399,13 @@ function TapToPlaceOverlay({ config, onPlace }) {
 
   return (
     <div className="relative cursor-crosshair" onClick={handleClick}>
-      <div className="avatar-idle rounded-2xl">
+      <div className="avatar-idle rounded-md">
         <AvatarDisplay config={config} size="xl" />
       </div>
       {/* Overlay SVG for crosshair indicator */}
       <svg
         ref={svgRef}
-        className="absolute inset-0 w-full h-full rounded-2xl"
+        className="absolute inset-0 w-full h-full rounded-md"
         viewBox="0 0 32 32"
         style={{ pointerEvents: 'all' }}
         onClick={(e) => {
@@ -422,7 +422,7 @@ function TapToPlaceOverlay({ config, onPlace }) {
         <line x1={petX - 2} y1={petY} x2={petX + 2} y2={petY} stroke="#3b82f6" strokeWidth="0.3" opacity="0.6" />
         <line x1={petX} y1={petY - 2} x2={petX} y2={petY + 2} stroke="#3b82f6" strokeWidth="0.3" opacity="0.6" />
       </svg>
-      <p className="text-center text-sky text-[10px] font-medium mt-1.5 flex items-center justify-center gap-1">
+      <p className="text-center text-accent text-[10px] font-medium mt-1.5 flex items-center justify-center gap-1">
         <Crosshair size={10} /> Tap to place your pet
       </p>
     </div>
@@ -461,7 +461,7 @@ function PetCustomiser({ config, set, locked, previewProps, petStats }) {
       {hasPet && (
         <>
           {/* ── Pet Level & XP Info ── */}
-          <div className="bg-surface-raised/50 rounded-xl p-3 border border-border">
+          <div className="bg-surface-raised/50 rounded-md p-3 border border-border">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Heart size={14} className="fill-current" style={{ color: PET_LEVEL_COLORS[levelInfo.level] }} />
@@ -506,7 +506,7 @@ function PetCustomiser({ config, set, locked, previewProps, petStats }) {
                     <div
                       key={lv}
                       className={`text-center flex-shrink-0 rounded-lg p-1 ${
-                        isCurrent ? 'bg-sky/10 ring-1 ring-sky/40' : ''
+                        isCurrent ? 'bg-accent/10 ring-1 ring-accent/40' : ''
                       }`}
                       style={{ opacity: isFuture ? 0.35 : isPast ? 0.55 : 1 }}
                     >
@@ -539,7 +539,7 @@ function PetCustomiser({ config, set, locked, previewProps, petStats }) {
                   set('pet_color_tail', '');
                   set('pet_color_accent', '');
                 }}
-                className="text-[10px] text-sky hover:text-sky/80 transition-colors"
+                className="text-[10px] text-accent hover:text-accent/80 transition-colors"
               >
                 Reset all to match
               </button>
@@ -754,7 +754,7 @@ function CategoryStrip({ openCategory, onSelect }) {
       {canScrollLeft && (
         <button
           onClick={() => scroll(-1)}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-surface/90 border border-border text-muted hover:text-cream shadow-sm"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-surface/90 border border-border text-muted hover:text-cream"
           aria-label="Scroll left"
         >
           <ChevronLeft size={14} />
@@ -772,7 +772,7 @@ function CategoryStrip({ openCategory, onSelect }) {
             onClick={() => onSelect(cat.id)}
             className={`flex-shrink-0 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
               openCategory === cat.id
-                ? 'border-sky bg-sky/15 text-sky'
+                ? 'border-accent bg-accent/15 text-accent'
                 : 'border-border text-muted hover:border-border-light hover:text-cream'
             }`}
           >
@@ -785,7 +785,7 @@ function CategoryStrip({ openCategory, onSelect }) {
       {canScrollRight && (
         <button
           onClick={() => scroll(1)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-surface/90 border border-border text-muted hover:text-cream shadow-sm"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-surface/90 border border-border text-muted hover:text-cream"
           aria-label="Scroll right"
         >
           <ChevronRight size={14} />
@@ -904,7 +904,7 @@ export default function AvatarEditor() {
             >
               <ArrowLeft size={18} />
             </button>
-            <h2 className="font-heading text-cream text-lg font-bold">Customise Avatar</h2>
+            <h2 className="font-heading text-cream text-sm font-semibold">Customise Avatar</h2>
           </div>
           <button
             onClick={save}
@@ -925,7 +925,7 @@ export default function AvatarEditor() {
               }}
             />
           ) : (
-            <div className={`avatar-idle rounded-2xl transition-shadow duration-300 ${preview ? 'shadow-[0_0_16px_rgba(245,158,11,0.45)]' : ''}`}>
+            <div className={`avatar-idle rounded-md transition-shadow duration-300`}>
               <AvatarDisplay config={displayConfig} size="xl" />
             </div>
           )}

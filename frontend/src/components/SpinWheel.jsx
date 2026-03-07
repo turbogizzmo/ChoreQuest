@@ -8,7 +8,7 @@ const SEGMENTS = [
   { value: 5, color: '#f59e0b' },
   { value: 2, color: '#10b981' },
   { value: 10, color: '#a855f7' },
-  { value: 3, color: '#3b82f6' },
+  { value: 3, color: '#14b8a6' },
   { value: 15, color: '#f97316' },
   { value: 1, color: '#ec4899' },
   { value: 25, color: '#f59e0b' },
@@ -110,8 +110,7 @@ export default function SpinWheel({ availability, onSpinComplete }) {
         {/* Pointer at top */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 z-10">
           <div
-            className="w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[20px] border-t-sky"
-            style={{ filter: 'drop-shadow(0 2px 6px rgba(59,130,246,0.4))' }}
+            className="w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[20px] border-t-accent"
           />
         </div>
 
@@ -126,7 +125,7 @@ export default function SpinWheel({ availability, onSpinComplete }) {
         >
           <svg
             viewBox="0 0 300 300"
-            className="w-full h-full drop-shadow-xl"
+            className="w-full h-full"
           >
             {/* Outer ring */}
             <circle
@@ -150,7 +149,7 @@ export default function SpinWheel({ availability, onSpinComplete }) {
                   <path
                     d={describeArc(cx, cy, r, startAngle, endAngle)}
                     fill={seg.color}
-                    stroke="#0a0e1a"
+                    stroke="#121212"
                     strokeWidth="2"
                     opacity={disabled && !spinning ? 0.4 : 0.9}
                   />
@@ -160,7 +159,7 @@ export default function SpinWheel({ availability, onSpinComplete }) {
                     textAnchor="middle"
                     dominantBaseline="central"
                     fill="white"
-                    fontFamily="Inter, system-ui, sans-serif"
+                    fontFamily="system-ui, sans-serif"
                     fontSize="12"
                     fontWeight="800"
                     transform={`rotate(${labelAngle}, ${labelPos.x}, ${labelPos.y})`}
@@ -173,7 +172,7 @@ export default function SpinWheel({ availability, onSpinComplete }) {
 
             {/* Center circle */}
             <circle cx={cx} cy={cy} r={22} fill="#111827" stroke="#1e293b" strokeWidth="3" />
-            <circle cx={cx} cy={cy} r={10} fill="#3b82f6" />
+            <circle cx={cx} cy={cy} r={10} fill="#14b8a6" />
           </svg>
         </motion.div>
       </div>
@@ -182,7 +181,7 @@ export default function SpinWheel({ availability, onSpinComplete }) {
       {result !== null && (
         <div className="game-panel px-6 py-3 text-center">
           <p className="text-muted text-xs">You won</p>
-          <p className="text-gold text-lg font-bold mt-1">
+          <p className="text-gold text-sm font-semibold mt-1">
             {result} XP
           </p>
         </div>
