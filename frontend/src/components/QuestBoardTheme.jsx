@@ -90,7 +90,7 @@ export function QuestBoardOverlay({ themeId }) {
 
   return (
     <div
-      className="absolute inset-0 rounded-xl pointer-events-none z-0"
+      className="absolute inset-0 rounded-md pointer-events-none z-0"
       style={{ background: theme.headerGradient }}
     />
   );
@@ -102,7 +102,7 @@ export function QuestBoardParticles({ themeId }) {
   if (!theme.particleEmojis) return null;
 
   return (
-    <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none z-0">
+    <div className="absolute inset-0 overflow-hidden rounded-md pointer-events-none z-0">
       {theme.particleEmojis.map((emoji, i) => (
         <span
           key={i}

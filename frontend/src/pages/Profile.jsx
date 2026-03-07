@@ -65,45 +65,25 @@ function PushNotificationToggle() {
   const unsupported = supportLevel === 'unsupported';
 
   return (
-    <div className="game-panel p-5">
-      <h2 className="text-cream text-sm font-bold mb-4 flex items-center gap-2">
-        {subscribed ? <Bell size={16} className="text-sky" /> : <BellOff size={16} className="text-muted" />}
+    <div className="game-panel p-4">
+      <h2 className="text-cream text-sm font-semibold mb-3 flex items-center gap-2">
+        {subscribed ? <Bell size={14} className="text-accent" /> : <BellOff size={14} className="text-muted" />}
         Push Notifications
       </h2>
       {needsHttps ? (
         <div>
-          <p className="text-cream/80 text-sm">
-            Get notified about quests, rewards & achievements
-          </p>
-          <p className="text-amber/80 text-xs mt-2">
-            Push notifications require a secure (HTTPS) connection.
-          </p>
-          <p className="text-muted text-xs mt-1">
-            Set up a reverse proxy with SSL (e.g. Nginx Proxy Manager) or access ChoreQuest via HTTPS to enable push notifications.
-          </p>
+          <p className="text-cream/80 text-sm">Get notified about quests, rewards & achievements</p>
+          <p className="text-amber/80 text-xs mt-2">Push notifications require HTTPS.</p>
         </div>
       ) : needsInstall ? (
         <div>
-          <p className="text-cream/80 text-sm">
-            Get notified about quests, rewards & achievements
-          </p>
-          <p className="text-amber/80 text-xs mt-2">
-            To enable push notifications, add ChoreQuest to your Home Screen:
-          </p>
-          <ol className="text-muted text-xs mt-1 list-decimal list-inside space-y-0.5">
-            <li>Tap the <strong className="text-cream/70">Share</strong> button in Safari</li>
-            <li>Scroll down and tap <strong className="text-cream/70">Add to Home Screen</strong></li>
-            <li>Open ChoreQuest from your Home Screen</li>
-          </ol>
+          <p className="text-cream/80 text-sm">Get notified about quests, rewards & achievements</p>
+          <p className="text-amber/80 text-xs mt-2">Add ChoreQuest to your Home Screen to enable notifications.</p>
         </div>
       ) : unsupported ? (
         <div>
-          <p className="text-cream/80 text-sm">
-            Get notified about quests, rewards & achievements
-          </p>
-          <p className="text-muted text-xs mt-2">
-            Your browser does not support push notifications. Try using Chrome, Edge, Firefox, or Safari 16.4+.
-          </p>
+          <p className="text-cream/80 text-sm">Get notified about quests, rewards & achievements</p>
+          <p className="text-muted text-xs mt-2">Your browser does not support push notifications.</p>
         </div>
       ) : (
         <div className="flex items-center justify-between">
@@ -112,28 +92,26 @@ function PushNotificationToggle() {
               {denied
                 ? 'Notifications blocked by browser'
                 : subscribed
-                  ? 'You\'ll get alerts even when the app is closed'
-                  : 'Get notified about quests, rewards & achievements'}
+                  ? 'Alerts enabled'
+                  : 'Get notified about quests & rewards'}
             </p>
             {denied && (
-              <p className="text-muted text-xs mt-1">
-                Check your browser settings to allow notifications for this site.
-              </p>
+              <p className="text-muted text-xs mt-1">Check browser settings to allow notifications.</p>
             )}
           </div>
           <button
             onClick={handleToggle}
             disabled={loading || toggling || denied}
-            className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+            className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
               subscribed
-                ? 'bg-sky/30 border border-sky/40'
+                ? 'bg-accent/30 border border-accent/40'
                 : 'bg-navy border border-border'
-            } ${(denied) ? 'opacity-40 cursor-not-allowed' : ''}`}
+            } ${denied ? 'opacity-40 cursor-not-allowed' : ''}`}
           >
             <div
-              className={`absolute top-0.5 w-5 h-5 rounded-full transition-all ${
+              className={`absolute top-0.5 w-4 h-4 rounded-full transition-all ${
                 subscribed
-                  ? 'left-6 bg-sky'
+                  ? 'left-5 bg-accent'
                   : 'left-0.5 bg-muted/60'
               }`}
             />
@@ -141,11 +119,11 @@ function PushNotificationToggle() {
         </div>
       )}
       {subscribed && (
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2">
           <button
             onClick={handleTest}
             disabled={testing}
-            className="text-xs text-sky/70 hover:text-sky underline"
+            className="text-xs text-accent/70 hover:text-accent underline"
           >
             {testing ? 'Sending...' : 'Send test notification'}
           </button>
@@ -163,30 +141,23 @@ export default function Profile() {
   const { user, logout, updateUser } = useAuth();
   const { theme, mode, setMode, colorTheme, setColorTheme } = useTheme();
 
-  // showEditor state removed — avatar editor is now a full page at /avatar
-
-  // Display name editing
   const [displayName, setDisplayName] = useState(user?.display_name || '');
   const [nameSaving, setNameSaving] = useState(false);
   const [nameMsg, setNameMsg] = useState('');
 
-  // Stats (kids only)
   const isKid = user?.role === 'kid';
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(isKid);
 
-  // Achievements (kids only)
   const [achievements, setAchievements] = useState([]);
   const [achievementsLoading, setAchievementsLoading] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
 
-  // PIN
   const [pin, setPin] = useState('');
   const [pinSaving, setPinSaving] = useState(false);
   const [pinMsg, setPinMsg] = useState('');
 
-  // Password
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -197,7 +168,6 @@ export default function Profile() {
     setDisplayName(user?.display_name || '');
   }, [user?.display_name]);
 
-  // Fetch stats (kids only)
   useEffect(() => {
     if (!isKid) return;
     (async () => {
@@ -213,7 +183,6 @@ export default function Profile() {
     })();
   }, [isKid]);
 
-  // Fetch achievements when toggled (kids only)
   useEffect(() => {
     if (!showAchievements || achievements.length > 0) return;
     (async () => {
@@ -302,24 +271,14 @@ export default function Profile() {
     }
   };
 
-  const roleBadgeColors = {
-    admin: 'bg-crimson/10 border-crimson/30 text-crimson',
-    parent: 'bg-purple/10 border-purple/30 text-purple',
-    kid: 'bg-sky/10 border-sky/30 text-sky',
-  };
-
   return (
-    <div className="max-w-xl mx-auto space-y-5">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-2">
-        <UserCircle size={24} className="text-sky" />
-        <h1 className="font-heading text-cream text-xl font-extrabold">
-          Profile
-        </h1>
-      </div>
+    <div className="max-w-xl mx-auto space-y-4">
+      <h1 className="text-cream text-lg font-semibold mb-1">
+        Profile
+      </h1>
 
-      {/* Avatar + Name + Role */}
-      <div className="game-panel p-6 flex flex-col items-center gap-4">
+      {/* Avatar + Name */}
+      <div className="game-panel p-5 flex flex-col items-center gap-3">
         <button
           onClick={() => navigate('/avatar')}
           className="relative"
@@ -331,32 +290,27 @@ export default function Profile() {
             name={user?.display_name || user?.username}
             animate
           />
-          <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-sky flex items-center justify-center border-2 border-surface shadow-lg">
-            <Pencil size={14} className="text-white" />
+          <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-accent flex items-center justify-center border-2 border-surface">
+            <Pencil size={12} className="text-navy" />
           </div>
         </button>
 
-        {/* Role badge + Rank */}
+        {/* Role + Rank */}
         <div className="flex items-center gap-2 flex-wrap justify-center">
-          <span
-            className={`inline-block px-3 py-1 rounded-full border text-[10px] font-semibold uppercase tracking-wider ${
-              roleBadgeColors[user?.role] || 'border-border text-muted'
-            }`}
-          >
+          <span className="inline-block px-2 py-0.5 rounded-md border text-[10px] font-medium capitalize border-border text-muted">
             {user?.role}
           </span>
           {stats?.rank && <RankBadge rank={stats.rank} size="sm" />}
         </div>
-        {/* Pet level */}
         {stats?.pet && (
-          <div className="mt-1">
+          <div className="mt-0.5">
             <PetLevelBadge pet={stats.pet} />
           </div>
         )}
 
         {/* Editable display name */}
         <div className="w-full max-w-xs">
-          <label className="block text-cream/80 text-sm font-medium mb-1.5 text-center">
+          <label className="block text-cream text-sm font-medium mb-1 text-center">
             Display Name
           </label>
           <div className="flex gap-2">
@@ -384,48 +338,44 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Avatar Editor Modal */}
-
-      {/* Stats Summary (kids only) */}
+      {/* Stats (kids only) */}
       {isKid && (
-        <div className="game-panel p-5">
-          <h2 className="text-cream text-sm font-bold mb-4">
-            Stats
-          </h2>
+        <div className="game-panel p-4">
+          <h2 className="text-cream text-sm font-semibold mb-3">Stats</h2>
           {statsLoading ? (
             <div className="flex justify-center py-4">
-              <Loader2 size={20} className="text-sky animate-spin" />
+              <Loader2 size={18} className="text-accent animate-spin" />
             </div>
           ) : stats ? (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="text-center">
-                  <Star size={18} className="text-gold mx-auto mb-1" />
-                  <p className="text-gold text-sm font-bold">
+                  <Star size={16} className="text-gold mx-auto mb-1" />
+                  <p className="text-gold text-sm font-medium">
                     {stats.points_balance ?? stats.xp_balance ?? 0}
                   </p>
                   <p className="text-muted text-xs">XP Balance</p>
                 </div>
                 <div className="text-center">
-                  <Award size={18} className="text-emerald mx-auto mb-1" />
-                  <p className="text-emerald text-sm font-bold">
+                  <Award size={16} className="text-emerald mx-auto mb-1" />
+                  <p className="text-emerald text-sm font-medium">
                     {stats.total_points_earned ?? stats.total_xp_earned ?? 0}
                   </p>
                   <p className="text-muted text-xs">Total Earned</p>
                 </div>
                 <div className="text-center">
-                  <Flame size={18} className="text-orange-400 mx-auto mb-1" />
-                  <p className="text-orange-400 text-sm font-bold">
+                  <Flame size={16} className="text-orange-400 mx-auto mb-1" />
+                  <p className="text-orange-400 text-sm font-medium">
                     {stats.current_streak ?? stats.streak ?? 0}
                   </p>
                   <p className="text-muted text-xs">Streak</p>
                 </div>
                 <button
-                  className="text-center hover:bg-surface-raised/50 rounded-lg py-1 transition-colors"
+                  className="text-center hover:bg-surface-raised/50 rounded-md py-1 transition-colors"
                   onClick={() => setShowAchievements((v) => !v)}
                 >
-                  <Trophy size={18} className="text-purple mx-auto mb-1" />
-                  <p className="text-purple text-sm font-bold">
+                  <Trophy size={16} className="text-purple mx-auto mb-1" />
+                  <p className="text-purple text-sm font-medium">
                     {stats.achievements_count ?? 0}
                   </p>
                   <p className="text-muted text-xs flex items-center justify-center gap-0.5">
@@ -434,12 +384,11 @@ export default function Profile() {
                 </button>
               </div>
 
-              {/* Rank progress */}
               {stats.rank && stats.rank.next_threshold && (
-                <div className="mt-4 pt-3 border-t border-border/50">
-                  <div className="flex items-center justify-between mb-1.5">
+                <div className="mt-3 pt-3 border-t border-border/50">
+                  <div className="flex items-center justify-between mb-1">
                     <span className="text-muted text-xs">Next rank: {stats.rank.next_title}</span>
-                    <span className="text-cream text-xs font-bold">
+                    <span className="text-cream text-xs font-medium">
                       {stats.total_points_earned}/{stats.rank.next_threshold} XP
                     </span>
                   </div>
@@ -452,30 +401,29 @@ export default function Profile() {
                 </div>
               )}
 
-              {/* Progress Charts toggle */}
               <button
                 onClick={() => setShowProgress((v) => !v)}
-                className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-surface-raised/30 hover:bg-surface-raised/60 border border-border/50 text-muted hover:text-cream transition-colors text-xs font-medium"
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-md bg-surface-raised/30 hover:bg-surface-raised/60 border border-border/50 text-muted hover:text-cream transition-colors text-xs font-medium"
               >
-                <BarChart3 size={14} />
+                <BarChart3 size={13} />
                 {showProgress ? 'Hide Charts' : 'View Progress Charts'}
               </button>
             </>
           ) : (
             <p className="text-muted text-center text-sm">
-              Stats not available yet. Complete quests to build your record!
+              Stats not available yet.
             </p>
           )}
         </div>
       )}
 
-      {/* Achievements Browser (kids only) */}
+      {/* Achievements (kids only) */}
       {isKid && showAchievements && (
-        <div className="game-panel p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-cream text-sm font-bold flex items-center gap-2">
-              <Trophy size={16} className="text-purple" />
-              All Achievements
+        <div className="game-panel p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-cream text-sm font-semibold flex items-center gap-2">
+              <Trophy size={14} className="text-purple" />
+              Achievements
             </h2>
             <button
               onClick={() => setShowAchievements(false)}
@@ -486,21 +434,18 @@ export default function Profile() {
           </div>
           {achievementsLoading ? (
             <div className="flex justify-center py-4">
-              <Loader2 size={20} className="text-sky animate-spin" />
+              <Loader2 size={18} className="text-accent animate-spin" />
             </div>
           ) : achievements.length === 0 ? (
-            <p className="text-muted text-center text-sm">
-              No achievements available yet.
-            </p>
+            <p className="text-muted text-center text-sm">No achievements available yet.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {(() => {
                 const tierColors = {
                   bronze: { border: 'border-amber-600/40', bg: 'bg-amber-600/10', text: 'text-amber-500', icon: 'text-amber-500', label: 'Bronze' },
                   silver: { border: 'border-slate-300/40', bg: 'bg-slate-300/10', text: 'text-slate-300', icon: 'text-slate-300', label: 'Silver' },
                   gold: { border: 'border-yellow-400/40', bg: 'bg-yellow-400/10', text: 'text-yellow-400', icon: 'text-yellow-400', label: 'Gold' },
                 };
-                // Group achievements by group_key, ungrouped come last
                 const grouped = [];
                 const seen = new Set();
                 const sorted = [...achievements].sort((a, b) => (a.sort_order ?? 99) - (b.sort_order ?? 99));
@@ -516,7 +461,7 @@ export default function Profile() {
                 return grouped.map(({ group, items }) => (
                   <div key={group || items[0].id}>
                     {group && items.length > 1 && (
-                      <p className="text-muted text-[10px] uppercase tracking-widest font-semibold mt-3 mb-1 px-1">
+                      <p className="text-muted text-xs font-medium mt-2 mb-1 px-1 capitalize">
                         {group.replace(/_/g, ' ')}
                       </p>
                     )}
@@ -525,45 +470,43 @@ export default function Profile() {
                       return (
                         <div
                           key={a.id}
-                          className={`flex items-center gap-3 p-3 rounded-lg border transition-opacity mb-1.5 ${
+                          className={`flex items-center gap-2.5 p-2.5 rounded-md border transition-opacity mb-1 ${
                             a.unlocked
                               ? tier ? `${tier.border} ${tier.bg}` : 'border-purple/30 bg-purple/5'
                               : 'border-border bg-surface-raised/30 opacity-60'
                           }`}
                         >
                           <div
-                            className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${
                               a.unlocked
                                 ? tier ? `${tier.bg} border ${tier.border}` : 'bg-purple/20 border border-purple/40'
                                 : 'bg-surface-raised border border-border'
                             }`}
                           >
                             {a.unlocked ? (
-                              <ChoreIcon name={a.icon} size={20} className={tier ? tier.icon : 'text-purple'} />
+                              <ChoreIcon name={a.icon} size={16} className={tier ? tier.icon : 'text-purple'} />
                             ) : (
-                              <Lock size={16} className="text-muted" />
+                              <Lock size={14} className="text-muted" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5">
                               <p className={`text-sm font-medium ${a.unlocked ? 'text-cream' : 'text-muted'}`}>
                                 {a.title}
                               </p>
                               {tier && (
-                                <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${tier.border} ${tier.bg} ${tier.text}`}>
+                                <span className={`text-[9px] font-medium px-1 py-0.5 rounded-md border ${tier.border} ${tier.bg} ${tier.text}`}>
                                   {tier.label}
                                 </span>
                               )}
                             </div>
-                            <p className="text-muted text-xs mt-0.5">
-                              {a.description}
-                            </p>
+                            <p className="text-muted text-xs mt-0.5">{a.description}</p>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
                             {a.points_reward > 0 && (
-                              <div className="flex items-center gap-1">
-                                <Star size={12} className="text-gold fill-gold" />
-                                <span className="text-gold text-xs font-bold">{a.points_reward}</span>
+                              <div className="flex items-center gap-0.5">
+                                <Star size={11} className="text-gold fill-gold" />
+                                <span className="text-gold text-xs font-medium">{a.points_reward}</span>
                               </div>
                             )}
                             {a.unlocked && (
@@ -583,10 +526,10 @@ export default function Profile() {
                                     URL.revokeObjectURL(url);
                                   } catch { /* ignore */ }
                                 }}
-                                className="p-1 rounded hover:bg-surface-raised/60 transition-colors"
+                                className="p-1 rounded-md hover:bg-surface-raised/60 transition-colors"
                                 title="Download badge"
                               >
-                                <Download size={12} className="text-muted hover:text-cream" />
+                                <Download size={11} className="text-muted hover:text-cream" />
                               </button>
                             )}
                           </div>
@@ -603,10 +546,10 @@ export default function Profile() {
 
       {/* Progress Charts */}
       {showProgress && (
-        <div className="game-panel p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-cream text-sm font-bold flex items-center gap-2">
-              <BarChart3 size={16} className="text-sky" />
+        <div className="game-panel p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-cream text-sm font-semibold flex items-center gap-2">
+              <BarChart3 size={14} className="text-accent" />
               Progress Charts
             </h2>
             <button
@@ -622,16 +565,16 @@ export default function Profile() {
 
       {/* Progress Charts for parents */}
       {!isKid && (
-        <div className="game-panel p-5">
+        <div className="game-panel p-4">
           <button
             onClick={() => setShowProgress((v) => !v)}
             className="w-full flex items-center justify-center gap-2 py-2 text-muted hover:text-cream transition-colors text-xs font-medium"
           >
-            <BarChart3 size={14} />
+            <BarChart3 size={13} />
             {showProgress ? 'Hide Family Progress Charts' : 'View Family Progress Charts'}
           </button>
           {showProgress && (
-            <div className="mt-4">
+            <div className="mt-3">
               <ProgressCharts />
             </div>
           )}
@@ -639,9 +582,9 @@ export default function Profile() {
       )}
 
       {/* PIN Setup */}
-      <div className="game-panel p-5">
-        <h2 className="text-cream text-sm font-bold mb-4 flex items-center gap-2">
-          <KeyRound size={16} className="text-muted" />
+      <div className="game-panel p-4">
+        <h2 className="text-cream text-sm font-semibold mb-3 flex items-center gap-2">
+          <KeyRound size={14} className="text-muted" />
           Quick PIN Login
         </h2>
         <div className="flex gap-2">
@@ -670,41 +613,16 @@ export default function Profile() {
       </div>
 
       {/* Password Change */}
-      <div className="game-panel p-5">
-        <h2 className="text-cream text-sm font-bold mb-4 flex items-center gap-2">
-          <Lock size={16} className="text-muted" />
+      <div className="game-panel p-4">
+        <h2 className="text-cream text-sm font-semibold mb-3 flex items-center gap-2">
+          <Lock size={14} className="text-muted" />
           Change Password
         </h2>
-        <div className="space-y-3">
-          <input
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            placeholder="Current password"
-            autoComplete="current-password"
-            className="field-input"
-          />
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="New password"
-            autoComplete="new-password"
-            className="field-input"
-          />
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Confirm new password"
-            autoComplete="new-password"
-            className="field-input"
-          />
-          <button
-            onClick={changePassword}
-            disabled={pwSaving}
-            className="game-btn game-btn-blue"
-          >
+        <div className="space-y-2">
+          <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current password" autoComplete="current-password" className="field-input" />
+          <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New password" autoComplete="new-password" className="field-input" />
+          <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" autoComplete="new-password" className="field-input" />
+          <button onClick={changePassword} disabled={pwSaving} className="game-btn game-btn-blue">
             {pwSaving ? 'Changing...' : 'Change Password'}
           </button>
         </div>
@@ -719,11 +637,9 @@ export default function Profile() {
       <PushNotificationToggle />
 
       {/* Theme Toggle */}
-      <div className="game-panel p-5">
-        <h2 className="text-cream text-sm font-bold mb-4">
-          Appearance
-        </h2>
-        <div className="flex items-center gap-1 mb-5 bg-navy/60 rounded-lg p-1">
+      <div className="game-panel p-4">
+        <h2 className="text-cream text-sm font-semibold mb-3">Appearance</h2>
+        <div className="flex items-center gap-0.5 mb-4 bg-navy/60 rounded-md p-0.5">
           {[
             { id: 'light', icon: Sun, label: 'Light' },
             { id: 'dark', icon: Moon, label: 'Dark' },
@@ -732,61 +648,58 @@ export default function Profile() {
             <button
               key={id}
               onClick={() => setMode(id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-medium transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 mode === id
-                  ? 'bg-sky/20 text-sky border border-sky/30'
+                  ? 'bg-surface-raised text-cream'
                   : 'text-muted hover:text-cream'
               }`}
             >
-              <Icon size={14} />
+              <Icon size={13} />
               {label}
             </button>
           ))}
         </div>
 
-        {/* Color Theme Picker */}
-        <h3 className="text-cream/80 text-xs font-semibold uppercase tracking-wider mb-3">
-          Color Theme
-        </h3>
+        {/* Color Theme */}
+        <p className="text-muted text-xs font-medium mb-2">Color Theme</p>
         {['boy', 'girl'].map((group) => (
-          <div key={group} className="mb-4">
-            <p className="text-muted text-[11px] font-semibold uppercase tracking-widest mb-2">
+          <div key={group} className="mb-3">
+            <p className="text-muted text-[11px] font-medium mb-1.5">
               {group === 'boy' ? 'Knight Themes' : 'Princess Themes'}
             </p>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
               {COLOR_THEMES.filter((t) => t.group === group).map((t) => {
                 const isActive = colorTheme === t.id;
                 return (
                   <button
                     key={t.id}
                     onClick={() => setColorTheme(t.id)}
-                    className={`relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
+                    className={`relative flex flex-col items-center gap-1 p-2 rounded-md border transition-colors ${
                       isActive
-                        ? 'border-accent bg-accent/10 scale-[1.02]'
+                        ? 'border-accent bg-accent/10'
                         : 'border-border hover:border-border-light bg-surface-raised/30'
                     }`}
                   >
-                    {/* Colour swatch */}
-                    <div className="flex gap-1">
+                    <div className="flex gap-0.5">
                       <div
-                        className="w-5 h-5 rounded-full border border-white/10"
+                        className="w-4 h-4 rounded-full border border-white/10"
                         style={{ backgroundColor: t.accent }}
                       />
                       <div
-                        className="w-5 h-5 rounded-full border border-white/10"
+                        className="w-4 h-4 rounded-full border border-white/10"
                         style={{ backgroundColor: t.secondary }}
                       />
                       <div
-                        className="w-5 h-5 rounded-full border border-white/10"
+                        className="w-4 h-4 rounded-full border border-white/10"
                         style={{ backgroundColor: t.tertiary }}
                       />
                     </div>
-                    <span className="text-[11px] font-medium text-cream/80 leading-tight text-center">
+                    <span className="text-[10px] font-medium text-cream/80 leading-tight text-center">
                       {t.label}
                     </span>
                     {isActive && (
                       <div
-                        className="absolute top-1 right-1 w-3 h-3 rounded-full"
+                        className="absolute top-1 right-1 w-2 h-2 rounded-full"
                         style={{ backgroundColor: t.accent }}
                       />
                     )}
@@ -800,37 +713,33 @@ export default function Profile() {
 
       {/* Management */}
       {(user?.role === 'admin' || user?.role === 'parent') && (
-        <div className="game-panel p-5 space-y-2">
-          <h2 className="text-cream text-sm font-bold mb-3 flex items-center gap-2">
-            <Settings size={16} className="text-muted" />
+        <div className="game-panel p-4 space-y-1.5">
+          <h2 className="text-cream text-sm font-semibold mb-2 flex items-center gap-2">
+            <Settings size={14} className="text-muted" />
             Management
           </h2>
           <button
             onClick={() => navigate('/settings')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-surface-raised/50 hover:bg-surface-raised border border-border/50 hover:border-border transition-colors text-left"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md bg-surface-raised/50 hover:bg-surface-raised border border-border/50 hover:border-border transition-colors text-left"
           >
-            <div className="w-9 h-9 rounded-lg bg-sky/10 border border-sky/20 flex items-center justify-center flex-shrink-0">
-              <Settings size={18} className="text-sky" />
-            </div>
+            <Settings size={16} className="text-accent flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-cream text-sm font-medium">Family Settings</p>
-              <p className="text-muted text-xs">Features, resets &amp; rewards</p>
+              <p className="text-muted text-xs">Features, resets & rewards</p>
             </div>
-            <ChevronRight size={16} className="text-muted flex-shrink-0" />
+            <ChevronRight size={14} className="text-muted flex-shrink-0" />
           </button>
           {user?.role === 'admin' && (
             <button
               onClick={() => navigate('/admin')}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-surface-raised/50 hover:bg-surface-raised border border-border/50 hover:border-border transition-colors text-left"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md bg-surface-raised/50 hover:bg-surface-raised border border-border/50 hover:border-border transition-colors text-left"
             >
-              <div className="w-9 h-9 rounded-lg bg-crimson/10 border border-crimson/20 flex items-center justify-center flex-shrink-0">
-                <ShieldCheck size={18} className="text-crimson" />
-              </div>
+              <ShieldCheck size={16} className="text-crimson flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-cream text-sm font-medium">Admin Dashboard</p>
-                <p className="text-muted text-xs">Users, keys &amp; audit log</p>
+                <p className="text-muted text-xs">Users, keys & audit log</p>
               </div>
-              <ChevronRight size={16} className="text-muted flex-shrink-0" />
+              <ChevronRight size={14} className="text-muted flex-shrink-0" />
             </button>
           )}
         </div>

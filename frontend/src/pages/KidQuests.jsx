@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import {
   Loader2,
   Star,
@@ -22,15 +21,6 @@ const STATUS_CONFIG = {
   completed: { label: 'Awaiting Approval', color: 'text-gold', icon: Clock },
   verified: { label: 'Approved', color: 'text-emerald', icon: CheckCircle2 },
   skipped: { label: 'Skipped', color: 'text-muted/50', icon: SkipForward },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: (i) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.05, type: 'spring', stiffness: 300, damping: 28 },
-  }),
 };
 
 export default function KidQuests() {
@@ -98,7 +88,7 @@ export default function KidQuests() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="animate-spin text-sky" size={28} />
+        <Loader2 className="animate-spin text-accent" size={24} />
       </div>
     );
   }
@@ -108,7 +98,7 @@ export default function KidQuests() {
       <div className="max-w-2xl mx-auto py-6">
         <div className="game-panel p-8 text-center">
           <XCircle size={36} className="mx-auto text-crimson mb-3" />
-          <p className="text-cream text-lg font-extrabold mb-2">Error</p>
+          <p className="text-cream text-base font-semibold mb-2">Error</p>
           <p className="text-muted text-sm">{error}</p>
         </div>
       </div>
@@ -134,7 +124,7 @@ export default function KidQuests() {
             animate
           />
           <div className="min-w-0 flex-1">
-            <h1 className="font-heading text-cream text-base sm:text-xl font-extrabold truncate">
+            <h1 className="text-cream text-sm sm:text-base font-semibold truncate">
               {kid.display_name}'s Quests
             </h1>
             <div className="flex items-center gap-3 mt-1">
@@ -185,13 +175,9 @@ export default function KidQuests() {
             const isBusy = isVerifying || isRejecting;
 
             return (
-              <motion.div
+              <div
                 key={a.id}
                 className={`game-panel p-3 sm:p-4 ${isVerified ? 'opacity-50' : ''}`}
-                variants={cardVariants}
-                initial="hidden"
-                animate="visible"
-                custom={idx}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div
@@ -199,11 +185,11 @@ export default function KidQuests() {
                     onClick={() => navigate(`/chores/${a.chore_id}`)}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-cream text-sm font-bold truncate">
+                      <h3 className="text-cream text-sm font-medium truncate">
                         {themedTitle(a.chore.title, colorTheme)}
                       </h3>
                       {a.chore.requires_photo && (
-                        <Camera size={12} className="text-sky flex-shrink-0" />
+                        <Camera size={12} className="text-accent flex-shrink-0" />
                       )}
                     </div>
                     {a.chore.description && (
@@ -270,11 +256,11 @@ export default function KidQuests() {
                     <img
                       src={`/api/uploads/${a.photo_proof_path}`}
                       alt="Photo proof"
-                      className="rounded-lg max-h-48 object-cover border border-border"
+                      className="rounded-md max-h-48 object-cover border border-border"
                     />
                   </div>
                 )}
-              </motion.div>
+              </div>
             );
           })}
         </div>

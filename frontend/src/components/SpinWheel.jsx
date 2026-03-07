@@ -126,7 +126,7 @@ export default function SpinWheel({ availability, onSpinComplete }) {
         >
           <svg
             viewBox="0 0 300 300"
-            className="w-full h-full drop-shadow-xl"
+            className="w-full h-full"
           >
             {/* Outer ring */}
             <circle
@@ -182,7 +182,7 @@ export default function SpinWheel({ availability, onSpinComplete }) {
       {result !== null && (
         <div className="game-panel px-6 py-3 text-center">
           <p className="text-muted text-xs">You won</p>
-          <p className="text-gold text-lg font-bold mt-1">
+          <p className="text-gold text-sm font-semibold mt-1">
             {result} XP
           </p>
         </div>

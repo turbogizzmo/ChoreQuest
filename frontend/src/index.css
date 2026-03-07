@@ -1,25 +1,25 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy: #0a0e1a;
-  --color-navy-light: #111827;
-  --color-navy-mid: #1e293b;
-  --color-gold: #f59e0b;
-  --color-gold-light: #fbbf24;
+  --color-navy: #121212;
+  --color-navy-light: #1a1a1a;
+  --color-navy-mid: #252525;
+  --color-gold: #d4a017;
+  --color-gold-light: #e0b730;
   --color-emerald: #10b981;
   --color-crimson: #ef4444;
   --color-purple: #a855f7;
-  --color-sky: #3b82f6;
-  --color-cream: #f1f5f9;
-  --color-accent: #3b82f6;
-  --color-accent-light: #60a5fa;
-  --color-surface: #111827;
-  --color-surface-raised: #1e293b;
-  --color-border: #1e293b;
-  --color-border-light: #334155;
-  --color-muted: #94a3b8;
-  --font-heading: "Inter", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
+  --color-sky: #14b8a6;
+  --color-cream: #e5e5e5;
+  --color-accent: #14b8a6;
+  --color-accent-light: #2dd4bf;
+  --color-surface: #1a1a1a;
+  --color-surface-raised: #252525;
+  --color-border: #2a2a2a;
+  --color-border-light: #3a3a3a;
+  --color-muted: #888888;
+  --font-heading: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", system-ui, sans-serif;
 }
 
 * {
@@ -33,7 +33,7 @@ html {
 
 body {
   font-family: var(--font-body);
-  font-size: 15px;
+  font-size: 14px;
   background: var(--color-navy);
   color: var(--color-cream);
   min-height: 100dvh;
@@ -45,86 +45,63 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-weight: 600;
 }
 
-/* Card panel with subtle elevation */
+/* Card panel */
 .game-panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .game-panel:hover {
   border-color: var(--color-border-light);
 }
 
-/* Modern button base */
+/* Button base */
 .game-btn {
-  font-family: var(--font-heading);
+  font-family: var(--font-body);
   font-size: 13px;
-  font-weight: 600;
-  padding: 10px 20px;
+  font-weight: 500;
+  padding: 8px 16px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.15s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
 }
 
 .game-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  opacity: 0.85;
 }
 
 .game-btn:active {
-  transform: translateY(0);
+  opacity: 0.7;
 }
 
 .game-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 
 .game-btn-gold {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: #0a0e1a;
-}
-
-.game-btn-gold:hover {
-  box-shadow: 0 4px 16px rgba(245,158,11,0.3);
+  background: #d4a017;
+  color: #121212;
 }
 
 .game-btn-blue {
-  background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 80%, black));
-  color: white;
-}
-
-.game-btn-blue:hover {
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  background: var(--color-accent);
+  color: #121212;
 }
 
 .game-btn-red {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
+  background: #dc2626;
   color: white;
-}
-
-.game-btn-red:hover {
-  box-shadow: 0 4px 16px rgba(239,68,68,0.3);
 }
 
 .game-btn-purple {
-  background: linear-gradient(135deg, #a855f7, #9333ea);
+  background: #7c3aed;
   color: white;
-}
-
-.game-btn-purple:hover {
-  box-shadow: 0 4px 16px rgba(168,85,247,0.3);
 }
 
 /* Input fields */
@@ -133,48 +110,37 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--color-navy);
   border: 1px solid var(--color-border);
   color: var(--color-cream);
-  padding: 10px 14px;
-  border-radius: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
   font-family: var(--font-body);
   font-size: 14px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .field-input::placeholder {
   color: var(--color-muted);
-  opacity: 0.5;
+  opacity: 0.6;
 }
 
 .field-input:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent);
 }
 
 /* XP progress bar */
 .xp-bar {
-  height: 8px;
+  height: 6px;
   background: var(--color-navy);
-  border-radius: 4px;
+  border-radius: 3px;
   overflow: hidden;
+  position: relative;
 }
 
 .xp-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-light));
-  border-radius: 4px;
-  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* Level-up glow keyframe */
-@keyframes levelGlow {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 40%, transparent); }
-  50% { box-shadow: 0 0 20px 8px color-mix(in srgb, var(--color-accent) 20%, transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 0%, transparent); }
-}
-
-.level-up-glow {
-  animation: levelGlow 1.5s ease-out;
+  background: var(--color-accent);
+  border-radius: 3px;
+  transition: width 0.4s ease;
 }
 
 /* Scrollbar */
@@ -192,38 +158,22 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--color-border-light);
 }
 
-/* Stat card subtle shine */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.stat-shimmer {
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent);
-  background-size: 200% 100%;
-  animation: shimmer 3s ease-in-out infinite;
-}
-
-/* ─── Light Mode ─── */
+/* Light Mode */
 .light-mode {
-  --color-navy: #f8fafc;
-  --color-navy-light: #f1f5f9;
-  --color-navy-mid: #e2e8f0;
-  --color-cream: #0f172a;
+  --color-navy: #f5f5f4;
+  --color-navy-light: #e7e5e4;
+  --color-navy-mid: #d6d3d1;
+  --color-cream: #1c1917;
   --color-surface: #ffffff;
-  --color-surface-raised: #f1f5f9;
-  --color-border: #e2e8f0;
-  --color-border-light: #cbd5e1;
-  --color-muted: #64748b;
+  --color-surface-raised: #f5f5f4;
+  --color-border: #d6d3d1;
+  --color-border-light: #a8a29e;
+  --color-muted: #78716c;
 }
 
 .light-mode body {
   background: var(--color-navy);
   color: var(--color-cream);
-}
-
-.light-mode .game-panel {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
 }
 
 .light-mode .field-input {
@@ -248,11 +198,9 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--color-border-light);
 }
 
-/* ═══════════════════════════════════════════
-   Color Themes
-   ═══════════════════════════════════════════ */
+/* Color Themes */
 
-/* Dragon Fire — red/orange fiery theme */
+/* Dragon Fire */
 .theme-dragon {
   --color-sky: #ef4444;
   --color-accent: #ef4444;
@@ -274,7 +222,7 @@ h1, h2, h3, h4, h5, h6 {
   --color-border-light: #fca5a5;
 }
 
-/* Enchanted Forest — green/earth tones */
+/* Enchanted Forest */
 .theme-forest {
   --color-sky: #10b981;
   --color-accent: #10b981;
@@ -296,7 +244,7 @@ h1, h2, h3, h4, h5, h6 {
   --color-border-light: #6ee7b7;
 }
 
-/* Galaxy — purple/magenta space theme */
+/* Galaxy */
 .theme-galaxy {
   --color-sky: #a855f7;
   --color-accent: #a855f7;
@@ -318,7 +266,7 @@ h1, h2, h3, h4, h5, h6 {
   --color-border-light: #d8b4fe;
 }
 
-/* Rose Gold — pink/rose warm theme */
+/* Rose Gold */
 .theme-rose {
   --color-sky: #ec4899;
   --color-accent: #ec4899;
@@ -340,11 +288,11 @@ h1, h2, h3, h4, h5, h6 {
   --color-border-light: #f9a8d4;
 }
 
-/* Sunshine — yellow/coral warm theme */
+/* Sunshine */
 .theme-sunshine {
-  --color-sky: #f59e0b;
-  --color-accent: #f59e0b;
-  --color-accent-light: #fbbf24;
+  --color-sky: #d4a017;
+  --color-accent: #d4a017;
+  --color-accent-light: #e0b730;
   --color-navy: #1a140a;
   --color-navy-light: #1f1a0d;
   --color-surface: #1f1a0d;
@@ -362,7 +310,7 @@ h1, h2, h3, h4, h5, h6 {
   --color-border-light: #fcd34d;
 }
 
-/* Arctic — ice blue/cool theme */
+/* Arctic */
 .theme-arctic {
   --color-sky: #06b6d4;
   --color-accent: #06b6d4;
@@ -384,7 +332,7 @@ h1, h2, h3, h4, h5, h6 {
   --color-border-light: #67e8f9;
 }
 
-/* Fairy Dust — soft lavender/purple theme */
+/* Fairy Dust */
 .theme-fairy {
   --color-sky: #c084fc;
   --color-accent: #c084fc;
@@ -406,7 +354,7 @@ h1, h2, h3, h4, h5, h6 {
   --color-border-light: #d8b4fe;
 }
 
-/* ── Hide scrollbar for horizontal category strip ── */
+/* Hide scrollbar for horizontal strip */
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -415,16 +363,13 @@ h1, h2, h3, h4, h5, h6 {
   display: none;
 }
 
-/* ── Avatar idle animations ── */
-
-/* Gentle body sway — rocks the whole avatar left/right */
+/* Avatar idle animations */
 @keyframes avatar-sway {
   0%, 100% { transform: rotate(0deg); }
   30% { transform: rotate(0.8deg); }
   70% { transform: rotate(-0.8deg); }
 }
 
-/* Idle fidget — every ~12s a bigger nod/shift breaks the loop */
 @keyframes avatar-fidget {
   0%, 85%, 100% { transform: rotate(0deg) translateY(0); }
   88% { transform: rotate(-1.5deg) translateY(-0.3px); }
@@ -433,34 +378,29 @@ h1, h2, h3, h4, h5, h6 {
   97% { transform: rotate(0deg) translateY(0); }
 }
 
-/* Eye blink — eyelid ovals cover eyes for ~400ms every 4s */
 @keyframes avatar-blink {
   0%, 86%, 100% { opacity: 0; }
   90%, 96% { opacity: 1; }
 }
 
-/* Mouth breathing — subtle stretch open/close */
 @keyframes avatar-mouth-move {
   0%, 90%, 100% { transform: scaleY(1); }
   93% { transform: scaleY(1.25); }
   96% { transform: scaleY(1); }
 }
 
-/* Pet bounce — small hop up and down */
 @keyframes avatar-pet-bounce {
   0%, 100% { transform: translateY(0); }
   40% { transform: translateY(-0.6px); }
   60% { transform: translateY(-0.6px); }
 }
 
-/* Pet tail wag — rotation back and forth */
 @keyframes avatar-tail-wag {
   0%, 100% { transform: rotate(0deg); }
   25% { transform: rotate(12deg); }
   75% { transform: rotate(-12deg); }
 }
 
-/* Accessory sparkle — brief flash of a highlight */
 @keyframes avatar-sparkle {
   0%, 88%, 100% { opacity: 0; }
   92% { opacity: 0.8; }
@@ -468,14 +408,12 @@ h1, h2, h3, h4, h5, h6 {
   97% { opacity: 0.5; }
 }
 
-/* ── Apply animations when .avatar-idle is present ── */
-
 .avatar-idle .avatar-svg {
   animation:
     avatar-sway 4s ease-in-out infinite,
     avatar-fidget 12s ease-in-out infinite;
   animation-delay: var(--avatar-delay, 0s);
-  transform-origin: 16px 28px; /* bottom-center of 32x32 viewBox */
+  transform-origin: 16px 28px;
 }
 
 .avatar-idle .avatar-eyelid {
@@ -486,7 +424,7 @@ h1, h2, h3, h4, h5, h6 {
 .avatar-idle .avatar-mouth {
   animation: avatar-mouth-move 7s ease-in-out infinite;
   animation-delay: var(--avatar-delay, 0s);
-  transform-origin: 16px 18px; /* center of mouth area */
+  transform-origin: 16px 18px;
 }
 
 .avatar-idle .avatar-pet {
@@ -506,103 +444,46 @@ h1, h2, h3, h4, h5, h6 {
   animation-delay: var(--avatar-delay, 0s);
 }
 
-/* ── Pet glow pulse for high-level pets ── */
-@keyframes pet-glow-pulse {
-  0%, 100% { opacity: 0.1; r: 3.5; }
-  50% { opacity: 0.25; r: 4.5; }
-}
-
-.avatar-idle circle[class*="pet-glow"] {
-  animation: pet-glow-pulse 3s ease-in-out infinite;
-}
-
-/* ═══════════════════════════════════════════
-   Quest Board Themes
-   ═══════════════════════════════════════════ */
-
-/* ── Floating particle animation ── */
-@keyframes quest-particle-drift {
-  0% { transform: translateY(0) translateX(0) scale(1); opacity: 0.12; }
-  25% { transform: translateY(-6px) translateX(3px) scale(1.05); opacity: 0.18; }
-  50% { transform: translateY(-2px) translateX(-2px) scale(0.95); opacity: 0.14; }
-  75% { transform: translateY(-8px) translateX(1px) scale(1.02); opacity: 0.2; }
-  100% { transform: translateY(0) translateX(0) scale(1); opacity: 0.12; }
-}
-
-.quest-particle {
-  animation: quest-particle-drift 8s ease-in-out infinite;
-}
-
-/* ── Halloween / Haunted Dungeon ── */
+/* Quest Board Themes — subtle border tints only */
 .quest-board-halloween .game-panel {
   border-color: rgba(147, 51, 234, 0.2);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15),
-              0 0 20px rgba(147, 51, 234, 0.06);
 }
 .quest-board-halloween .game-panel:hover {
   border-color: rgba(147, 51, 234, 0.35);
 }
 
-/* ── Christmas / Winter Workshop ── */
 .quest-board-christmas .game-panel {
   border-color: rgba(22, 101, 52, 0.2);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15),
-              0 0 20px rgba(22, 101, 52, 0.06);
 }
 .quest-board-christmas .game-panel:hover {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
-/* ── Space Station ── */
 .quest-board-space .game-panel {
   border-color: rgba(59, 130, 246, 0.2);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15),
-              0 0 20px rgba(59, 130, 246, 0.06);
 }
 .quest-board-space .game-panel:hover {
   border-color: rgba(59, 130, 246, 0.35);
 }
 
-/* ── Ocean Kingdom ── */
 .quest-board-underwater .game-panel {
   border-color: rgba(6, 182, 212, 0.2);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15),
-              0 0 20px rgba(6, 182, 212, 0.06);
 }
 .quest-board-underwater .game-panel:hover {
   border-color: rgba(6, 182, 212, 0.35);
 }
 
-/* ── Enchanted Garden ── */
 .quest-board-enchanted .game-panel {
   border-color: rgba(236, 72, 153, 0.2);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15),
-              0 0 20px rgba(236, 72, 153, 0.06);
 }
 .quest-board-enchanted .game-panel:hover {
   border-color: rgba(236, 72, 153, 0.35);
 }
 
-/* ═══════════════════════════════════════════
-   Pet Level Visual Effects
-   ═══════════════════════════════════════════ */
-
-@keyframes pet-sparkle-pulse {
-  0%, 100% { opacity: 0; transform: scale(0.5); }
-  50% { opacity: 0.8; transform: scale(1.2); }
-}
-
+/* Pet Level Visual Effects */
 @keyframes pet-shimmer-rotate {
   0% { stroke-dashoffset: 20; }
   100% { stroke-dashoffset: 0; }
-}
-
-.pet-sparkle {
-  animation: pet-sparkle-pulse 2.5s ease-in-out infinite;
-}
-
-.pet-sparkle-delay {
-  animation-delay: 1.2s;
 }
 
 .pet-shimmer {
@@ -610,17 +491,13 @@ h1, h2, h3, h4, h5, h6 {
   animation: pet-shimmer-rotate 3s linear infinite;
 }
 
-/* ═══════════════════════════════════════════
-   Pet Interaction Animations (Kid Dashboard)
-   ═══════════════════════════════════════════ */
-
+/* Pet Interaction Animations */
 .pet-interaction-stage {
   position: relative;
   display: inline-block;
   transition: transform 0.2s ease;
 }
 
-/* Feed — pet bobs down (eating) then bounces up satisfied */
 @keyframes pet-action-feed-anim {
   0%   { transform: translateY(0) scale(1); }
   15%  { transform: translateY(4px) scale(1.05, 0.92); }
@@ -635,7 +512,6 @@ h1, h2, h3, h4, h5, h6 {
   animation: pet-action-feed-anim 0.8s ease-in-out;
 }
 
-/* Play — pet does a full flip/spin */
 @keyframes pet-action-play-anim {
   0%   { transform: rotate(0deg) scale(1); }
   25%  { transform: rotate(90deg) scale(0.9) translateY(-8px); }
@@ -648,7 +524,6 @@ h1, h2, h3, h4, h5, h6 {
   animation: pet-action-play-anim 0.7s ease-in-out;
 }
 
-/* Pet/Stroke — happy wiggle like a puppy being stroked */
 @keyframes pet-action-pet-anim {
   0%, 100% { transform: rotate(0deg) translateX(0); }
   10%  { transform: rotate(-8deg) translateX(-2px); }
@@ -666,7 +541,6 @@ h1, h2, h3, h4, h5, h6 {
   animation: pet-action-pet-anim 0.9s ease-in-out;
 }
 
-/* ── Tap-to-place crosshair in editor ── */
 @keyframes pet-place-pulse {
   0%, 100% { r: 1.5; opacity: 0.6; }
   50% { r: 2.2; opacity: 1; }

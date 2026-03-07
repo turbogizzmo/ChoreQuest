@@ -129,7 +129,7 @@ export default function Settings() {
         onClick={() => onChange(!enabled)}
         className={`relative inline-flex h-6 w-11 items-center rounded-full border transition-colors flex-shrink-0 ${
           enabled
-            ? 'bg-sky/30 border-sky/40'
+            ? 'bg-accent/30 border-accent/40'
             : 'bg-navy border-border'
         }`}
         aria-label={`Toggle ${label}`}
@@ -137,7 +137,7 @@ export default function Settings() {
         <span
           className={`inline-block h-4 w-4 rounded-full transition-transform ${
             enabled
-              ? 'translate-x-6 bg-sky'
+              ? 'translate-x-6 bg-accent'
               : 'translate-x-1 bg-muted/60'
           }`}
         />
@@ -157,7 +157,7 @@ export default function Settings() {
       </button>
       <div className="flex items-center gap-3 mb-6">
         <CogIcon size={24} className="text-cream" />
-        <h1 className="text-cream text-lg font-bold">
+        <h1 className="text-cream text-lg font-semibold">
           Family Settings
         </h1>
       </div>
@@ -168,7 +168,7 @@ export default function Settings() {
           <Shield size={48} className="text-crimson/30 mx-auto mb-4" />
           <p className="text-crimson text-sm">{error}</p>
           <p className="text-muted text-xs mt-2">
-            Only guild leaders may alter the realm's configuration.
+            Only parents and admins can change settings.
           </p>
         </div>
       )}
@@ -176,7 +176,7 @@ export default function Settings() {
       {/* Loading */}
       {loading && !error && (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={32} className="text-sky animate-spin" />
+          <Loader2 size={24} className="text-accent animate-spin" />
         </div>
       )}
 
@@ -185,7 +185,7 @@ export default function Settings() {
         <div className="space-y-6">
           {/* Toggle settings */}
           <div className="game-panel p-4">
-            <h2 className="text-cream text-base font-bold mb-3">
+            <h2 className="text-cream text-sm font-semibold mb-3">
               Feature Toggles
             </h2>
 
@@ -210,7 +210,7 @@ export default function Settings() {
 
           {/* Daily reset hour */}
           <div className="game-panel p-4">
-            <h2 className="text-cream text-base font-bold mb-3">
+            <h2 className="text-cream text-sm font-semibold mb-3">
               Daily Reset Hour
             </h2>
             <p className="text-muted text-xs mb-3">
@@ -250,14 +250,14 @@ export default function Settings() {
 
           {/* Achievement point values */}
           <div className="game-panel p-4">
-            <h2 className="text-cream text-base font-bold mb-3 flex items-center gap-2">
+            <h2 className="text-cream text-sm font-semibold mb-3 flex items-center gap-2">
               <Award size={16} className="text-muted" />
               Achievement Point Values
             </h2>
 
             {achievementsLoading ? (
               <div className="flex justify-center py-4">
-                <Loader2 size={20} className="text-sky animate-spin" />
+                <Loader2 size={20} className="text-accent animate-spin" />
               </div>
             ) : achievements.length === 0 ? (
               <p className="text-muted text-xs">
@@ -271,7 +271,7 @@ export default function Settings() {
                   return (
                   <div
                     key={ach.id}
-                    className="p-3 rounded-lg bg-surface-raised/30 border border-border space-y-2"
+                    className="p-3 rounded-md bg-surface-raised/30 border border-border space-y-2"
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -279,7 +279,7 @@ export default function Settings() {
                           {ach.title || ach.name}
                         </p>
                         {ach.tier && (
-                          <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${tierStyle}`}>
+                          <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-md border ${tierStyle}`}>
                             {ach.tier}
                           </span>
                         )}
