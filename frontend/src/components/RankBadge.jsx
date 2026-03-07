@@ -19,7 +19,7 @@ export default function RankBadge({ rank, size = 'sm' }) {
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border font-semibold ${colors.bg} ${colors.border} ${colors.text} ${
+      className={`inline-flex items-center gap-1 rounded-md border font-semibold ${colors.bg} ${colors.border} ${colors.text} ${
         isSmall ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'
       }`}
     >

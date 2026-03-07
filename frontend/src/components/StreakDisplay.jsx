@@ -1,17 +1,5 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { Flame } from 'lucide-react';
-
-const flickerAnimation = {
-  scale: [1, 1.1, 0.97, 1.05, 1],
-  rotate: [-1, 2, -2, 1, 0],
-  transition: {
-    duration: 1,
-    repeat: Infinity,
-    repeatType: 'mirror',
-    ease: 'easeInOut',
-  },
-};
 
 function getFlameProps(streak) {
   if (streak >= 30) {
@@ -35,13 +23,7 @@ export default function StreakDisplay({ streak = 0, longest = 0 }) {
       onMouseLeave={() => setShowTooltip(false)}
     >
       {/* Flame Icon */}
-      {isEpic ? (
-        <motion.div animate={flickerAnimation} className="flex items-center">
-          <Flame size={flameProps.size} className={flameProps.className} />
-        </motion.div>
-      ) : (
-        <Flame size={flameProps.size} className={flameProps.className} />
-      )}
+      <Flame size={flameProps.size} className={flameProps.className} />
 
       {/* Streak Count */}
       <span className="font-bold text-orange-400 text-sm tabular-nums">

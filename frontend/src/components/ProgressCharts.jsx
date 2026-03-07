@@ -149,7 +149,7 @@ export default function ProgressCharts() {
           Completion Rate
         </h3>
         <div className="h-16 overflow-hidden">
-          <SparkLine data={days} dataKey="rate" color="#3b82f6" height={60} />
+          <SparkLine data={days} dataKey="rate" color="#14b8a6" height={60} />
         </div>
         <div className="flex justify-between mt-1">
           <span className="text-muted text-[9px]">{days[0]?.date?.slice(5)}</span>

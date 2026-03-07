@@ -266,7 +266,7 @@ function ColorSwatch({ colors, selected, onSelect }) {
           key={c}
           onClick={() => onSelect(c)}
           className={`w-7 h-7 rounded-full border-2 transition-all ${
-            selected === c ? 'border-accent scale-110' : 'border-transparent hover:border-border-light'
+            selected === c ? 'border-accent' : 'border-transparent hover:border-border-light'
           }`}
           style={{ backgroundColor: c }}
           aria-label={c}

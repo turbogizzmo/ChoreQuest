@@ -332,7 +332,7 @@ export default function KidDashboard() {
               if (!chore) return null;
 
               const diff = difficultyLabel(chore.difficulty);
-              const categoryColor = chore.category?.colour || '#3b82f6';
+              const categoryColor = chore.category?.colour || '#14b8a6';
 
               return (
                 <motion.div

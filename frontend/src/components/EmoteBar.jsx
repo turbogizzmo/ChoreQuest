@@ -81,7 +81,7 @@ export default function EmoteBar() {
             key={emote.id}
             onClick={() => sendEmote(emote)}
             disabled={cooldown}
-            className={`w-9 h-9 rounded-lg text-lg transition-all hover:scale-110 active:scale-95 bg-surface-raised border border-border/50 hover:border-border-light ${
+            className={`w-9 h-9 rounded-lg text-lg transition-colors bg-surface-raised border border-border/50 hover:border-border-light ${
               cooldown ? 'opacity-50 cursor-not-allowed' : ''
             }`}
             title={emote.label}

@@ -77,7 +77,7 @@ export default function ShoutoutPanel({ members }) {
   return (
     <div className="game-panel p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-cream text-sm font-bold flex items-center gap-2">
+        <h2 className="text-cream text-sm font-semibold flex items-center gap-2">
           <Megaphone size={14} className="text-gold" />
           Shoutouts
         </h2>
