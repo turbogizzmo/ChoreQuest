@@ -360,6 +360,15 @@ async def cleanup_all_stale(
     }
 
 
+@router.get("/templates", response_model=list[QuestTemplateResponse])
+async def list_templates(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(QuestTemplate))
+    return [QuestTemplateResponse.model_validate(t) for t in result.scalars().all()]
+
+
 @router.get("/{chore_id}", response_model=ChoreResponse)
 async def get_chore(
     chore_id: int,
@@ -438,17 +447,6 @@ async def delete_chore(
 
 # ---------------------------------------------------------------------------
 # Quest Templates
-# ---------------------------------------------------------------------------
-
-@router.get("/templates", response_model=list[QuestTemplateResponse])
-async def list_templates(
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    result = await db.execute(select(QuestTemplate))
-    return [QuestTemplateResponse.model_validate(t) for t in result.scalars().all()]
-
-
 # ---------------------------------------------------------------------------
 # Assignment Rules
 # ---------------------------------------------------------------------------
