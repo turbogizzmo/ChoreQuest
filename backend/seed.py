@@ -200,6 +200,7 @@ QUEST_TEMPLATES = [
     {"title": "The Grand Polish", "description": "The ancient wooden furniture of the great chamber has lost its lustre. Take up the polishing oil and cloth, and restore the piano, desks, and relics of the realm to their former glory.", "category_name": "General", "difficulty": Difficulty.medium, "suggested_points": 20, "icon": "home"},
     {"title": "The Couch Cleansing", "description": "The royal seating has fallen into disrepute. Wield the lint roller against the fur invaders, then apply the enchanted carpet potion to vanquish every stain that mars the upholstery.", "category_name": "General", "difficulty": Difficulty.easy, "suggested_points": 15, "icon": "home"},
     {"title": "The Grand Purge", "description": "Every chamber in the realm has a bin that festers. Make your rounds through the upstairs keep, the master bath, the kitchen, the office, and every bathroom in between. Empty each vessel, replace the lining, and leave no room untouched.", "category_name": "General", "difficulty": Difficulty.easy, "suggested_points": 15, "icon": "home"},
+    {"title": "The Endurance Trial", "description": "Every great hero must train their body as well as their mind. Mount the enchanted running machine and complete your allotted time upon it. Only those who endure the trial grow stronger.", "category_name": "General", "difficulty": Difficulty.medium, "suggested_points": 20, "icon": "home"},
 ]
 
 
