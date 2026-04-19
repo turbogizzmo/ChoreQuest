@@ -936,8 +936,8 @@ async def complete_chore(
             type=NotificationType.chore_completed,
             title="Quest Awaiting Approval",
             message=f"{user.display_name} completed '{chore.title}' - tap to approve (+{chore.points} XP)",
-            reference_type="chore_assignment",
-            reference_id=assignment.id,
+            reference_type="kid_quest",
+            reference_id=user.id,
         ))
     await db.commit()
 
