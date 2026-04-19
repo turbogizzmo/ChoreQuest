@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -292,13 +292,19 @@ async def get_kid_detail(
         .join(Chore, ChoreAssignment.chore_id == Chore.id)
         .where(
             ChoreAssignment.user_id == kid_id,
-            ChoreAssignment.date == today,
             Chore.is_active == True,
+            or_(
+                ChoreAssignment.date == today,
+                and_(
+                    ChoreAssignment.date < today,
+                    ChoreAssignment.status == AssignmentStatus.completed,
+                ),
+            ),
         )
         .options(
             _chore_with_category_loader(),
         )
-        .order_by(ChoreAssignment.status, Chore.title)
+        .order_by(ChoreAssignment.date.desc(), ChoreAssignment.status, Chore.title)
     )
     assignments = result.scalars().all()
 
@@ -637,6 +643,7 @@ def _build_kid_assignment(a: ChoreAssignment) -> dict:
     return {
         "id": a.id,
         "chore_id": a.chore_id,
+        "date": a.date.isoformat() if a.date else None,
         "status": a.status.value,
         "completed_at": a.completed_at.isoformat() if a.completed_at else None,
         "verified_at": a.verified_at.isoformat() if a.verified_at else None,

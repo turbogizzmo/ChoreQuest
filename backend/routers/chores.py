@@ -958,16 +958,17 @@ async def verify_chore(
         select(ChoreAssignment)
         .where(
             ChoreAssignment.chore_id == chore_id,
-            ChoreAssignment.date == today,
             ChoreAssignment.status == AssignmentStatus.completed,
         )
         .options(selectinload(ChoreAssignment.chore))
+        .order_by(ChoreAssignment.date.desc())
+        .limit(1)
     )
     assignment = result.scalar_one_or_none()
     if assignment is None:
         raise HTTPException(
             status_code=404,
-            detail="No completed assignment found to verify for this chore today",
+            detail="No completed assignment found to verify for this chore",
         )
 
     chore = assignment.chore
@@ -1151,17 +1152,18 @@ async def uncomplete_chore(
     result = await db.execute(
         select(ChoreAssignment).where(
             ChoreAssignment.chore_id == chore_id,
-            ChoreAssignment.date == today,
             ChoreAssignment.status.in_(
                 [AssignmentStatus.completed, AssignmentStatus.verified]
             ),
         )
+        .order_by(ChoreAssignment.date.desc())
+        .limit(1)
     )
     assignment = result.scalar_one_or_none()
     if assignment is None:
         raise HTTPException(
             status_code=404,
-            detail="No completed assignment found to undo for this chore today",
+            detail="No completed assignment found to undo for this chore",
         )
 
     assigned_user_id = assignment.user_id
