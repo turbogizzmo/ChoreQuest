@@ -948,18 +948,23 @@ async def complete_chore(
 @router.post("/{chore_id}/verify", response_model=AssignmentResponse)
 async def verify_chore(
     chore_id: int,
+    kid_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_parent),
 ):
     today = date.today()
     now = datetime.now(timezone.utc)
 
+    filters = [
+        ChoreAssignment.chore_id == chore_id,
+        ChoreAssignment.status == AssignmentStatus.completed,
+    ]
+    if kid_id is not None:
+        filters.append(ChoreAssignment.user_id == kid_id)
+
     result = await db.execute(
         select(ChoreAssignment)
-        .where(
-            ChoreAssignment.chore_id == chore_id,
-            ChoreAssignment.status == AssignmentStatus.completed,
-        )
+        .where(*filters)
         .options(selectinload(ChoreAssignment.chore))
         .order_by(ChoreAssignment.date.desc())
         .limit(1)
@@ -1143,19 +1148,25 @@ async def verify_chore(
 @router.post("/{chore_id}/uncomplete", response_model=AssignmentResponse)
 async def uncomplete_chore(
     chore_id: int,
+    kid_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_parent),
 ):
     today = date.today()
     now = datetime.now(timezone.utc)
 
+    filters = [
+        ChoreAssignment.chore_id == chore_id,
+        ChoreAssignment.status.in_(
+            [AssignmentStatus.completed, AssignmentStatus.verified]
+        ),
+    ]
+    if kid_id is not None:
+        filters.append(ChoreAssignment.user_id == kid_id)
+
     result = await db.execute(
-        select(ChoreAssignment).where(
-            ChoreAssignment.chore_id == chore_id,
-            ChoreAssignment.status.in_(
-                [AssignmentStatus.completed, AssignmentStatus.verified]
-            ),
-        )
+        select(ChoreAssignment)
+        .where(*filters)
         .order_by(ChoreAssignment.date.desc())
         .limit(1)
     )
