@@ -74,12 +74,13 @@ const cardVariants = {
 
 export default function KidDashboard() {
   const { user, updateUser } = useAuth();
-  const { spin_wheel_enabled } = useSettings();
+  const { spin_wheel_enabled, grace_period_days } = useSettings();
   const { colorTheme } = useTheme();
   const navigate = useNavigate();
 
   // data state
   const [assignments, setAssignments] = useState([]);
+  const [overdueAssignments, setOverdueAssignments] = useState([]);
   const [chores, setChores] = useState([]);
   const [spinAvailability, setSpinAvailability] = useState(null);
   const [myStats, setMyStats] = useState(null);
@@ -114,9 +115,17 @@ export default function KidDashboard() {
       const monday = getMondayOfThisWeek();
       const today = todayISO();
 
+      // Also fetch the previous week if the grace period might reach back that far
+      const prevMonday = (() => {
+        const d = new Date(monday);
+        d.setDate(d.getDate() - 7);
+        return d.toISOString().slice(0, 10);
+      })();
+
       const promises = [
         api('/api/chores'),
         api(`/api/calendar?week_start=${monday}`),
+        grace_period_days > 0 ? api(`/api/calendar?week_start=${prevMonday}`) : Promise.resolve(null),
       ];
       if (spin_wheel_enabled) {
         promises.push(api('/api/spin/availability'));
@@ -126,8 +135,9 @@ export default function KidDashboard() {
       const results = await Promise.all(promises);
       const choresRes = results[0];
       const calendarRes = results[1];
-      const spinRes = spin_wheel_enabled ? results[2] : null;
-      const statsRes = results[spin_wheel_enabled ? 3 : 2];
+      const prevCalendarRes = results[2];
+      const spinRes = spin_wheel_enabled ? results[3] : null;
+      const statsRes = results[spin_wheel_enabled ? 4 : 3];
       if (statsRes) {
         setMyStats(statsRes);
         if (statsRes.interactions_remaining != null) {
@@ -142,13 +152,34 @@ export default function KidDashboard() {
       const todayAssignments = allToday.filter((a) => a.user_id === user?.id);
       setAssignments(todayAssignments);
 
+      // Collect pending assignments from past days within the grace window
+      if (grace_period_days > 0) {
+        const overdue = [];
+        const allDays = {
+          ...(calendarRes.days || {}),
+          ...(prevCalendarRes?.days || {}),
+        };
+        for (let d = 1; d <= grace_period_days; d++) {
+          const dt = new Date(today);
+          dt.setDate(dt.getDate() - d);
+          const dayStr = dt.toISOString().slice(0, 10);
+          const dayAssignments = (allDays[dayStr] || []).filter(
+            (a) => a.user_id === user?.id && a.status === 'pending'
+          );
+          overdue.push(...dayAssignments.map((a) => ({ ...a, _overdue_date: dayStr })));
+        }
+        setOverdueAssignments(overdue);
+      } else {
+        setOverdueAssignments([]);
+      }
+
       setSpinAvailability(spinRes);
     } catch (err) {
       setError(err.message || 'Failed to load quest data');
     } finally {
       setLoading(false);
     }
-  }, [user?.id, spin_wheel_enabled]);
+  }, [user?.id, spin_wheel_enabled, grace_period_days]);
 
   useEffect(() => {
     fetchData();
@@ -299,6 +330,68 @@ export default function KidDashboard() {
         <div className="game-panel p-3 flex items-center gap-2 border-crimson/30 text-crimson text-sm">
           <AlertTriangle size={16} />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* ── Overdue quests (grace period) ── */}
+      {overdueAssignments.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-crimson text-xs font-semibold px-1 flex items-center gap-1">
+            <AlertTriangle size={12} />
+            Forgotten Quests — mark these done if you completed them!
+          </p>
+          {overdueAssignments.map((assignment, idx) => {
+            const chore = assignment.chore;
+            if (!chore) return null;
+            const diff = difficultyLabel(chore.difficulty);
+            const categoryColor = chore.category?.colour || '#14b8a6';
+            const daysAgo = Math.round(
+              (new Date().setHours(0,0,0,0) - new Date(assignment._overdue_date + 'T00:00:00')) / 86400000
+            );
+            return (
+              <motion.div
+                key={assignment.id}
+                className="game-panel p-4 border-crimson/30 cursor-pointer hover:border-crimson/50 transition-all"
+                variants={cardVariants}
+                initial="hidden"
+                animate="visible"
+                custom={idx}
+                onClick={() => navigate('/chores')}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 w-1 h-12 rounded-full flex-shrink-0 bg-crimson/60" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <h3 className="text-cream text-sm font-semibold truncate">
+                        {themedTitle(chore.title, colorTheme)}
+                      </h3>
+                      <span className="text-crimson text-[10px] font-bold flex-shrink-0 bg-crimson/10 border border-crimson/30 px-1.5 py-0.5 rounded">
+                        {daysAgo === 1 ? 'Yesterday' : `${daysAgo}d ago`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1 text-gold text-xs font-semibold">
+                        <Star size={12} fill="currentColor" />
+                        {chore.points} XP
+                      </span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${diff.color}`}>
+                        {diff.text}
+                      </span>
+                      {chore.category?.name && (
+                        <span className="text-muted text-xs">{chore.category.name}</span>
+                      )}
+                      {chore.requires_photo && (
+                        <span className="inline-flex items-center gap-1 text-muted text-xs">
+                          <Camera size={10} />
+                          Photo
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       )}
 

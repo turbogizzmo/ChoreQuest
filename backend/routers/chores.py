@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from backend.database import get_db
 from backend.models import (
+    AppSetting,
     Chore,
     ChoreAssignment,
     ChoreAssignmentRule,
@@ -844,21 +845,31 @@ async def complete_chore(
     today = date.today()
     now = datetime.now(timezone.utc)
 
+    grace_result = await db.execute(
+        select(AppSetting).where(AppSetting.key == "grace_period_days")
+    )
+    grace_setting = grace_result.scalar_one_or_none()
+    grace_days = int(grace_setting.value) if grace_setting else 1
+    earliest = today - timedelta(days=grace_days)
+
     result = await db.execute(
         select(ChoreAssignment)
         .where(
             ChoreAssignment.chore_id == chore_id,
             ChoreAssignment.user_id == user.id,
-            ChoreAssignment.date == today,
+            ChoreAssignment.date >= earliest,
+            ChoreAssignment.date <= today,
             ChoreAssignment.status == AssignmentStatus.pending,
         )
         .options(selectinload(ChoreAssignment.chore))
+        .order_by(ChoreAssignment.date.desc())
+        .limit(1)
     )
     assignment = result.scalar_one_or_none()
     if assignment is None:
         raise HTTPException(
             status_code=404,
-            detail="No pending assignment found for this chore today",
+            detail="No pending assignment found for this chore within the grace period",
         )
 
     chore = assignment.chore
@@ -936,8 +947,8 @@ async def complete_chore(
             type=NotificationType.chore_completed,
             title="Quest Awaiting Approval",
             message=f"{user.display_name} completed '{chore.title}' - tap to approve (+{chore.points} XP)",
-            reference_type="chore_assignment",
-            reference_id=assignment.id,
+            reference_type="kid_quest",
+            reference_id=user.id,
         ))
     await db.commit()
 
@@ -948,18 +959,23 @@ async def complete_chore(
 @router.post("/{chore_id}/verify", response_model=AssignmentResponse)
 async def verify_chore(
     chore_id: int,
+    kid_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_parent),
 ):
     today = date.today()
     now = datetime.now(timezone.utc)
 
+    filters = [
+        ChoreAssignment.chore_id == chore_id,
+        ChoreAssignment.status == AssignmentStatus.completed,
+    ]
+    if kid_id is not None:
+        filters.append(ChoreAssignment.user_id == kid_id)
+
     result = await db.execute(
         select(ChoreAssignment)
-        .where(
-            ChoreAssignment.chore_id == chore_id,
-            ChoreAssignment.status == AssignmentStatus.completed,
-        )
+        .where(*filters)
         .options(selectinload(ChoreAssignment.chore))
         .order_by(ChoreAssignment.date.desc())
         .limit(1)
@@ -1143,19 +1159,25 @@ async def verify_chore(
 @router.post("/{chore_id}/uncomplete", response_model=AssignmentResponse)
 async def uncomplete_chore(
     chore_id: int,
+    kid_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_parent),
 ):
     today = date.today()
     now = datetime.now(timezone.utc)
 
+    filters = [
+        ChoreAssignment.chore_id == chore_id,
+        ChoreAssignment.status.in_(
+            [AssignmentStatus.completed, AssignmentStatus.verified]
+        ),
+    ]
+    if kid_id is not None:
+        filters.append(ChoreAssignment.user_id == kid_id)
+
     result = await db.execute(
-        select(ChoreAssignment).where(
-            ChoreAssignment.chore_id == chore_id,
-            ChoreAssignment.status.in_(
-                [AssignmentStatus.completed, AssignmentStatus.verified]
-            ),
-        )
+        select(ChoreAssignment)
+        .where(*filters)
         .order_by(ChoreAssignment.date.desc())
         .limit(1)
     )

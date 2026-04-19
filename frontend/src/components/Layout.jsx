@@ -243,7 +243,13 @@ export default function Layout({ children }) {
                         return (
                           <div
                             key={n.id}
-                            onClick={() => { if (!n.is_read && !isTrade) markRead(n.id); }}
+                            onClick={() => {
+                              if (!n.is_read && !isTrade) markRead(n.id);
+                              if (n.reference_type === 'kid_quest' && n.reference_id) {
+                                setShowNotifs(false);
+                                navigate(`/kids/${n.reference_id}`);
+                              }
+                            }}
                             className={`w-full text-left px-4 py-3 border-b border-border/50 hover:bg-surface-raised transition-colors cursor-pointer ${
                               !n.is_read ? 'bg-accent/5' : ''
                             }`}

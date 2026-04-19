@@ -74,7 +74,7 @@ export default function KidQuests() {
     const key = `verify-${choreId}`;
     setActionBusy(key, true);
     try {
-      await api(`/api/chores/${choreId}/verify`, { method: 'POST' });
+      await api(`/api/chores/${choreId}/verify?kid_id=${kidId}`, { method: 'POST' });
       await fetchData();
     } catch (err) {
       setError(err.message || 'Failed to verify quest');
@@ -87,7 +87,7 @@ export default function KidQuests() {
     const key = `reject-${choreId}`;
     setActionBusy(key, true);
     try {
-      await api(`/api/chores/${choreId}/uncomplete`, { method: 'POST' });
+      await api(`/api/chores/${choreId}/uncomplete?kid_id=${kidId}`, { method: 'POST' });
       await fetchData();
     } catch (err) {
       setError(err.message || 'Failed to reject quest');
