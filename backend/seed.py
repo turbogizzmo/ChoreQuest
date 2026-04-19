@@ -199,6 +199,7 @@ QUEST_TEMPLATES = [
     {"title": "The Linen Exchange", "description": "The hand towels of the keep have grown unworthy of use. Collect the soiled linens from every bathroom, transport them to the Washing Shrine, and hang fresh towels in their place.", "category_name": "Laundry", "difficulty": Difficulty.easy, "suggested_points": 10, "icon": "shirt"},
     {"title": "The Grand Polish", "description": "The ancient wooden furniture of the great chamber has lost its lustre. Take up the polishing oil and cloth, and restore the piano, desks, and relics of the realm to their former glory.", "category_name": "General", "difficulty": Difficulty.medium, "suggested_points": 20, "icon": "home"},
     {"title": "The Couch Cleansing", "description": "The royal seating has fallen into disrepute. Wield the lint roller against the fur invaders, then apply the enchanted carpet potion to vanquish every stain that mars the upholstery.", "category_name": "General", "difficulty": Difficulty.easy, "suggested_points": 15, "icon": "home"},
+    {"title": "The Grand Purge", "description": "Every chamber in the realm has a bin that festers. Make your rounds through the upstairs keep, the master bath, the kitchen, the office, and every bathroom in between. Empty each vessel, replace the lining, and leave no room untouched.", "category_name": "General", "difficulty": Difficulty.easy, "suggested_points": 15, "icon": "home"},
 ]
 
 
