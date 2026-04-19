@@ -23,6 +23,17 @@ const STATUS_CONFIG = {
   skipped: { label: 'Skipped', color: 'text-muted/50', icon: SkipForward },
 };
 
+function formatAssignmentDate(dateStr) {
+  if (!dateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(dateStr + 'T00:00:00');
+  const diffDays = Math.round((today - d) / 86400000);
+  if (diffDays === 0) return null;
+  if (diffDays === 1) return 'from yesterday';
+  return `from ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+}
+
 export default function KidQuests() {
   const { kidId } = useParams();
   const navigate = useNavigate();
@@ -108,8 +119,13 @@ export default function KidQuests() {
   if (!data) return null;
 
   const { kid, assignments } = data;
-  const completedCount = assignments.filter(
+  const today = new Date().toISOString().slice(0, 10);
+  const todayAssignments = assignments.filter((a) => a.date === today);
+  const completedCount = todayAssignments.filter(
     (a) => a.status === 'completed' || a.status === 'verified'
+  ).length;
+  const pendingReviewCount = assignments.filter(
+    (a) => a.status === 'completed' && a.date !== today
   ).length;
 
   return (
@@ -140,7 +156,12 @@ export default function KidQuests() {
               )}
             </div>
             <p className="text-muted text-xs mt-1">
-              {completedCount}/{assignments.length} quests done today
+              {completedCount}/{todayAssignments.length} quests done today
+              {pendingReviewCount > 0 && (
+                <span className="ml-2 text-gold">
+                  · {pendingReviewCount} awaiting approval
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -166,6 +187,7 @@ export default function KidQuests() {
           {assignments.map((a, idx) => {
             const cfg = STATUS_CONFIG[a.status] || STATUS_CONFIG.pending;
             const StatusIcon = cfg.icon;
+            const dateLabel = formatAssignmentDate(a.date);
             const isCompleted = a.status === 'completed';
             const isVerified = a.status === 'verified';
             const verifyKey = `verify-${a.chore_id}`;
@@ -211,6 +233,9 @@ export default function KidQuests() {
                         <StatusIcon size={12} />
                         {cfg.label}
                       </span>
+                      {dateLabel && (
+                        <span className="text-muted text-xs italic">{dateLabel}</span>
+                      )}
                     </div>
                   </div>
 
