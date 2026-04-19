@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from backend.database import get_db
 from backend.models import (
+    AppSetting,
     Chore,
     ChoreAssignment,
     ChoreAssignmentRule,
@@ -844,21 +845,31 @@ async def complete_chore(
     today = date.today()
     now = datetime.now(timezone.utc)
 
+    grace_result = await db.execute(
+        select(AppSetting).where(AppSetting.key == "grace_period_days")
+    )
+    grace_setting = grace_result.scalar_one_or_none()
+    grace_days = int(grace_setting.value) if grace_setting else 1
+    earliest = today - timedelta(days=grace_days)
+
     result = await db.execute(
         select(ChoreAssignment)
         .where(
             ChoreAssignment.chore_id == chore_id,
             ChoreAssignment.user_id == user.id,
-            ChoreAssignment.date == today,
+            ChoreAssignment.date >= earliest,
+            ChoreAssignment.date <= today,
             ChoreAssignment.status == AssignmentStatus.pending,
         )
         .options(selectinload(ChoreAssignment.chore))
+        .order_by(ChoreAssignment.date.desc())
+        .limit(1)
     )
     assignment = result.scalar_one_or_none()
     if assignment is None:
         raise HTTPException(
             status_code=404,
-            detail="No pending assignment found for this chore today",
+            detail="No pending assignment found for this chore within the grace period",
         )
 
     chore = assignment.chore

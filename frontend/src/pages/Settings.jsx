@@ -229,6 +229,27 @@ export default function Settings() {
             />
           </div>
 
+          {/* Grace period */}
+          <div className="game-panel p-4">
+            <h2 className="text-cream text-sm font-semibold mb-3">
+              Late Completion Grace Period
+            </h2>
+            <p className="text-muted text-xs mb-3">
+              Number of days kids can mark a past quest as done (0 = today only, 1 = yesterday allowed, etc.).
+            </p>
+            <input
+              type="number"
+              min={0}
+              max={7}
+              value={settings.grace_period_days ?? 1}
+              onChange={(e) => {
+                const val = Math.min(7, Math.max(0, parseInt(e.target.value, 10) || 0));
+                updateSetting('grace_period_days', val);
+              }}
+              className="field-input max-w-[120px]"
+            />
+          </div>
+
           {/* Save button */}
           <button
             onClick={saveSettings}
