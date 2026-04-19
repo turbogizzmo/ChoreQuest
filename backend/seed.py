@@ -184,6 +184,21 @@ QUEST_TEMPLATES = [
     {"title": "Merchant's Errand", "description": "The guild requires supplies from the village market. Accompany the Quartermaster on this vital resupply mission beyond the castle gates.", "category_name": "Outdoor", "difficulty": Difficulty.medium, "suggested_points": 20, "icon": "trees"},
     # Bathroom
     {"title": "The Porcelain Throne", "description": "A perilous quest awaits in the Bathroom Keep. Scrub the basin, polish the mirrors, and vanquish the grime that clings to every surface.", "category_name": "Bathroom", "difficulty": Difficulty.medium, "suggested_points": 20, "icon": "bath"},
+    # Household — extended set
+    {"title": "The Waste Purge", "description": "Dark forces fester in the refuse bins of every chamber. Gather the rubbish sacks from the upstairs keep, the master bath, the kitchen, and the office quarters. Haul them to the outer gates before the stench grows.", "category_name": "General", "difficulty": Difficulty.easy, "suggested_points": 10, "icon": "home"},
+    {"title": "The Recycling March", "description": "The kingdom's recyclable relics must be escorted to the outer courtyard. Sort the glass, paper, and metal, then carry them beyond the castle gates for the collectors.", "category_name": "General", "difficulty": Difficulty.easy, "suggested_points": 10, "icon": "home"},
+    {"title": "Garment Crusade", "description": "Soiled garments have piled up in every hero's quarters. Gather the fallen laundry, transport it to the Washing Shrine, and return the clean items to their rightful drawers and cupboards.", "category_name": "Laundry", "difficulty": Difficulty.medium, "suggested_points": 20, "icon": "shirt"},
+    {"title": "The Countertop Chronicles", "description": "The kitchen surfaces bear the marks of a hundred meals. Take up your enchanted cloth and banish the crumbs, stains, and clutter that litter the counters and the sacred coffee station.", "category_name": "Kitchen", "difficulty": Difficulty.easy, "suggested_points": 10, "icon": "cooking-pot"},
+    {"title": "The Dust Wardens", "description": "Cursed dust has settled upon the bed frame, lamps, and blinds of the parents' quarters. Take your feathered wand and drive the dust back into the void where it belongs.", "category_name": "Bedroom", "difficulty": Difficulty.medium, "suggested_points": 20, "icon": "bed"},
+    {"title": "The Vacuum Crusade", "description": "The floors of the Great Hall, the hallway, the dining chamber, and the parents' quarters have been overrun by debris. Wield the enchanted suction device and restore peace to every room.", "category_name": "General", "difficulty": Difficulty.medium, "suggested_points": 25, "icon": "home"},
+    {"title": "The Bathroom Keep", "description": "The hygiene outposts of the realm are running dangerously low on supplies. Restock the toilet scrolls, refill the soap dispensers, replace the hand towels, and empty the waste bins.", "category_name": "Bathroom", "difficulty": Difficulty.easy, "suggested_points": 15, "icon": "bath"},
+    {"title": "The Hound's Field Patrol", "description": "The castle grounds have been defiled by your loyal beast. Equip yourself with the sacred bags and scour every inch of the outer yard, removing all evidence of the creature's passage.", "category_name": "Pets", "difficulty": Difficulty.easy, "suggested_points": 10, "icon": "paw-print"},
+    {"title": "The Grooming Rite", "description": "Your faithful companion has gone too long without proper care. Gather the brushes and tools of the grooming chamber, and tend to the beast until their coat shines like a champion's.", "category_name": "Pets", "difficulty": Difficulty.medium, "suggested_points": 20, "icon": "paw-print"},
+    {"title": "The Supply Run", "description": "The guild's food stores run critically low. Accompany the Quartermaster to the village market, retrieve provisions from the list of needed supplies, and return with the kingdom's stores replenished.", "category_name": "Outdoor", "difficulty": Difficulty.medium, "suggested_points": 25, "icon": "trees"},
+    {"title": "Realm of Toys", "description": "The children's quarters lie in ruin — toys scattered across the floors and closets in complete disorder. Venture in, restore each item to its proper chest or shelf, and bring order back to the chaos.", "category_name": "Bedroom", "difficulty": Difficulty.easy, "suggested_points": 15, "icon": "bed"},
+    {"title": "The Linen Exchange", "description": "The hand towels of the keep have grown unworthy of use. Collect the soiled linens from every bathroom, transport them to the Washing Shrine, and hang fresh towels in their place.", "category_name": "Laundry", "difficulty": Difficulty.easy, "suggested_points": 10, "icon": "shirt"},
+    {"title": "The Grand Polish", "description": "The ancient wooden furniture of the great chamber has lost its lustre. Take up the polishing oil and cloth, and restore the piano, desks, and relics of the realm to their former glory.", "category_name": "General", "difficulty": Difficulty.medium, "suggested_points": 20, "icon": "home"},
+    {"title": "The Couch Cleansing", "description": "The royal seating has fallen into disrepute. Wield the lint roller against the fur invaders, then apply the enchanted carpet potion to vanquish every stain that mars the upholstery.", "category_name": "General", "difficulty": Difficulty.easy, "suggested_points": 15, "icon": "home"},
 ]
 
 
@@ -383,10 +398,12 @@ async def seed_database(db: AsyncSession):
         if added > 0:
             await db.commit()
 
-    # Seed built-in quest templates
-    result = await db.execute(select(QuestTemplate).limit(1))
-    if result.scalar_one_or_none() is None:
-        for tpl in QUEST_TEMPLATES:
+    # Seed built-in quest templates — add any missing by title
+    existing_tpl_result = await db.execute(select(QuestTemplate.title))
+    existing_tpl_titles = {row[0] for row in existing_tpl_result.all()}
+    added_tpls = 0
+    for tpl in QUEST_TEMPLATES:
+        if tpl["title"] not in existing_tpl_titles:
             db.add(QuestTemplate(
                 title=tpl["title"],
                 description=tpl.get("description"),
@@ -395,6 +412,8 @@ async def seed_database(db: AsyncSession):
                 category_name=tpl["category_name"],
                 icon=tpl.get("icon"),
             ))
+            added_tpls += 1
+    if added_tpls > 0:
         await db.commit()
 
     # Migrate existing chores to assignment rules (one-time migration)
