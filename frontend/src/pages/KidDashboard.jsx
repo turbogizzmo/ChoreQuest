@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toLocalISO, todayLocalISO } from '../utils/dates';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star,
@@ -45,7 +46,7 @@ function getMondayOfThisWeek() {
 }
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  return todayLocalISO();
 }
 
 function difficultyLabel(difficulty) {
@@ -120,9 +121,9 @@ export default function KidDashboard() {
 
       // Also fetch the previous week if the grace period might reach back that far
       const prevMonday = (() => {
-        const d = new Date(monday);
+        const d = new Date(monday + 'T00:00:00');
         d.setDate(d.getDate() - 7);
-        return d.toISOString().slice(0, 10);
+        return toLocalISO(d);
       })();
 
       const promises = [
@@ -163,9 +164,9 @@ export default function KidDashboard() {
           ...(prevCalendarRes?.days || {}),
         };
         for (let d = 1; d <= grace_period_days; d++) {
-          const dt = new Date(today);
+          const dt = new Date(today + 'T00:00:00');
           dt.setDate(dt.getDate() - d);
-          const dayStr = dt.toISOString().slice(0, 10);
+          const dayStr = toLocalISO(dt);
           const dayAssignments = (allDays[dayStr] || []).filter(
             (a) => a.user_id === user?.id && a.status === 'pending'
           );
