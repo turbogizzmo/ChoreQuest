@@ -74,15 +74,18 @@ export default async function globalSetup() {
     icon: '🎁',
   }, parentToken);
 
+  // Get kid user ID for use in completion tests
+  const kidInfo = await get('/api/admin/users', parentToken);
+  const kidUser = kidInfo.find((u) => u.username === 'e2e_kid');
+  const kidId = kidUser?.id;
+
   // Get available chores and assign one to the kid
   const chores = await get('/api/chores', parentToken);
   if (chores.length > 0) {
     const chore = chores[0];
-    const kidInfo = await get('/api/admin/users', parentToken);
-    const kidUser = kidInfo.find((u) => u.username === 'e2e_kid');
-    if (kidUser) {
+    if (kidId) {
       await post(`/api/chores/${chore.id}/assign`, {
-        user_ids: [kidUser.id],
+        user_ids: [kidId],
         recurrence: 'once',
         requires_photo: false,
       }, parentToken).catch(() => {}); // ignore if already assigned
@@ -94,6 +97,7 @@ export default async function globalSetup() {
   writeFileSync('/tmp/chorequest_e2e_tokens.json', JSON.stringify({
     parentToken,
     kidToken,
+    kidId,
     parentUsername: 'e2e_parent',
     parentPassword: 'password123',
     kidUsername: 'e2e_kid',
