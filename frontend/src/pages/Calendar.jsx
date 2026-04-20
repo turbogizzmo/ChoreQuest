@@ -160,7 +160,7 @@ export default function Calendar() {
     setTradeModal(true);
     try {
       const data = await api('/api/stats/kids');
-      const kids = (data || []).filter((k) => k.id !== user.id);
+      const kids = (data || []).filter((k) => k.id !== user?.id);
       setFamilyKids(kids);
     } catch {
       setFamilyKids([]);

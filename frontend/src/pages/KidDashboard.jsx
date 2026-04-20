@@ -210,8 +210,8 @@ export default function KidDashboard() {
       await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
       setShowConfetti(true);
       await fetchData();
-    } catch (err) {
-      // ignore — e.g. photo required; let backend surface it silently
+    } catch {
+      await fetchData();
     } finally {
       setCompletingOverdue(null);
     }
