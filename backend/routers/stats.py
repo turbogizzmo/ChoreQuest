@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
@@ -155,11 +155,11 @@ async def get_party(
     today_completed = await _count_today_assignments_by_kid(db, kid_ids, today, completed_only=True) if kid_ids else {}
 
     # Recent activity: last 48 hours of point transactions + avatar drops
-    two_days_ago = today - timedelta(days=2)
+    two_days_ago_dt = datetime.now(timezone.utc) - timedelta(days=2)
     activity_result = await db.execute(
         select(PointTransaction)
         .where(
-            PointTransaction.created_at >= str(two_days_ago),
+            PointTransaction.created_at >= two_days_ago_dt.replace(tzinfo=None),
             PointTransaction.amount > 0,
             PointTransaction.type.in_([PointType.chore_complete, PointType.achievement, PointType.event_multiplier]),
         )
@@ -173,7 +173,7 @@ async def get_party(
         select(Notification)
         .where(
             Notification.type == NotificationType.avatar_item_drop,
-            Notification.created_at >= str(two_days_ago),
+            Notification.created_at >= two_days_ago_dt.replace(tzinfo=None),
         )
         .order_by(Notification.created_at.desc())
         .limit(10)

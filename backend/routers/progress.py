@@ -40,16 +40,16 @@ async def get_progress(
     # Daily XP earned
     xp_result = await db.execute(
         select(
-            func.date(PointTransaction.created_at).label("day"),
+            func.date(func.datetime(PointTransaction.created_at, 'localtime')).label("day"),
             func.sum(PointTransaction.amount).label("xp"),
         )
         .where(
             PointTransaction.user_id.in_(user_ids),
             PointTransaction.amount > 0,
-            func.date(PointTransaction.created_at) >= start,
-            func.date(PointTransaction.created_at) <= today,
+            func.date(func.datetime(PointTransaction.created_at, 'localtime')) >= start,
+            func.date(func.datetime(PointTransaction.created_at, 'localtime')) <= today,
         )
-        .group_by(func.date(PointTransaction.created_at))
+        .group_by(func.date(func.datetime(PointTransaction.created_at, 'localtime')))
     )
     xp_by_day = {str(row.day): row.xp or 0 for row in xp_result.all()}
 
