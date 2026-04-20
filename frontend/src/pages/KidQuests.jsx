@@ -215,7 +215,7 @@ export default function KidQuests() {
                       )}
                     </div>
                     {a.chore.description && (
-                      <p className="text-muted text-xs line-clamp-1 mb-1.5">
+                      <p className="text-muted text-xs mb-1.5">
                         {themedDescription(a.chore.title, a.chore.description, colorTheme)}
                       </p>
                     )}
