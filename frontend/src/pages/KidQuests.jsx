@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { todayLocalISO } from '../utils/dates';
 import {
   Loader2,
   Star,
@@ -119,7 +120,7 @@ export default function KidQuests() {
   if (!data) return null;
 
   const { kid, assignments } = data;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalISO();
   const todayAssignments = assignments.filter((a) => a.date === today);
   const completedCount = todayAssignments.filter(
     (a) => a.status === 'completed' || a.status === 'verified'
