@@ -390,8 +390,8 @@ async def get_leaderboard(
         .where(
             PointTransaction.user_id.in_(list(kid_map.keys())),
             PointTransaction.amount > 0,
-            func.date(PointTransaction.created_at) >= monday,
-            func.date(PointTransaction.created_at) <= sunday,
+            func.date(func.datetime(PointTransaction.created_at, 'localtime')) >= monday,
+            func.date(func.datetime(PointTransaction.created_at, 'localtime')) <= sunday,
         )
         .group_by(PointTransaction.user_id)
         .order_by(func.sum(PointTransaction.amount).desc())
