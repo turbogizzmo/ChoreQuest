@@ -850,6 +850,22 @@ async def complete_chore(
     grace_days = int(grace_setting.value) if grace_setting else 1
     earliest = today - timedelta(days=grace_days)
 
+    # Guard: one completion per chore per grace window — prevents double XP
+    already_done = await db.execute(
+        select(ChoreAssignment).where(
+            ChoreAssignment.chore_id == chore_id,
+            ChoreAssignment.user_id == user.id,
+            ChoreAssignment.date >= earliest,
+            ChoreAssignment.date <= today,
+            ChoreAssignment.status.in_([AssignmentStatus.completed, AssignmentStatus.verified]),
+        )
+    )
+    if already_done.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="This quest has already been completed. Ask a parent if you think this is wrong.",
+        )
+
     result = await db.execute(
         select(ChoreAssignment)
         .where(

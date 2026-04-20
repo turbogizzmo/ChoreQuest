@@ -210,7 +210,8 @@ export default function KidDashboard() {
       await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
       setShowConfetti(true);
       await fetchData();
-    } catch {
+    } catch (err) {
+      setError(err.message || 'Could not complete quest');
       await fetchData();
     } finally {
       setCompletingOverdue(null);
