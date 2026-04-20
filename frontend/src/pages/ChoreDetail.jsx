@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../hooks/useTheme';
+import { todayLocalISO } from '../utils/dates';
 import { themedTitle, themedDescription } from '../utils/questThemeText';
 import {
   ArrowLeft,
@@ -311,7 +312,7 @@ export default function ChoreDetail() {
 
   // Determine today's assignment
   const assignments = chore.assignments || chore.history || [];
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayLocalISO();
   const todayAssignment = assignments.find(
     (a) => a.date === today || a.assigned_date === today || a.due_date === today
   );

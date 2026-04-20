@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
+import { toLocalISO } from '../utils/dates';
 import { useAuth } from '../hooks/useAuth';
 import Modal from '../components/Modal';
 import {
@@ -20,7 +21,7 @@ function formatDate(iso) {
 
 function toInputDate(iso) {
   if (!iso) return '';
-  return new Date(iso).toISOString().slice(0, 10);
+  return toLocalISO(new Date(iso));
 }
 
 export default function Events() {
@@ -101,8 +102,8 @@ export default function Events() {
         title: title.trim(),
         description: description.trim() || null,
         multiplier: mult,
-        start_date: new Date(startDate + 'T00:00:00').toISOString(),
-        end_date: new Date(endDate + 'T23:59:59').toISOString(),
+        start_date: startDate,
+        end_date: endDate,
       };
 
       if (editing) {
