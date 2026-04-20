@@ -198,6 +198,24 @@ export default function KidDashboard() {
     return () => window.removeEventListener('ws:message', handler);
   }, [fetchData]);
 
+  // ---- complete overdue quest ----
+
+  const [completingOverdue, setCompletingOverdue] = useState(null);
+
+  const handleCompleteOverdue = async (assignment) => {
+    if (completingOverdue) return;
+    setCompletingOverdue(assignment.id);
+    try {
+      await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
+      setShowConfetti(true);
+      await fetchData();
+    } catch (err) {
+      // ignore — e.g. photo required; let backend surface it silently
+    } finally {
+      setCompletingOverdue(null);
+    }
+  };
+
 
   // ---- pet interaction ----
   const handlePetInteraction = async (action) => {
@@ -351,15 +369,15 @@ export default function KidDashboard() {
             const daysAgo = Math.round(
               (new Date().setHours(0,0,0,0) - new Date(assignment._overdue_date + 'T00:00:00')) / 86400000
             );
+            const isCompleting = completingOverdue === assignment.id;
             return (
               <motion.div
                 key={assignment.id}
-                className="game-panel p-4 border-crimson/30 cursor-pointer hover:border-crimson/50 transition-all"
+                className="game-panel p-4 border-crimson/30 transition-all"
                 variants={cardVariants}
                 initial="hidden"
                 animate="visible"
                 custom={idx}
-                onClick={() => navigate('/chores')}
               >
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 w-1 h-12 rounded-full flex-shrink-0 bg-crimson/60" />
@@ -372,7 +390,7 @@ export default function KidDashboard() {
                         {daysAgo === 1 ? 'Yesterday' : `${daysAgo}d ago`}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
                       <span className="inline-flex items-center gap-1 text-gold text-xs font-semibold">
                         <Star size={12} fill="currentColor" />
                         {chore.points} XP
@@ -390,6 +408,14 @@ export default function KidDashboard() {
                         </span>
                       )}
                     </div>
+                    <button
+                      onClick={() => handleCompleteOverdue(assignment)}
+                      disabled={isCompleting || !!completingOverdue}
+                      className="game-btn game-btn-blue !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                    >
+                      {isCompleting ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                      {isCompleting ? 'Marking...' : 'Mark Done'}
+                    </button>
                   </div>
                 </div>
               </motion.div>
