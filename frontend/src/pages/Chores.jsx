@@ -436,7 +436,7 @@ export default function Chores() {
 
                 {/* Description */}
                 {chore.description && (
-                  <p className="text-muted text-xs line-clamp-2">
+                  <p className="text-muted text-xs">
                     {themedDescription(chore.title, chore.description, colorTheme)}
                   </p>
                 )}
