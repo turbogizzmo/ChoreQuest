@@ -369,7 +369,7 @@ export default function Rewards() {
                   <div className="flex-1 min-w-0">
                     <h3 className="text-cream text-sm font-medium">{reward.title}</h3>
                     {reward.description && (
-                      <p className="text-muted text-xs mt-0.5 line-clamp-2">{reward.description}</p>
+                      <p className="text-muted text-xs mt-0.5">{reward.description}</p>
                     )}
                   </div>
                 </div>
