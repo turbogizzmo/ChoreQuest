@@ -7,7 +7,7 @@ background task to avoid duplicating the complex scheduling rules.
 import logging
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import (
@@ -67,6 +67,31 @@ async def auto_generate_week_assignments(
             await _generate_legacy(db, chore, week_dates, exclusion_set)
 
     await db.commit()
+
+
+async def expire_stale_assignments(db: AsyncSession, today: date) -> None:
+    """Mark pending assignments older than the grace window as skipped.
+
+    Prevents accumulated past-due assignments from being completable and
+    keeps the kid dashboard free of irrelevant old quests.
+    """
+    from backend.models import AppSetting
+    grace_result = await db.execute(
+        select(AppSetting).where(AppSetting.key == "grace_period_days")
+    )
+    grace_setting = grace_result.scalar_one_or_none()
+    grace_days = int(grace_setting.value) if grace_setting else 1
+    cutoff = today - timedelta(days=grace_days)
+
+    await db.execute(
+        update(ChoreAssignment)
+        .where(
+            ChoreAssignment.date < cutoff,
+            ChoreAssignment.status == AssignmentStatus.pending,
+        )
+        .values(status=AssignmentStatus.skipped)
+    )
+    logger.info("Expired stale pending assignments older than %s", cutoff)
 
 
 async def generate_daily_assignments(db: AsyncSession, today: date) -> None:

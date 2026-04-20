@@ -17,7 +17,7 @@ from backend.seed import seed_database
 from backend.auth import decode_access_token
 from backend.websocket_manager import ws_manager
 from backend.models import RefreshToken, User, UserRole
-from backend.services.assignment_generator import generate_daily_assignments
+from backend.services.assignment_generator import generate_daily_assignments, expire_stale_assignments
 from backend.services.push_hook import install_push_hooks
 
 logger = logging.getLogger(__name__)
@@ -94,6 +94,7 @@ async def daily_reset_task():
             async with async_session() as db:
                 today = date.today()
 
+                await expire_stale_assignments(db, today)
                 await generate_daily_assignments(db, today)
 
                 # Reset streaks for kids who missed yesterday
