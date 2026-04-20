@@ -23,13 +23,15 @@ function swVersionStamp() {
   }
 }
 
+const backendPort = process.env.VITE_BACKEND_PORT || '8122';
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), swVersionStamp()],
   server: {
-    port: 5173,
+    port: parseInt(process.env.VITE_PORT || '5173'),
     proxy: {
-      '/api': 'http://localhost:8122',
-      '/ws': { target: 'ws://localhost:8122', ws: true },
+      '/api': `http://localhost:${backendPort}`,
+      '/ws': { target: `ws://localhost:${backendPort}`, ws: true },
     },
   },
 })
