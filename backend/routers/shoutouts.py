@@ -1,7 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone, date
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
@@ -19,10 +19,10 @@ async def list_shoutouts(
     current_user: User = Depends(get_current_user),
 ):
     """Recent shoutouts (last 7 days)."""
-    cutoff = datetime.utcnow() - timedelta(days=7)
+    seven_days_ago = date.today() - timedelta(days=7)
     result = await db.execute(
         select(Shoutout)
-        .where(Shoutout.created_at >= cutoff)
+        .where(func.date(func.datetime(Shoutout.created_at, 'localtime')) >= str(seven_days_ago))
         .order_by(Shoutout.created_at.desc())
         .limit(50)
     )
@@ -73,12 +73,12 @@ async def create_shoutout(
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Rate limit: max 5 shoutouts per user per day
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    # Rate limit: max 5 shoutouts per user per local calendar day
+    today_local = date.today()
     count_result = await db.execute(
         select(Shoutout).where(
             Shoutout.from_user_id == current_user.id,
-            Shoutout.created_at >= today_start,
+            func.date(func.datetime(Shoutout.created_at, 'localtime')) == str(today_local),
         )
     )
     if len(count_result.scalars().all()) >= 5:

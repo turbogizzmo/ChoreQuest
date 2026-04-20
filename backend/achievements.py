@@ -1,4 +1,7 @@
 from datetime import datetime, date, timezone
+from zoneinfo import ZoneInfo
+
+_LOCAL_TZ = ZoneInfo('America/Chicago')
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import (
@@ -53,8 +56,10 @@ async def _check_criteria(db: AsyncSession, user: User, criteria: dict) -> bool:
             )
         )
         for assignment in result.scalars().all():
-            if assignment.completed_at and assignment.completed_at.hour < hour:
-                return True
+            if assignment.completed_at:
+                local_hour = assignment.completed_at.replace(tzinfo=timezone.utc).astimezone(_LOCAL_TZ).hour
+                if local_hour < hour:
+                    return True
         return False
 
     elif ctype == "streak_reached":
@@ -86,8 +91,10 @@ async def _check_criteria(db: AsyncSession, user: User, criteria: dict) -> bool:
         for a in assignments:
             if a.status == AssignmentStatus.pending:
                 return False
-            if a.completed_at and a.completed_at.hour >= hour:
-                return False
+            if a.completed_at:
+                local_hour = a.completed_at.replace(tzinfo=timezone.utc).astimezone(_LOCAL_TZ).hour
+                if local_hour >= hour:
+                    return False
         return True
 
     elif ctype == "all_daily_completed":
