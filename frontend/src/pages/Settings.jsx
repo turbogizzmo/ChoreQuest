@@ -10,11 +10,22 @@ import {
   Award,
   ArrowLeft,
   GitCommit,
+  RefreshCw,
+  ArrowUpCircle,
+  CheckCircle2,
+  AlertTriangle,
+  Wifi,
 } from 'lucide-react';
 import VacationSettings from '../components/VacationSettings';
 
-function VersionInfo() {
+function UpdatePanel({ isAdmin }) {
   const [version, setVersion] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState(null); // null = not checked yet
+  const [triggering, setTriggering] = useState(false);
+  const [triggerMsg, setTriggerMsg] = useState('');
+
+  // Load current version from health endpoint on mount
   useEffect(() => {
     fetch('/api/health')
       .then((r) => r.json())
@@ -22,18 +33,150 @@ function VersionInfo() {
       .catch(() => {});
   }, []);
 
-  if (!version) return null;
+  const checkForUpdates = async () => {
+    setChecking(true);
+    setUpdateInfo(null);
+    setTriggerMsg('');
+    try {
+      const res = await fetch('/api/admin/update/check', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Check failed');
+      setUpdateInfo(data);
+    } catch (err) {
+      setUpdateInfo({ error: err.message });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const applyUpdate = async () => {
+    setTriggering(true);
+    setTriggerMsg('');
+    try {
+      const res = await fetch('/api/admin/update/trigger', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Trigger failed');
+      setTriggerMsg('Update scheduled! The app will restart in ~1-2 minutes.');
+    } catch (err) {
+      setTriggerMsg(`Error: ${err.message}`);
+    } finally {
+      setTriggering(false);
+    }
+  };
+
   return (
-    <div className="game-panel p-4 flex items-center justify-between">
-      <div className="flex items-center gap-2 text-muted">
-        <GitCommit size={14} />
-        <span className="text-xs">Version</span>
+    <div className="game-panel p-4 space-y-3">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-muted">
+          <GitCommit size={14} />
+          <span className="text-xs font-medium text-cream">Version</span>
+        </div>
+        {version?.version && version.version !== 'unknown' && (
+          <p className="text-cream text-xs font-mono">{version.version}</p>
+        )}
+        {(!version?.version || version.version === 'unknown') && (
+          <p className="text-muted text-xs font-mono">dev build</p>
+        )}
       </div>
-      <div className="text-right">
-        <p className="text-cream text-xs font-mono">{version.version}</p>
-        {version.build_date && version.build_date !== 'unknown' && (
-          <p className="text-muted text-[11px]">
-            {new Date(version.build_date).toLocaleString()}
+
+      {version?.build_date && version.build_date !== 'unknown' && (
+        <p className="text-muted text-[11px]">
+          Built {new Date(version.build_date).toLocaleString()}
+        </p>
+      )}
+
+      {/* Update check — parents and admins can check; only admins can apply */}
+      <div className="pt-1 border-t border-border/50 space-y-2">
+        <button
+          onClick={checkForUpdates}
+          disabled={checking}
+          className="game-btn game-btn-blue !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+        >
+          {checking
+            ? <Loader2 size={12} className="animate-spin" />
+            : <RefreshCw size={12} />}
+          {checking ? 'Checking…' : 'Check for Updates'}
+        </button>
+
+        {/* Result */}
+        {updateInfo && !updateInfo.error && (
+          <div className={`rounded-md p-3 border text-xs space-y-1.5 ${
+            updateInfo.update_available
+              ? 'bg-accent/10 border-accent/30'
+              : 'bg-emerald/10 border-emerald/30'
+          }`}>
+            {updateInfo.update_available ? (
+              <>
+                <div className="flex items-center gap-1.5 text-accent font-semibold">
+                  <ArrowUpCircle size={13} />
+                  Update available ({updateInfo.latest})
+                </div>
+                {updateInfo.commit_message && (
+                  <p className="text-cream/80 line-clamp-2">{updateInfo.commit_message}</p>
+                )}
+                {updateInfo.commit_date && (
+                  <p className="text-muted">
+                    {new Date(updateInfo.commit_date).toLocaleString()} · {updateInfo.commit_author}
+                  </p>
+                )}
+                {isAdmin && !triggerMsg && (
+                  <button
+                    onClick={applyUpdate}
+                    disabled={triggering}
+                    className="game-btn game-btn-blue !py-1.5 !px-3 !text-xs flex items-center gap-1.5 mt-2"
+                  >
+                    {triggering
+                      ? <Loader2 size={12} className="animate-spin" />
+                      : <ArrowUpCircle size={12} />}
+                    {triggering ? 'Scheduling…' : 'Apply Update'}
+                  </button>
+                )}
+                {!isAdmin && (
+                  <p className="text-muted italic">Ask an admin to apply the update.</p>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center gap-1.5 text-emerald font-medium">
+                <CheckCircle2 size={13} />
+                Up to date ({updateInfo.current})
+              </div>
+            )}
+          </div>
+        )}
+
+        {updateInfo?.message && !updateInfo.update_available && !updateInfo.error && (
+          <p className="text-muted text-xs italic">{updateInfo.message}</p>
+        )}
+
+        {updateInfo?.error && (
+          <div className="flex items-center gap-1.5 text-crimson text-xs">
+            <Wifi size={12} />
+            {updateInfo.error}
+          </div>
+        )}
+
+        {triggerMsg && (
+          <div className={`flex items-start gap-1.5 text-xs p-2 rounded-md border ${
+            triggerMsg.startsWith('Error')
+              ? 'text-crimson border-crimson/30 bg-crimson/10'
+              : 'text-accent border-accent/30 bg-accent/10'
+          }`}>
+            {triggerMsg.startsWith('Error')
+              ? <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+              : <CheckCircle2 size={12} className="flex-shrink-0 mt-0.5" />}
+            {triggerMsg}
+          </div>
+        )}
+
+        {isAdmin && (
+          <p className="text-muted text-[11px] leading-relaxed">
+            Requires <span className="font-mono text-cream/60">watchdog.sh</span> running on the host. See the repo for setup.
           </p>
         )}
       </div>
@@ -397,7 +540,7 @@ export default function Settings() {
             </div>
           )}
 
-          <VersionInfo />
+          <UpdatePanel isAdmin={user?.role === 'admin'} />
         </div>
       )}
     </div>
