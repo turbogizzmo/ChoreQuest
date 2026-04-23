@@ -417,6 +417,41 @@ export default function ChoreDetail() {
             </span>
           </div>
         )}
+
+        {/* Bounty Board toggle (parent only) */}
+        {isParent && (
+          <div className="flex items-center justify-between px-3 py-2 rounded bg-surface-raised border border-border">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">📜</span>
+              <div>
+                <p className="text-cream text-xs font-medium">On Bounty Board</p>
+                <p className="text-muted text-[11px]">Kids can optionally claim this for bonus XP</p>
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  const updated = await api(`/api/chores/${chore.id}`, {
+                    method: 'PUT',
+                    body: { is_bounty: !chore.is_bounty },
+                  });
+                  setChore(updated);
+                } catch {
+                  /* ignore */
+                }
+              }}
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                chore.is_bounty ? 'bg-accent' : 'bg-border'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                  chore.is_bounty ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Action Message */}

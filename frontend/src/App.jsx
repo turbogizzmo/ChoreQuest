@@ -20,6 +20,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Events = lazy(() => import('./pages/Events'));
 const KidQuests = lazy(() => import('./pages/KidQuests'));
 const Party = lazy(() => import('./pages/Party'));
+const BountyBoard = lazy(() => import('./pages/BountyBoard'));
 const AvatarEditor = lazy(() => import('./components/AvatarEditor'));
 
 function Loading() {
@@ -78,6 +79,7 @@ export default function App() {
           <Route path="/avatar" element={<AvatarEditor />} />
           <Route path="/events" element={<Events />} />
           <Route path="/kids/:kidId" element={<KidQuests />} />
+          <Route path="/bounty" element={<BountyBoard />} />
           <Route path="/settings" element={<Settings />} />
           {user.role === 'admin' && <Route path="/admin" element={<AdminDashboard />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
