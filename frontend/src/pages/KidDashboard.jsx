@@ -156,19 +156,29 @@ export default function KidDashboard() {
       const todayAssignments = allToday.filter((a) => a.user_id === user?.id);
       setAssignments(todayAssignments);
 
-      // Collect pending assignments from past days within the grace window
+      // Collect pending assignments from past days within the grace window.
+      // Exclude any chore that already has a completed/verified assignment today —
+      // completing it again would give double XP and the backend would reject it.
       if (grace_period_days > 0) {
         const overdue = [];
         const allDays = {
           ...(calendarRes.days || {}),
           ...(prevCalendarRes?.days || {}),
         };
+        const completedTodayChoreIds = new Set(
+          todayAssignments
+            .filter((a) => a.status === 'completed' || a.status === 'verified')
+            .map((a) => a.chore_id)
+        );
         for (let d = 1; d <= grace_period_days; d++) {
           const dt = new Date(today + 'T00:00:00');
           dt.setDate(dt.getDate() - d);
           const dayStr = toLocalISO(dt);
           const dayAssignments = (allDays[dayStr] || []).filter(
-            (a) => a.user_id === user?.id && a.status === 'pending'
+            (a) =>
+              a.user_id === user?.id &&
+              a.status === 'pending' &&
+              !completedTodayChoreIds.has(a.chore_id)
           );
           overdue.push(...dayAssignments.map((a) => ({ ...a, _overdue_date: dayStr })));
         }
