@@ -33,6 +33,16 @@ function UpdatePanel({ isAdmin }) {
       .catch(() => {});
   }, []);
 
+  // Auto-check for updates on mount, reusing cached result from Layout if available
+  useEffect(() => {
+    const cached = sessionStorage.getItem('cq_update_checked');
+    if (cached) {
+      // Re-use what Layout already fetched — just trigger the visual check silently
+      checkForUpdates();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const checkForUpdates = async () => {
     setChecking(true);
     setUpdateInfo(null);

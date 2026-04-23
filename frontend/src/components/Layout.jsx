@@ -66,6 +66,24 @@ export default function Layout({ children }) {
   }, [user, syncFromUser]);
   const [showNotifs, setShowNotifs] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  // Silent background update check — once per session, parents/admins only
+  useEffect(() => {
+    if (!user || (user.role !== 'parent' && user.role !== 'admin')) return;
+    const already = sessionStorage.getItem('cq_update_checked');
+    if (already) {
+      setUpdateAvailable(sessionStorage.getItem('cq_update_available') === 'true');
+      return;
+    }
+    api('/api/admin/update/check')
+      .then((data) => {
+        sessionStorage.setItem('cq_update_checked', '1');
+        sessionStorage.setItem('cq_update_available', data.update_available ? 'true' : 'false');
+        setUpdateAvailable(!!data.update_available);
+      })
+      .catch(() => {});
+  }, [user]);
   const panelRef = useRef(null);
   const moreRef = useRef(null);
 
@@ -148,12 +166,17 @@ export default function Layout({ children }) {
             className="flex items-center gap-2.5 px-4 py-3 border-t border-border cursor-pointer hover:bg-surface-raised transition-colors"
             onClick={() => navigate('/profile')}
           >
-            <AvatarDisplay
-              config={user.avatar_config}
-              size="sm"
-              name={user.display_name || user.username}
-              animate
-            />
+            <div className="relative flex-shrink-0">
+              <AvatarDisplay
+                config={user.avatar_config}
+                size="sm"
+                name={user.display_name || user.username}
+                animate
+              />
+              {updateAvailable && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-accent rounded-full border-2 border-surface" title="Update available" />
+              )}
+            </div>
             <div className="min-w-0">
               <p className="text-cream text-sm font-medium truncate">
                 {user.display_name || user.username}
@@ -314,7 +337,7 @@ export default function Layout({ children }) {
             {user && (
               <button
                 onClick={() => navigate('/profile')}
-                className="md:hidden"
+                className="md:hidden relative"
                 aria-label="Profile"
               >
                 <AvatarDisplay
@@ -323,6 +346,9 @@ export default function Layout({ children }) {
                   name={user.display_name || user.username}
                   animate
                 />
+                {updateAvailable && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-accent rounded-full border-2 border-surface" title="Update available" />
+                )}
               </button>
             )}
           </div>
