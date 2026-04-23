@@ -36,7 +36,8 @@ test.describe('Navigation — parent', () => {
     const moreBtn = page.locator('button:has-text("More")');
     if (await moreBtn.isVisible()) {
       await moreBtn.click();
-      await page.locator('text=Calendar').click();
+      // Use the button inside the More-menu drawer, not the sidebar link
+      await page.locator('button:has-text("Calendar"), a[href="/calendar"]').last().click();
       await expect(page).toHaveURL(/\/calendar/);
     }
   });
