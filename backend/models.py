@@ -208,6 +208,9 @@ class ChoreRotation(Base):
     chore_id: Mapped[int] = mapped_column(ForeignKey("chores.id"), nullable=False)
     kid_ids: Mapped[list] = mapped_column(JSON, nullable=False)
     cadence: Mapped[RotationCadence] = mapped_column(Enum(RotationCadence), nullable=False)
+    # Day of week the rotation advances: 0=Monday … 6=Sunday (only meaningful for
+    # weekly / fortnightly cadences; ignored for daily and monthly).
+    rotation_day: Mapped[int] = mapped_column(Integer, default=0)
     current_index: Mapped[int] = mapped_column(Integer, default=0)
     last_rotated: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
