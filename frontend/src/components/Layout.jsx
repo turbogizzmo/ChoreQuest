@@ -20,6 +20,7 @@ import {
   Users,
   Trophy,
   MoreHorizontal,
+  ScrollText,
 } from 'lucide-react';
 import AvatarDisplay from './AvatarDisplay';
 
@@ -30,6 +31,7 @@ const ALL_NAV_ITEMS = [
   { label: 'Leaderboard', icon: Trophy, path: '/leaderboard', settingKey: 'leaderboard_enabled', mobileMore: true },
   { label: 'Rewards', icon: Gift, path: '/rewards' },
   { label: 'Calendar', icon: CalendarDays, path: '/calendar', mobileMore: true },
+  { label: 'Bounties', icon: ScrollText, path: '/bounty', mobileMore: true },
   { label: 'Events', icon: Sparkles, path: '/events', parentOnly: true, mobileMore: true },
 ];
 

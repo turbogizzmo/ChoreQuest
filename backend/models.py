@@ -70,6 +70,15 @@ class NotificationType(str, enum.Enum):
     pet_levelup = "pet_levelup"
     announcement = "announcement"
     quest_feedback = "quest_feedback"
+    bounty_claimed = "bounty_claimed"
+    bounty_verified = "bounty_verified"
+
+
+class BountyClaimStatus(str, enum.Enum):
+    claimed = "claimed"
+    completed = "completed"
+    verified = "verified"
+    abandoned = "abandoned"
 
 
 class AvatarItemRarity(str, enum.Enum):
@@ -162,6 +171,7 @@ class Chore(Base):
     custom_days: Mapped[list | None] = mapped_column(JSON, nullable=True)
     requires_photo: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_bounty: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -511,3 +521,26 @@ class VacationPeriod(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     creator = relationship("User")
+
+
+class BountyBoardClaim(Base):
+    """Tracks a kid's claim on an optional bounty board chore."""
+    __tablename__ = "bounty_board_claims"
+    __table_args__ = (UniqueConstraint("chore_id", "user_id"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    chore_id: Mapped[int] = mapped_column(ForeignKey("chores.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    status: Mapped[BountyClaimStatus] = mapped_column(
+        Enum(BountyClaimStatus), default=BountyClaimStatus.claimed
+    )
+    photo_proof_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    claimed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    verified_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    chore = relationship("Chore")
+    user = relationship("User", foreign_keys=[user_id])
+    verifier = relationship("User", foreign_keys=[verified_by])

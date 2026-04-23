@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from pydantic import BaseModel, Field
-from backend.models import UserRole, Difficulty, Recurrence, AssignmentStatus, RedemptionStatus, PointType, NotificationType, RotationCadence
+from backend.models import UserRole, Difficulty, Recurrence, AssignmentStatus, RedemptionStatus, PointType, NotificationType, RotationCadence, BountyClaimStatus
 
 
 # Auth
@@ -87,6 +87,7 @@ class ChoreCreate(BaseModel):
     recurrence: Recurrence
     custom_days: list[int] | None = None
     requires_photo: bool = False
+    is_bounty: bool = False
     assigned_user_ids: list[int] = []
 
 
@@ -100,6 +101,7 @@ class ChoreUpdate(BaseModel):
     recurrence: Recurrence | None = None
     custom_days: list[int] | None = None
     requires_photo: bool | None = None
+    is_bounty: bool | None = None
     assigned_user_ids: list[int] | None = None
 
 
@@ -116,6 +118,7 @@ class ChoreResponse(BaseModel):
     custom_days: list[int] | None
     requires_photo: bool
     is_active: bool
+    is_bounty: bool = False
     created_by: int
     created_at: datetime
 
@@ -542,3 +545,38 @@ class StreakFreezeResponse(BaseModel):
 # Pet Interaction
 class PetInteractionRequest(BaseModel):
     action: str = Field(pattern=r"^(feed|pet|play)$")
+
+
+# Bounty Board
+class BountyClaimResponse(BaseModel):
+    id: int
+    chore_id: int
+    user_id: int
+    user_display_name: str | None = None
+    status: BountyClaimStatus
+    photo_proof_path: str | None
+    claimed_at: datetime
+    completed_at: datetime | None
+    verified_at: datetime | None
+    verified_by: int | None
+
+    model_config = {"from_attributes": True}
+
+
+class BountyResponse(BaseModel):
+    id: int
+    title: str
+    description: str | None
+    points: int
+    difficulty: Difficulty
+    icon: str | None
+    category_id: int
+    category: CategoryResponse | None = None
+    requires_photo: bool
+    is_active: bool
+    # Enriched at query time
+    my_claim: BountyClaimResponse | None = None
+    claim_count: int = 0
+    claims: list[BountyClaimResponse] = []
+
+    model_config = {"from_attributes": True}
