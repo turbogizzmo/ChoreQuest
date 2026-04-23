@@ -194,7 +194,12 @@ app.include_router(bounty.router)
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    import os
+    return {
+        "status": "ok",
+        "version": os.environ.get("GIT_COMMIT", "unknown"),
+        "build_date": os.environ.get("BUILD_DATE", "unknown"),
+    }
 
 
 @app.websocket("/ws/{user_id}")
