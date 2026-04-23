@@ -192,9 +192,9 @@ export default function Chores() {
   }, [fetchChores, fetchAssignments]);
 
   const handleKidComplete = async (chore) => {
+    if (completeInFlight.current) return;
     const choreId = chore.id;
     if (chore.requires_photo && !photoFiles[choreId]) return;
-    if (completeInFlight.current) return;
     completeInFlight.current = true;
     setCompletingId(choreId);
     try {
