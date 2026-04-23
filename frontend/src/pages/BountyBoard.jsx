@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import ChoreIcon from '../components/ChoreIcon';
 
 const DIFFICULTY_COLORS = {
   easy: 'text-green-400',
@@ -285,10 +286,10 @@ function BountyCard({ bounty, isParent, actionLoading, onClaim, onComplete, onAb
     <div className="game-panel p-4 transition-all" style={{ borderLeftColor: catColor, borderLeftWidth: 3 }}>
       <div className="flex items-start gap-3">
         <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-lg"
+          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: `${catColor}20` }}
         >
-          {bounty.icon || '📜'}
+          <ChoreIcon name={bounty.icon} size={18} className="text-cream/70" />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -420,8 +421,8 @@ function ClaimReviewCard({ claim, bounties, actionLoading, onVerify, onReject })
   return (
     <div className="game-panel p-4">
       <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0 text-lg">
-          {bounty?.icon || '📜'}
+        <div className="w-9 h-9 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0">
+          <ChoreIcon name={bounty?.icon} size={18} className="text-accent opacity-80" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-cream text-sm font-semibold truncate">
