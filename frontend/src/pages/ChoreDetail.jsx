@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import { useTheme } from '../hooks/useTheme';
 import { todayLocalISO } from '../utils/dates';
 import { themedTitle, themedDescription } from '../utils/questThemeText';
+import Modal from '../components/Modal';
 import {
   ArrowLeft,
   Star,
@@ -108,6 +109,7 @@ export default function ChoreDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
+  const [confirmAction, setConfirmAction] = useState(null); // { type: 'skip'|'uncomplete', assignmentId }
 
   // Rotation state (parent only)
   const [rotation, setRotation] = useState(null);
@@ -190,33 +192,36 @@ export default function ChoreDetail() {
     }
   };
 
-  const handleUncomplete = async (assignmentId) => {
-    setActionLoading('uncomplete');
-    try {
-      const path = assignmentId
-        ? `/api/chores/assignments/${assignmentId}/uncomplete`
-        : `/api/chores/${id}/uncomplete`;
-      await api(path, { method: 'POST' });
-      showToast('Quest marked as incomplete.', 'info');
-      await fetchChore();
-    } catch (err) {
-      showToast(err.message || 'Could not undo completion.', 'error');
-    } finally {
-      setActionLoading('');
-    }
+  const handleUncomplete = (assignmentId) => {
+    setConfirmAction({ type: 'uncomplete', assignmentId });
   };
 
-  const handleSkip = async (assignmentId) => {
-    setActionLoading('skip');
+  const handleSkip = (assignmentId) => {
+    setConfirmAction({ type: 'skip', assignmentId });
+  };
+
+  const confirmDestructiveAction = async () => {
+    if (!confirmAction) return;
+    const { type, assignmentId } = confirmAction;
+    setConfirmAction(null);
+    setActionLoading(type);
     try {
-      const path = assignmentId
-        ? `/api/chores/assignments/${assignmentId}/skip`
-        : `/api/chores/${id}/skip`;
-      await api(path, { method: 'POST' });
-      showToast('Quest skipped for today.', 'info');
+      if (type === 'uncomplete') {
+        const path = assignmentId
+          ? `/api/chores/assignments/${assignmentId}/uncomplete`
+          : `/api/chores/${id}/uncomplete`;
+        await api(path, { method: 'POST' });
+        showToast('Quest marked as incomplete.', 'info');
+      } else if (type === 'skip') {
+        const path = assignmentId
+          ? `/api/chores/assignments/${assignmentId}/skip`
+          : `/api/chores/${id}/skip`;
+        await api(path, { method: 'POST' });
+        showToast('Quest skipped for today.', 'info');
+      }
       await fetchChore();
     } catch (err) {
-      showToast(err.message || 'Could not skip the quest.', 'error');
+      showToast(err.message || 'Action failed.', 'error');
     } finally {
       setActionLoading('');
     }
@@ -767,6 +772,31 @@ export default function ChoreDetail() {
           </div>
         </div>
       )}
+
+      {/* Confirmation modal for destructive actions */}
+      <Modal
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        title={confirmAction?.type === 'skip' ? 'Skip Quest Today?' : 'Uncomplete Quest?'}
+        actions={[
+          {
+            label: 'Cancel',
+            onClick: () => setConfirmAction(null),
+            className: 'game-btn game-btn-blue',
+          },
+          {
+            label: confirmAction?.type === 'skip' ? 'Skip Today' : 'Uncomplete',
+            onClick: confirmDestructiveAction,
+            className: 'game-btn game-btn-red',
+          },
+        ]}
+      >
+        <p className="text-muted">
+          {confirmAction?.type === 'skip'
+            ? "Are you sure you want to skip this quest today? The hero will lose today's opportunity to earn XP."
+            : 'Are you sure you want to mark this quest as incomplete? The XP award will be rolled back.'}
+        </p>
+      </Modal>
 
     </div>
   );

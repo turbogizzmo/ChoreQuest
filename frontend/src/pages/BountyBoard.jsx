@@ -16,6 +16,7 @@ import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import ChoreIcon from '../components/ChoreIcon';
 import { useToast } from '../components/Toast';
+import Modal from '../components/Modal';
 
 const DIFFICULTY_COLORS = {
   easy: 'text-green-400',
@@ -50,6 +51,7 @@ export default function BountyBoard() {
   const [loadError, setLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
   const [tab, setTab] = useState('board'); // 'board' | 'review'
+  const [abandonTarget, setAbandonTarget] = useState(null); // choreId pending confirmation
 
   const fetchData = useCallback(async () => {
     setLoadError('');
@@ -108,7 +110,14 @@ export default function BountyBoard() {
     }
   };
 
-  const handleAbandon = async (choreId) => {
+  const handleAbandon = (choreId) => {
+    setAbandonTarget(choreId);
+  };
+
+  const confirmAbandon = async () => {
+    if (abandonTarget === null) return;
+    const choreId = abandonTarget;
+    setAbandonTarget(null);
     setActionLoading(`abandon-${choreId}`);
     try {
       await api(`/api/bounty/${choreId}/claim`, { method: 'DELETE' });
@@ -273,6 +282,30 @@ export default function BountyBoard() {
           )}
         </>
       )}
+
+      {/* Confirmation modal for abandoning a bounty */}
+      <Modal
+        isOpen={abandonTarget !== null}
+        onClose={() => setAbandonTarget(null)}
+        title="Abandon Bounty?"
+        actions={[
+          {
+            label: 'Cancel',
+            onClick: () => setAbandonTarget(null),
+            className: 'game-btn game-btn-blue',
+          },
+          {
+            label: 'Abandon',
+            onClick: confirmAbandon,
+            className: 'game-btn game-btn-red',
+          },
+        ]}
+      >
+        <p className="text-muted">
+          Are you sure you want to abandon this bounty? Your in-progress work will be lost.
+        </p>
+      </Modal>
+
     </div>
   );
 }
