@@ -419,7 +419,7 @@ export default function Chores() {
                             body: { is_bounty: !chore.is_bounty },
                           }).then(() => fetchChores()).catch(() => {});
                         }}
-                        className={`p-1 rounded-md hover:bg-surface-raised transition-colors ${
+                        className={`min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-surface-raised transition-colors ${
                           chore.is_bounty ? 'text-accent' : 'text-muted hover:text-accent'
                         }`}
                         aria-label={chore.is_bounty ? 'Remove from Bounty Board' : 'Add to Bounty Board'}
@@ -433,7 +433,7 @@ export default function Chores() {
                           setEditingChore(chore);
                           setShowCreateModal(true);
                         }}
-                        className="p-1 rounded-md hover:bg-surface-raised transition-colors text-muted hover:text-accent"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-surface-raised transition-colors text-muted hover:text-accent"
                         aria-label="Edit quest"
                       >
                         <Pencil size={13} />
@@ -443,7 +443,7 @@ export default function Chores() {
                           e.stopPropagation();
                           setDeleteTarget(chore);
                         }}
-                        className="p-1 rounded-md hover:bg-surface-raised transition-colors text-muted hover:text-crimson"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-surface-raised transition-colors text-muted hover:text-crimson"
                         aria-label="Delete quest"
                       >
                         <Trash2 size={13} />

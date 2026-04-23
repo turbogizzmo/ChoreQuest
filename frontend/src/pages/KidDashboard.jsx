@@ -313,7 +313,7 @@ export default function KidDashboard() {
             </h1>
             <button
               onClick={() => setShowThemePicker((v) => !v)}
-              className="flex items-center justify-center w-8 h-8 rounded-lg border border-border hover:border-accent hover:bg-accent/10 text-cream transition-all text-base"
+              className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg border border-border hover:border-accent hover:bg-accent/10 text-cream transition-all text-base"
               title="Change board theme"
             >
               {BOARD_THEMES.find((t) => t.id === boardTheme)?.icon || '\u2694\uFE0F'}

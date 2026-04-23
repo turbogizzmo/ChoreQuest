@@ -338,7 +338,7 @@ export default function Calendar() {
                 {/* Assignments */}
                 <div className="space-y-2 mt-2 min-h-[80px]">
                   {dayAssignments.length === 0 && (
-                    <p className="text-muted text-xs text-center py-4">
+                    <p className="text-muted/40 text-xs text-center py-4">
                       No quests
                     </p>
                   )}
