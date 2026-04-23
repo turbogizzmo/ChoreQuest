@@ -442,18 +442,57 @@ async def verify_bounty_claim(
             reference_type="pet",
         ))
 
-    # Update streak (bounty completions count for streaks)
+    # Update streak — same full logic as regular chore verification
+    # (vacation checks + freeze + milestone notifications)
     today = date.today()
-    if kid.last_streak_date is None or kid.last_streak_date < today - timedelta(days=1):
+    if kid.last_streak_date == today:
+        pass  # already updated today
+    elif kid.last_streak_date is not None:
+        gap = (today - kid.last_streak_date).days
+        if gap == 1:
+            kid.current_streak += 1
+            kid.last_streak_date = today
+        elif gap > 1:
+            from backend.routers.vacation import is_vacation_day
+            all_vacation = True
+            for offset in range(1, gap):
+                gap_day = kid.last_streak_date + timedelta(days=offset)
+                if not await is_vacation_day(db, gap_day):
+                    all_vacation = False
+                    break
+            if all_vacation:
+                kid.current_streak += 1
+                kid.last_streak_date = today
+            else:
+                current_month = today.month + today.year * 12
+                freeze_month = kid.streak_freeze_month or 0
+                if kid.current_streak > 0 and freeze_month != current_month:
+                    kid.streak_freezes_used = (kid.streak_freezes_used or 0) + 1
+                    kid.streak_freeze_month = current_month
+                    kid.current_streak += 1
+                    kid.last_streak_date = today
+                else:
+                    kid.current_streak = 1
+                    kid.last_streak_date = today
+        else:
+            kid.current_streak = 1
+            kid.last_streak_date = today
+    else:
         kid.current_streak = 1
         kid.last_streak_date = today
-    elif kid.last_streak_date == today - timedelta(days=1):
-        kid.current_streak += 1
-        kid.last_streak_date = today
-    elif kid.last_streak_date == today:
-        pass  # already updated today
+
     if kid.current_streak > kid.longest_streak:
         kid.longest_streak = kid.current_streak
+
+    _STREAK_MILESTONES = (7, 30, 100)
+    if kid.current_streak in _STREAK_MILESTONES:
+        db.add(Notification(
+            user_id=kid.id,
+            type=NotificationType.streak_milestone,
+            title=f"{kid.current_streak}-Day Streak!",
+            message=f"You've completed quests {kid.current_streak} days in a row! Keep it up!",
+            reference_type="streak",
+        ))
 
     # Finalise claim
     claim.status = BountyClaimStatus.verified
@@ -473,10 +512,9 @@ async def verify_bounty_claim(
     await db.commit()
     await db.refresh(claim)
 
-    # Check achievements
+    # Check achievements (same pattern as chore verification)
     from backend.achievements import check_achievements
-    async with db.begin_nested():
-        await check_achievements(db, kid)
+    await check_achievements(db, kid)
 
     await ws_manager.send_to_user(kid.id, {
         "type": "bounty_verified",
@@ -506,6 +544,15 @@ async def reject_bounty_claim(
         raise HTTPException(status_code=404, detail="Claim not found")
     if claim.status != BountyClaimStatus.completed:
         raise HTTPException(status_code=400, detail="Claim is not in completed state")
+
+    # Delete photo proof from disk if present
+    if claim.photo_proof_path:
+        from pathlib import Path
+        photo_path = Path("/app/data/uploads") / claim.photo_proof_path
+        try:
+            photo_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
     claim.status = BountyClaimStatus.claimed
     claim.completed_at = None

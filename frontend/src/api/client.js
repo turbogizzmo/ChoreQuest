@@ -71,6 +71,10 @@ export async function api(path, options = {}) {
     try {
       await ensureToken();
       config.headers['Authorization'] = `Bearer ${accessToken}`;
+      // Re-assign body from original options so FormData is not consumed/stale
+      if (body instanceof FormData) {
+        config.body = body;
+      }
       res = await fetch(path, { ...config, _retried: true });
     } catch {
       window.dispatchEvent(new CustomEvent('auth:expired'));
