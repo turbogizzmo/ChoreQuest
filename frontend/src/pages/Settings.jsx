@@ -39,7 +39,7 @@ function UpdatePanel({ isAdmin }) {
     setTriggerMsg('');
     try {
       const res = await fetch('/api/admin/update/check', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('chorequest_access_token')}` },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Check failed');
@@ -57,7 +57,7 @@ function UpdatePanel({ isAdmin }) {
     try {
       const res = await fetch('/api/admin/update/trigger', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem('chorequest_access_token')}` },
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Trigger failed');
