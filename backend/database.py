@@ -46,6 +46,8 @@ async def init_db():
             ("achievements", "sort_order", "INTEGER DEFAULT 0"),
             # Bounty Board
             ("chores", "is_bounty", "INTEGER DEFAULT 0"),
+            # Rotation day-of-week (0=Mon…6=Sun); default Monday
+            ("chore_rotations", "rotation_day", "INTEGER DEFAULT 0"),
         ]
         for table, col, typedef in _migrations:
             try:
