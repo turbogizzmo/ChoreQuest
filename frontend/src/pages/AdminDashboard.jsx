@@ -20,6 +20,8 @@ import {
   Eye,
   EyeOff,
   RotateCcw,
+  ArrowUpCircle,
+  ExternalLink,
 } from 'lucide-react';
 
 const TABS = [
@@ -28,6 +30,43 @@ const TABS = [
   { key: 'invite-codes', label: 'Invite Codes', icon: Ticket },
   { key: 'audit-log', label: 'Audit Log', icon: ScrollText },
 ];
+
+// ─── Update Banner ───────────────────────────────────────────────────
+function UpdateBanner() {
+  const [info, setInfo] = useState(null);
+
+  useEffect(() => {
+    api('/api/admin/update-check')
+      .then((data) => setInfo(data))
+      .catch(() => null);
+  }, []);
+
+  if (!info || !info.behind) return null;
+
+  return (
+    <div className="mb-4 flex items-center gap-3 p-3 rounded-md border border-accent/40 bg-accent/10 text-sm">
+      <ArrowUpCircle size={18} className="text-accent flex-shrink-0" />
+      <span className="text-cream flex-1">
+        <span className="font-semibold">Update available:</span> v{info.latest}
+        {info.release_name && info.release_name !== info.latest && (
+          <span className="text-muted"> — {info.release_name}</span>
+        )}
+        <span className="text-muted ml-1">(current: v{info.current})</span>
+      </span>
+      {info.url && (
+        <a
+          href={info.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-accent hover:underline flex-shrink-0"
+        >
+          Changelog <ExternalLink size={12} />
+        </a>
+      )}
+    </div>
+  );
+}
+
 
 // ─── Users Tab ───────────────────────────────────────────────────────
 function UsersTab() {
@@ -702,6 +741,8 @@ export default function AdminDashboard() {
           Admin Dashboard
         </h1>
       </div>
+
+      <UpdateBanner />
 
       {/* Tabs */}
       <div className="grid grid-cols-4 gap-1 mb-6">
