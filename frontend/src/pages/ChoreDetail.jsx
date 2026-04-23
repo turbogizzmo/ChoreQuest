@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../components/Toast';
 import { useTheme } from '../hooks/useTheme';
 import { todayLocalISO } from '../utils/dates';
 import { themedTitle, themedDescription } from '../utils/questThemeText';
@@ -88,6 +89,7 @@ export default function ChoreDetail() {
   const { user } = useAuth();
   const { colorTheme } = useTheme();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const isParent = user?.role === 'parent' || user?.role === 'admin';
   const isKid = user?.role === 'kid';
 
@@ -95,7 +97,6 @@ export default function ChoreDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
-  const [actionMessage, setActionMessage] = useState('');
 
   // Rotation state (parent only)
   const [rotation, setRotation] = useState(null);
@@ -150,13 +151,12 @@ export default function ChoreDetail() {
 
   const handleComplete = async () => {
     setActionLoading('complete');
-    setActionMessage('');
     try {
       await api(`/api/chores/${id}/complete`, { method: 'POST' });
-      setActionMessage('Quest completed! XP has been awarded to your hero.');
+      showToast('Quest completed! XP awarded! 🎉', 'success');
       await fetchChore();
     } catch (err) {
-      setActionMessage(err.message || 'Failed to complete the quest.');
+      showToast(err.message || 'Failed to complete the quest.', 'error');
     } finally {
       setActionLoading('');
     }
@@ -164,16 +164,15 @@ export default function ChoreDetail() {
 
   const handleVerify = async (assignmentId) => {
     setActionLoading('verify');
-    setActionMessage('');
     try {
       const path = assignmentId
         ? `/api/chores/assignments/${assignmentId}/verify`
         : `/api/chores/${id}/verify`;
       await api(path, { method: 'POST' });
-      setActionMessage('Quest verified! The hero has been rewarded.');
+      showToast('Quest verified! The hero has been rewarded.', 'success');
       await fetchChore();
     } catch (err) {
-      setActionMessage(err.message || 'Verification failed.');
+      showToast(err.message || 'Verification failed.', 'error');
     } finally {
       setActionLoading('');
     }
@@ -181,16 +180,15 @@ export default function ChoreDetail() {
 
   const handleUncomplete = async (assignmentId) => {
     setActionLoading('uncomplete');
-    setActionMessage('');
     try {
       const path = assignmentId
         ? `/api/chores/assignments/${assignmentId}/uncomplete`
         : `/api/chores/${id}/uncomplete`;
       await api(path, { method: 'POST' });
-      setActionMessage('Quest marked as incomplete.');
+      showToast('Quest marked as incomplete.', 'info');
       await fetchChore();
     } catch (err) {
-      setActionMessage(err.message || 'Could not undo completion.');
+      showToast(err.message || 'Could not undo completion.', 'error');
     } finally {
       setActionLoading('');
     }
@@ -198,23 +196,22 @@ export default function ChoreDetail() {
 
   const handleSkip = async (assignmentId) => {
     setActionLoading('skip');
-    setActionMessage('');
     try {
       const path = assignmentId
         ? `/api/chores/assignments/${assignmentId}/skip`
         : `/api/chores/${id}/skip`;
       await api(path, { method: 'POST' });
-      setActionMessage('Quest skipped for today.');
+      showToast('Quest skipped for today.', 'info');
       await fetchChore();
     } catch (err) {
-      setActionMessage(err.message || 'Could not skip the quest.');
+      showToast(err.message || 'Could not skip the quest.', 'error');
     } finally {
       setActionLoading('');
     }
   };
 
   const handleCreateRotation = async () => {
-    if (allKids.length < 2) { setActionMessage('Need at least 2 kids for a rotation.'); return; }
+    if (allKids.length < 2) { showToast('Need at least 2 kids for a rotation.', 'info'); return; }
     setActionLoading('rotation');
     try {
       await api('/api/rotations', {
@@ -222,9 +219,9 @@ export default function ChoreDetail() {
         body: { chore_id: parseInt(id), kid_ids: allKids.map((k) => k.id), cadence: selectedCadence },
       });
       await fetchRotation();
-      setActionMessage('Rotation created.');
+      showToast('Rotation created.', 'success');
     } catch (err) {
-      setActionMessage(err.message || 'Could not create rotation.');
+      showToast(err.message || 'Could not create rotation.', 'error');
     } finally {
       setActionLoading('');
     }
@@ -236,9 +233,9 @@ export default function ChoreDetail() {
     try {
       await api(`/api/rotations/${rotation.id}/advance`, { method: 'POST' });
       await fetchRotation();
-      setActionMessage('Rotation advanced to next kid.');
+      showToast('Rotation advanced to next kid.', 'info');
     } catch (err) {
-      setActionMessage(err.message || 'Could not advance rotation.');
+      showToast(err.message || 'Could not advance rotation.', 'error');
     } finally {
       setActionLoading('');
     }
@@ -253,9 +250,9 @@ export default function ChoreDetail() {
         body: { cadence: newCadence },
       });
       await fetchRotation();
-      setActionMessage(`Cadence updated to ${newCadence}.`);
+      showToast(`Rotation cadence set to ${newCadence}.`, 'info');
     } catch (err) {
-      setActionMessage(err.message || 'Could not update cadence.');
+      showToast(err.message || 'Could not update cadence.', 'error');
     } finally {
       setActionLoading('');
     }
@@ -267,9 +264,9 @@ export default function ChoreDetail() {
     try {
       await api(`/api/rotations/${rotation.id}`, { method: 'DELETE' });
       setRotation(null);
-      setActionMessage('Rotation removed.');
+      showToast('Rotation removed.', 'info');
     } catch (err) {
-      setActionMessage(err.message || 'Could not delete rotation.');
+      showToast(err.message || 'Could not delete rotation.', 'error');
     } finally {
       setActionLoading('');
     }
@@ -453,19 +450,6 @@ export default function ChoreDetail() {
           </div>
         )}
       </div>
-
-      {/* Action Message */}
-      {actionMessage && (
-        <div
-          className={`p-3 rounded border text-sm text-center ${
-            actionMessage.toLowerCase().includes('fail') || actionMessage.toLowerCase().includes('could not')
-              ? 'border-crimson/40 bg-crimson/10 text-crimson'
-              : 'border-emerald/40 bg-emerald/10 text-emerald'
-          }`}
-        >
-          {actionMessage}
-        </div>
-      )}
 
       {/* Actions for kids */}
       {isKid && hasPendingToday && (

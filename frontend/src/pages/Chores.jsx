@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../components/Toast';
 import { toLocalISO } from '../utils/dates';
 import { useTheme } from '../hooks/useTheme';
 import { themedTitle, themedDescription } from '../utils/questThemeText';
@@ -100,6 +101,7 @@ export default function Chores() {
   const { user } = useAuth();
   const { colorTheme } = useTheme();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const isParent = user?.role === 'parent' || user?.role === 'admin';
   const isKid = user?.role === 'kid';
 
@@ -202,9 +204,10 @@ export default function Chores() {
         await api(`/api/chores/${choreId}/complete`, { method: 'POST' });
       }
       setPhotoFiles((prev) => { const next = { ...prev }; delete next[choreId]; return next; });
+      showToast('Quest complete! XP awarded! 🎉', 'success');
       await fetchAll();
     } catch (err) {
-      setError(err.message || 'Failed to complete quest');
+      showToast(err.message || 'Failed to complete quest', 'error');
     } finally {
       setCompletingId(null);
     }
@@ -245,9 +248,10 @@ export default function Chores() {
     try {
       await api(`/api/chores/${deleteTarget.id}`, { method: 'DELETE' });
       setDeleteTarget(null);
+      showToast('Quest removed.', 'info');
       await fetchChores();
     } catch (err) {
-      setError(err.message || 'Failed to remove the quest.');
+      showToast(err.message || 'Failed to remove the quest.', 'error');
     } finally {
       setDeleting(false);
     }

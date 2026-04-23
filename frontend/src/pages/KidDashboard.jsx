@@ -10,13 +10,13 @@ import {
   Skull,
   Camera,
   Loader2,
-  AlertTriangle,
   ChevronRight,
   Heart,
   HandHeart,
   Gamepad2,
   ShieldOff,
 } from 'lucide-react';
+import { useToast } from '../components/Toast';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../hooks/useSettings';
@@ -81,6 +81,7 @@ export default function KidDashboard() {
   const { spin_wheel_enabled, grace_period_days } = useSettings();
   const { colorTheme } = useTheme();
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   // data state
   const [assignments, setAssignments] = useState([]);
@@ -91,7 +92,6 @@ export default function KidDashboard() {
 
   // ui state
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
 
@@ -115,7 +115,6 @@ export default function KidDashboard() {
 
   const fetchData = useCallback(async () => {
     try {
-      setError(null);
       const monday = getMondayOfThisWeek();
       const today = todayISO();
 
@@ -189,11 +188,11 @@ export default function KidDashboard() {
 
       setSpinAvailability(spinRes);
     } catch (err) {
-      setError(err.message || 'Failed to load quest data');
+      showToast(err.message || 'Failed to load quest data', 'error');
     } finally {
       setLoading(false);
     }
-  }, [user?.id, spin_wheel_enabled, grace_period_days]);
+  }, [user?.id, spin_wheel_enabled, grace_period_days, showToast]);
 
   useEffect(() => {
     fetchData();
@@ -219,9 +218,10 @@ export default function KidDashboard() {
     try {
       await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
       setShowConfetti(true);
+      showToast('Quest complete! XP awarded! 🎉', 'success');
       await fetchData();
     } catch (err) {
-      setError(err.message || 'Could not complete quest');
+      showToast(err.message || 'Could not complete quest', 'error');
       await fetchData();
     } finally {
       setCompletingOverdue(null);
@@ -238,9 +238,10 @@ export default function KidDashboard() {
     try {
       await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
       setShowConfetti(true);
+      showToast('Quest complete! XP awarded! 🎉', 'success');
       await fetchData();
     } catch (err) {
-      setError(err.message || 'Could not complete quest');
+      showToast(err.message || 'Could not complete quest', 'error');
     } finally {
       setCompletingToday(null);
     }
@@ -375,13 +376,6 @@ export default function KidDashboard() {
         </div>
       )}
 
-      {/* ── Error banner ── */}
-      {error && (
-        <div className="game-panel p-3 flex items-center gap-2 border-crimson/30 text-crimson text-sm">
-          <AlertTriangle size={16} />
-          <span>{error}</span>
-        </div>
-      )}
 
       {/* ── Overdue quests (grace period) ── */}
       {overdueAssignments.length > 0 && (

@@ -15,6 +15,7 @@ import {
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import ChoreIcon from '../components/ChoreIcon';
+import { useToast } from '../components/Toast';
 
 const DIFFICULTY_COLORS = {
   easy: 'text-green-400',
@@ -40,17 +41,18 @@ const STATUS_CONFIG = {
 export default function BountyBoard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const isParent = user?.role === 'parent' || user?.role === 'admin';
 
   const [bounties, setBounties] = useState([]);
   const [pendingClaims, setPendingClaims] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
   const [tab, setTab] = useState('board'); // 'board' | 'review'
 
   const fetchData = useCallback(async () => {
-    setError('');
+    setLoadError('');
     try {
       const data = await api('/api/bounty');
       setBounties(Array.isArray(data) ? data : []);
@@ -59,7 +61,7 @@ export default function BountyBoard() {
         setPendingClaims(Array.isArray(claims) ? claims : []);
       }
     } catch (err) {
-      setError(err.message || 'Could not load the Bounty Board');
+      setLoadError(err.message || 'Could not load the Bounty Board');
     } finally {
       setLoading(false);
     }
@@ -83,9 +85,10 @@ export default function BountyBoard() {
     setActionLoading(`claim-${choreId}`);
     try {
       await api(`/api/bounty/${choreId}/claim`, { method: 'POST' });
+      showToast('Bounty accepted! Get to work!', 'success');
       await fetchData();
     } catch (err) {
-      setError(err.message || 'Could not accept bounty');
+      showToast(err.message || 'Could not accept bounty', 'error');
     } finally {
       setActionLoading('');
     }
@@ -96,9 +99,10 @@ export default function BountyBoard() {
     try {
       const fd = new FormData();
       await api(`/api/bounty/${choreId}/complete`, { method: 'POST', body: fd });
+      showToast('Bounty turned in! Awaiting parent approval.', 'success');
       await fetchData();
     } catch (err) {
-      setError(err.message || 'Could not mark bounty complete');
+      showToast(err.message || 'Could not mark bounty complete', 'error');
     } finally {
       setActionLoading('');
     }
@@ -108,9 +112,10 @@ export default function BountyBoard() {
     setActionLoading(`abandon-${choreId}`);
     try {
       await api(`/api/bounty/${choreId}/claim`, { method: 'DELETE' });
+      showToast('Bounty abandoned.', 'info');
       await fetchData();
     } catch (err) {
-      setError(err.message || 'Could not abandon bounty');
+      showToast(err.message || 'Could not abandon bounty', 'error');
     } finally {
       setActionLoading('');
     }
@@ -120,9 +125,10 @@ export default function BountyBoard() {
     setActionLoading(`verify-${claimId}`);
     try {
       await api(`/api/bounty/claims/${claimId}/verify`, { method: 'POST' });
+      showToast('Bounty approved! XP awarded.', 'success');
       await fetchData();
     } catch (err) {
-      setError(err.message || 'Could not approve claim');
+      showToast(err.message || 'Could not approve claim', 'error');
     } finally {
       setActionLoading('');
     }
@@ -132,9 +138,10 @@ export default function BountyBoard() {
     setActionLoading(`reject-${claimId}`);
     try {
       await api(`/api/bounty/claims/${claimId}/reject`, { method: 'POST' });
+      showToast('Claim sent back for revision.', 'info');
       await fetchData();
     } catch (err) {
-      setError(err.message || 'Could not reject claim');
+      showToast(err.message || 'Could not reject claim', 'error');
     } finally {
       setActionLoading('');
     }
@@ -168,10 +175,10 @@ export default function BountyBoard() {
         </div>
       </div>
 
-      {error && (
+      {loadError && (
         <div className="game-panel p-3 flex items-center gap-2 border-crimson/30 text-crimson text-sm">
           <AlertCircle size={16} className="flex-shrink-0" />
-          {error}
+          {loadError}
         </div>
       )}
 
