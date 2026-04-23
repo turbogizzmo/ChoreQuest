@@ -9,7 +9,7 @@ services:
       - "8122:8122"
     environment:
       - SECRET_KEY=${SECRET_KEY}
-      - TZ=America/Chicago
+      - TZ=${TZ:-America/Chicago}
     volumes:
       - ./data:/app/data
     restart: unless-stopped
