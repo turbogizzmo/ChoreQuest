@@ -9,7 +9,18 @@ export BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 echo "Deploying commit $GIT_COMMIT (built $BUILD_DATE)"
 
-docker compose build --no-cache
-docker compose up -d
+# Support both modern 'docker compose' (plugin) and legacy 'docker-compose' (standalone)
+if docker compose version &>/dev/null; then
+  COMPOSE="docker compose"
+elif command -v docker-compose &>/dev/null; then
+  COMPOSE="docker-compose"
+else
+  echo "ERROR: Neither 'docker compose' nor 'docker-compose' found."
+  exit 1
+fi
+
+echo "Using: $COMPOSE"
+$COMPOSE build --no-cache
+$COMPOSE up -d
 
 echo "Done. Running version: $GIT_COMMIT"
