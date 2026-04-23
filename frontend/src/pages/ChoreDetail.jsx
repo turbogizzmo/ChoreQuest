@@ -534,35 +534,57 @@ export default function ChoreDetail() {
             <Users size={18} className="text-accent" />
             <h2 className="text-cream text-sm font-semibold">Assigned To</h2>
           </div>
-          <div className="space-y-2">
-            {assignmentRules.map((rule) => {
-              const kid = allKids.find((k) => k.id === rule.user_id);
-              return (
-                <div
-                  key={rule.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-border bg-surface-raised/20"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-cream text-sm font-medium truncate">
-                      {kid?.display_name || rule.user?.display_name || `Kid #${rule.user_id}`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-muted text-xs capitalize flex items-center gap-1">
-                      <RefreshCw size={10} />
-                      {rule.recurrence}
-                    </span>
-                    {rule.requires_photo && (
-                      <span className="text-muted text-xs flex items-center gap-1">
-                        <Camera size={10} />
-                        Photo
+
+          {/* When a rotation is active, the rotation controls assignment —
+              show a single "currently" line instead of listing all kids,
+              which would falsely imply all of them do the chore at once. */}
+          {rotation ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-purple/30 bg-purple/10">
+              <RotateCw size={14} className="text-purple flex-shrink-0" />
+              <span className="text-sm text-cream">
+                Rotation active — currently{' '}
+                <span className="font-semibold text-purple">
+                  {(() => {
+                    const currentKidId = rotation.kid_ids?.[rotation.current_index];
+                    const currentKid = allKids.find((k) => k.id === currentKidId);
+                    return currentKid?.display_name || `Kid #${currentKidId}`;
+                  })()}
+                </span>
+                's turn
+              </span>
+              <span className="text-muted text-xs ml-auto capitalize">{rotation.cadence}</span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {assignmentRules.map((rule) => {
+                const kid = allKids.find((k) => k.id === rule.user_id);
+                return (
+                  <div
+                    key={rule.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-border bg-surface-raised/20"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-cream text-sm font-medium truncate">
+                        {kid?.display_name || rule.user?.display_name || `Kid #${rule.user_id}`}
                       </span>
-                    )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-muted text-xs capitalize flex items-center gap-1">
+                        <RefreshCw size={10} />
+                        {rule.recurrence}
+                      </span>
+                      {rule.requires_photo && (
+                        <span className="text-muted text-xs flex items-center gap-1">
+                          <Camera size={10} />
+                          Photo
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
