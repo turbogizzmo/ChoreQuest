@@ -27,7 +27,7 @@ async def init_db():
             Notification, SpinResult, ApiKey, AuditLog, AppSetting,
             InviteCode, RefreshToken, PushSubscription,
             AvatarItem, UserAvatarItem,
-            Shoutout, VacationPeriod,
+            Shoutout, VacationPeriod, BountyBoardClaim,
         )
         await conn.run_sync(Base.metadata.create_all)
 
@@ -44,6 +44,8 @@ async def init_db():
             ("achievements", "tier", "VARCHAR(10)"),
             ("achievements", "group_key", "VARCHAR(50)"),
             ("achievements", "sort_order", "INTEGER DEFAULT 0"),
+            # Bounty Board
+            ("chores", "is_bounty", "INTEGER DEFAULT 0"),
         ]
         for table, col, typedef in _migrations:
             try:

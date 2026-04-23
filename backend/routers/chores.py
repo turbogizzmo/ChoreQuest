@@ -302,6 +302,7 @@ async def create_chore(
         recurrence=body.recurrence,
         custom_days=body.custom_days,
         requires_photo=body.requires_photo,
+        is_bounty=body.is_bounty,
         created_by=user.id,
     )
     db.add(chore)
