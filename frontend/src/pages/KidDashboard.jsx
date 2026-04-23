@@ -228,6 +228,23 @@ export default function KidDashboard() {
     }
   };
 
+  // ---- complete today's quest inline ----
+
+  const [completingToday, setCompletingToday] = useState(null);
+
+  const handleCompleteToday = async (assignment) => {
+    if (completingToday) return;
+    setCompletingToday(assignment.id);
+    try {
+      await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
+      setShowConfetti(true);
+      await fetchData();
+    } catch (err) {
+      setError(err.message || 'Could not complete quest');
+    } finally {
+      setCompletingToday(null);
+    }
+  };
 
   // ---- pet interaction ----
   const handlePetInteraction = async (action) => {
@@ -468,6 +485,7 @@ export default function KidDashboard() {
               const diff = difficultyLabel(chore.difficulty);
               const categoryColor = chore.category?.colour || '#14b8a6';
 
+              const isCompleting = completingToday === assignment.id;
               return (
                 <motion.div
                   key={assignment.id}
@@ -480,7 +498,7 @@ export default function KidDashboard() {
                   initial="hidden"
                   animate="visible"
                   custom={idx}
-                  onClick={() => navigate('/chores')}
+                  onClick={() => navigate(`/chores/${chore.id}`)}
                 >
                   <div className="flex items-start gap-3">
                     {/* Category indicator */}
@@ -500,26 +518,17 @@ export default function KidDashboard() {
                       </div>
 
                       {/* Meta row */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* XP */}
+                      <div className="flex items-center gap-2 flex-wrap mb-2">
                         <span className="inline-flex items-center gap-1 text-gold text-xs font-semibold">
                           <Star size={12} fill="currentColor" />
                           {chore.points} XP
                         </span>
-
-                        {/* Difficulty */}
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${diff.color}`}>
                           {diff.text}
                         </span>
-
-                        {/* Category */}
                         {chore.category?.name && (
-                          <span className="text-muted text-xs">
-                            {chore.category.name}
-                          </span>
+                          <span className="text-muted text-xs">{chore.category.name}</span>
                         )}
-
-                        {/* Photo indicator */}
                         {chore.requires_photo && (
                           <span className="inline-flex items-center gap-1 text-muted text-xs">
                             <Camera size={10} />
@@ -527,6 +536,26 @@ export default function KidDashboard() {
                           </span>
                         )}
                       </div>
+
+                      {/* Action row */}
+                      {chore.requires_photo ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/chores/${chore.id}`); }}
+                          className="game-btn game-btn-blue !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                        >
+                          <Camera size={12} />
+                          Add Photo & Complete
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCompleteToday(assignment); }}
+                          disabled={isCompleting || !!completingToday}
+                          className="game-btn game-btn-blue !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                        >
+                          {isCompleting ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                          {isCompleting ? 'Marking...' : 'Mark Done'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </motion.div>
