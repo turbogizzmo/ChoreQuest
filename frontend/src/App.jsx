@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
 import Layout from './components/Layout';
 import UpdatePrompt from './components/UpdatePrompt';
+import { ToastProvider } from './components/Toast';
 
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -46,14 +47,16 @@ export default function App() {
 
   if (!user) {
     return (
-      <Suspense fallback={<Loading />}>
-        <UpdatePrompt />
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </Suspense>
+      <ToastProvider>
+        <Suspense fallback={<Loading />}>
+          <UpdatePrompt />
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Suspense>
+      </ToastProvider>
     );
   }
 
@@ -62,29 +65,31 @@ export default function App() {
     : ParentDashboard;
 
   return (
-    <Layout>
-      <UpdatePrompt />
-      <Suspense fallback={<Loading />}>
-        <Routes>
-          <Route path="/" element={<DashboardComponent />} />
-          <Route path="/chores" element={<Chores />} />
-          <Route path="/chores/:id" element={<ChoreDetail />} />
-          <Route path="/rewards" element={<Rewards />} />
-          <Route path="/inventory" element={<Navigate to="/rewards?tab=inventory" replace />} />
-          <Route path="/wishlist" element={<Navigate to="/rewards?tab=wishlist" replace />} />
-          <Route path="/calendar" element={<Calendar />} />
-          <Route path="/party" element={<Party />} />
-          <Route path="/leaderboard" element={<Leaderboard />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/avatar" element={<AvatarEditor />} />
-          <Route path="/events" element={<Events />} />
-          <Route path="/kids/:kidId" element={<KidQuests />} />
-          <Route path="/bounty" element={<BountyBoard />} />
-          <Route path="/settings" element={<Settings />} />
-          {user.role === 'admin' && <Route path="/admin" element={<AdminDashboard />} />}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
-    </Layout>
+    <ToastProvider>
+      <Layout>
+        <UpdatePrompt />
+        <Suspense fallback={<Loading />}>
+          <Routes>
+            <Route path="/" element={<DashboardComponent />} />
+            <Route path="/chores" element={<Chores />} />
+            <Route path="/chores/:id" element={<ChoreDetail />} />
+            <Route path="/rewards" element={<Rewards />} />
+            <Route path="/inventory" element={<Navigate to="/rewards?tab=inventory" replace />} />
+            <Route path="/wishlist" element={<Navigate to="/rewards?tab=wishlist" replace />} />
+            <Route path="/calendar" element={<Calendar />} />
+            <Route path="/party" element={<Party />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/avatar" element={<AvatarEditor />} />
+            <Route path="/events" element={<Events />} />
+            <Route path="/kids/:kidId" element={<KidQuests />} />
+            <Route path="/bounty" element={<BountyBoard />} />
+            <Route path="/settings" element={<Settings />} />
+            {user.role === 'admin' && <Route path="/admin" element={<AdminDashboard />} />}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      </Layout>
+    </ToastProvider>
   );
 }
