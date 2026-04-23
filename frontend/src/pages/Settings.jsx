@@ -9,8 +9,37 @@ import {
   Loader2,
   Award,
   ArrowLeft,
+  GitCommit,
 } from 'lucide-react';
 import VacationSettings from '../components/VacationSettings';
+
+function VersionInfo() {
+  const [version, setVersion] = useState(null);
+  useEffect(() => {
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((d) => setVersion(d))
+      .catch(() => {});
+  }, []);
+
+  if (!version) return null;
+  return (
+    <div className="game-panel p-4 flex items-center justify-between">
+      <div className="flex items-center gap-2 text-muted">
+        <GitCommit size={14} />
+        <span className="text-xs">Version</span>
+      </div>
+      <div className="text-right">
+        <p className="text-cream text-xs font-mono">{version.version}</p>
+        {version.build_date && version.build_date !== 'unknown' && (
+          <p className="text-muted text-[11px]">
+            {new Date(version.build_date).toLocaleString()}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -367,6 +396,8 @@ export default function Settings() {
               </button>
             </div>
           )}
+
+          <VersionInfo />
         </div>
       )}
     </div>

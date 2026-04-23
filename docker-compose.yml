@@ -1,11 +1,15 @@
 services:
   chorequest:
-    build: .
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
     ports:
       - "8122:8122"
     environment:
       - SECRET_KEY=${SECRET_KEY}
-      - TZ=Europe/London
+      - TZ=America/Chicago
     volumes:
       - ./data:/app/data
     restart: unless-stopped
