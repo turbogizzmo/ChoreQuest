@@ -427,9 +427,8 @@ async def get_chore(
 ):
     chore = await _get_chore_or_404(db, chore_id, load_category=True)
     summaries = await _build_rotation_summaries(db, [chore_id])
-    data = ChoreResponse.model_validate(chore).model_dump()
-    data["rotation_summary"] = summaries.get(chore_id)
-    return data
+    response = ChoreResponse.model_validate(chore)
+    return response.model_copy(update={"rotation_summary": summaries.get(chore_id)})
 
 
 @router.put("/{chore_id}", response_model=ChoreResponse)
