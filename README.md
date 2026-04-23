@@ -72,6 +72,33 @@ docker-compose up -d --build
 
 The app runs on port **8122**. The first user to register automatically becomes the admin. After that, registration requires an invite code (generate from the admin dashboard).
 
+### Updating
+
+The Admin Dashboard checks GitHub Releases on load and shows a banner when a newer version is available (cached for 1 hour, no GitHub account needed).
+
+**To apply an update** — pull the latest image and restart:
+
+```bash
+docker-compose pull && docker-compose up -d
+```
+
+Your data volume (`./data`) is preserved across restarts.
+
+#### Automatic updates with Watchtower (optional)
+
+[Watchtower](https://containrrr.dev/watchtower/) can watch for new image releases and restart ChoreQuest automatically. Add it to your `docker-compose.yml`:
+
+```yaml
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 86400 chorequest
+    restart: unless-stopped
+```
+
+This polls once per day (`86400` seconds) and recreates the container when a new image is published.
+
 ### Expose externally
 
 ChoreQuest works well behind a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) — no port forwarding needed, free HTTPS, and enables push notifications and PWA install on all devices.

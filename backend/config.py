@@ -3,6 +3,8 @@ from pydantic_settings import BaseSettings
 
 WEAK_SECRETS = {"changeme", "secret", "password", "12345678", "1234567890123456"}
 
+CURRENT_VERSION = "1.0.0"  # Update this manually to match the GitHub Release tag on each release
+
 
 class Settings(BaseSettings):
     SECRET_KEY: str

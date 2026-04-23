@@ -1,13 +1,17 @@
 import hashlib
+import json
 import os
 import secrets
 import string
+import time
+import urllib.request
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import CURRENT_VERSION
 from backend.database import get_db
 from backend.models import User, ApiKey, InviteCode, AuditLog, AppSetting
 from backend.schemas import (
@@ -25,6 +29,80 @@ from backend.auth import hash_password
 from backend.dependencies import require_admin, require_parent, get_current_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+# Simple in-process cache for the GitHub release check (avoids hammering the API)
+_update_cache: dict = {"data": None, "ts": 0.0}
+_UPDATE_CACHE_TTL = 3600  # seconds
+
+
+# ============================================================
+# Update Check
+# ============================================================
+
+def _parse_version(v: str) -> tuple:
+    """Return a comparable tuple from a semver-ish string like '1.2.3' or 'v1.2.3'."""
+    v = v.lstrip("vV")
+    parts = []
+    for part in v.split(".")[:3]:
+        try:
+            parts.append(int(part))
+        except ValueError:
+            parts.append(0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts)
+
+
+# ---------- GET /update-check ----------
+@router.get("/update-check")
+async def check_for_updates(
+    _admin: User = Depends(require_admin),
+):
+    """Check GitHub Releases for a newer version of ChoreQuest."""
+    now = time.time()
+    if _update_cache["data"] is not None and (now - _update_cache["ts"]) < _UPDATE_CACHE_TTL:
+        return _update_cache["data"]
+
+    latest_tag: str | None = None
+    release_url: str | None = None
+    release_name: str | None = None
+    error: str | None = None
+
+    try:
+        req = urllib.request.Request(
+            "https://api.github.com/repos/turbogizzmo/ChoreQuest/releases/latest",
+            headers={"Accept": "application/vnd.github+json", "User-Agent": "ChoreQuest"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            payload = json.loads(resp.read().decode())
+        latest_tag = payload.get("tag_name", "")
+        release_url = payload.get("html_url", "")
+        release_name = payload.get("name", latest_tag)
+    except urllib.error.HTTPError as exc:
+        error = f"GitHub API returned HTTP {exc.code}"
+    except urllib.error.URLError:
+        error = "Could not reach GitHub (network error)"
+    except (json.JSONDecodeError, KeyError):
+        error = "Unexpected response from GitHub API"
+    except Exception:  # noqa: BLE001
+        error = "Update check failed"
+
+    behind = False
+    if latest_tag and not error:
+        behind = _parse_version(latest_tag) > _parse_version(CURRENT_VERSION)
+
+    result = {
+        "current": CURRENT_VERSION,
+        "latest": latest_tag,
+        "release_name": release_name,
+        "url": release_url,
+        "behind": behind,
+        "error": error,
+    }
+    if not error:
+        _update_cache["data"] = result
+        _update_cache["ts"] = now
+    return result
 
 
 # ============================================================
