@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
@@ -126,6 +126,7 @@ export default function Chores() {
   const [deleting, setDeleting] = useState(false);
 
   const [completingId, setCompletingId] = useState(null);
+  const completeInFlight = useRef(false);
   const [photoFiles, setPhotoFiles] = useState({});
 
   const fetchChores = useCallback(async () => {
@@ -193,7 +194,8 @@ export default function Chores() {
   const handleKidComplete = async (chore) => {
     const choreId = chore.id;
     if (chore.requires_photo && !photoFiles[choreId]) return;
-
+    if (completeInFlight.current) return;
+    completeInFlight.current = true;
     setCompletingId(choreId);
     try {
       if (chore.requires_photo && photoFiles[choreId]) {
@@ -209,6 +211,7 @@ export default function Chores() {
     } catch (err) {
       showToast(err.message || 'Failed to complete quest', 'error');
     } finally {
+      completeInFlight.current = false;
       setCompletingId(null);
     }
   };
