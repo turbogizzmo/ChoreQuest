@@ -35,6 +35,17 @@ const DIFFICULTY_COLORS = [
 ];
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+// 0=Monday … 6=Sunday (matches Python's date.weekday())
+const ROTATION_DAYS = [
+  { value: 0, label: 'Monday' },
+  { value: 1, label: 'Tuesday' },
+  { value: 2, label: 'Wednesday' },
+  { value: 3, label: 'Thursday' },
+  { value: 4, label: 'Friday' },
+  { value: 5, label: 'Saturday' },
+  { value: 6, label: 'Sunday' },
+];
+
 const CATEGORY_COLORS = {
   cleaning: 'bg-accent/20 text-accent border-accent/40',
   cooking: 'bg-gold/20 text-gold border-gold/40',
@@ -101,7 +112,8 @@ export default function ChoreDetail() {
   // Rotation state (parent only)
   const [rotation, setRotation] = useState(null);
   const [allKids, setAllKids] = useState([]);
-  const [selectedCadence, setSelectedCadence] = useState('daily');
+  const [selectedCadence, setSelectedCadence] = useState('weekly');
+  const [selectedRotationDay, setSelectedRotationDay] = useState(0); // 0=Mon … 6=Sun
   const [assignmentRules, setAssignmentRules] = useState([]);
 
   const fetchRotation = useCallback(async () => {
@@ -216,7 +228,12 @@ export default function ChoreDetail() {
     try {
       await api('/api/rotations', {
         method: 'POST',
-        body: { chore_id: parseInt(id), kid_ids: allKids.map((k) => k.id), cadence: selectedCadence },
+        body: {
+          chore_id: parseInt(id),
+          kid_ids: allKids.map((k) => k.id),
+          cadence: selectedCadence,
+          rotation_day: selectedRotationDay,
+        },
       });
       await fetchRotation();
       showToast('Rotation created.', 'success');
@@ -253,6 +270,23 @@ export default function ChoreDetail() {
       showToast(`Rotation cadence set to ${newCadence}.`, 'info');
     } catch (err) {
       showToast(err.message || 'Could not update cadence.', 'error');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const handleUpdateRotationDay = async (newDay) => {
+    if (!rotation) return;
+    setActionLoading('rotation');
+    try {
+      await api(`/api/rotations/${rotation.id}`, {
+        method: 'PUT',
+        body: { rotation_day: parseInt(newDay) },
+      });
+      await fetchRotation();
+      setActionMessage(`Rotation day updated.`);
+    } catch (err) {
+      setActionMessage(err.message || 'Could not update rotation day.');
     } finally {
       setActionLoading('');
     }
@@ -518,35 +552,61 @@ export default function ChoreDetail() {
             <Users size={18} className="text-accent" />
             <h2 className="text-cream text-sm font-semibold">Assigned To</h2>
           </div>
-          <div className="space-y-2">
-            {assignmentRules.map((rule) => {
-              const kid = allKids.find((k) => k.id === rule.user_id);
-              return (
-                <div
-                  key={rule.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-border bg-surface-raised/20"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-cream text-sm font-medium truncate">
-                      {kid?.display_name || rule.user?.display_name || `Kid #${rule.user_id}`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-muted text-xs capitalize flex items-center gap-1">
-                      <RefreshCw size={10} />
-                      {rule.recurrence}
-                    </span>
-                    {rule.requires_photo && (
-                      <span className="text-muted text-xs flex items-center gap-1">
-                        <Camera size={10} />
-                        Photo
+
+          {/* When a rotation is active, the rotation controls assignment —
+              show a single "currently" line instead of listing all kids,
+              which would falsely imply all of them do the chore at once. */}
+          {rotation ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-purple/30 bg-purple/10">
+              <RotateCw size={14} className="text-purple flex-shrink-0" />
+              <span className="text-sm text-cream">
+                Rotation active — currently{' '}
+                <span className="font-semibold text-purple">
+                  {(() => {
+                    const currentKidId = rotation.kid_ids?.[rotation.current_index];
+                    const currentKid = allKids.find((k) => k.id === currentKidId);
+                    return currentKid?.display_name || `Kid #${currentKidId}`;
+                  })()}
+                </span>
+                's turn
+              </span>
+              <span className="text-muted text-xs ml-auto capitalize">
+                {rotation.cadence}
+                {(rotation.cadence === 'weekly' || rotation.cadence === 'fortnightly') &&
+                  ` · every ${ROTATION_DAYS[rotation.rotation_day ?? 0]?.label}`}
+              </span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {assignmentRules.map((rule) => {
+                const kid = allKids.find((k) => k.id === rule.user_id);
+                return (
+                  <div
+                    key={rule.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-md border border-border bg-surface-raised/20"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-cream text-sm font-medium truncate">
+                        {kid?.display_name || rule.user?.display_name || `Kid #${rule.user_id}`}
                       </span>
-                    )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-muted text-xs capitalize flex items-center gap-1">
+                        <RefreshCw size={10} />
+                        {rule.recurrence}
+                      </span>
+                      {rule.requires_photo && (
+                        <span className="text-muted text-xs flex items-center gap-1">
+                          <Camera size={10} />
+                          Photo
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -560,19 +620,36 @@ export default function ChoreDetail() {
 
           {rotation ? (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted">Cadence:</span>
-                <select
-                  value={rotation.cadence}
-                  onChange={(e) => handleUpdateCadence(e.target.value)}
-                  disabled={actionLoading === 'rotation'}
-                  className="bg-surface-raised text-cream text-sm rounded-md border border-border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple"
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="fortnightly">Fortnightly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted">Cadence:</span>
+                  <select
+                    value={rotation.cadence}
+                    onChange={(e) => handleUpdateCadence(e.target.value)}
+                    disabled={actionLoading === 'rotation'}
+                    className="bg-surface-raised text-cream text-sm rounded-md border border-border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple"
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="fortnightly">Fortnightly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+                {(rotation.cadence === 'weekly' || rotation.cadence === 'fortnightly') && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted">Rotates on:</span>
+                    <select
+                      value={rotation.rotation_day ?? 0}
+                      onChange={(e) => handleUpdateRotationDay(e.target.value)}
+                      disabled={actionLoading === 'rotation'}
+                      className="bg-surface-raised text-cream text-sm rounded-md border border-border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple"
+                    >
+                      {ROTATION_DAYS.map((d) => (
+                        <option key={d.value} value={d.value}>{d.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
                 {(rotation.kid_ids || []).map((kidId, idx) => {
@@ -617,18 +694,34 @@ export default function ChoreDetail() {
               <p className="text-muted text-xs">
                 No rotation set. Create one to automatically rotate this quest between kids.
               </p>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted">Cadence:</span>
-                <select
-                  value={selectedCadence}
-                  onChange={(e) => setSelectedCadence(e.target.value)}
-                  className="bg-surface-raised text-cream text-sm rounded-md border border-border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple"
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="fortnightly">Fortnightly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted">Cadence:</span>
+                  <select
+                    value={selectedCadence}
+                    onChange={(e) => setSelectedCadence(e.target.value)}
+                    className="bg-surface-raised text-cream text-sm rounded-md border border-border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple"
+                  >
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="fortnightly">Fortnightly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+                {(selectedCadence === 'weekly' || selectedCadence === 'fortnightly') && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted">Rotates on:</span>
+                    <select
+                      value={selectedRotationDay}
+                      onChange={(e) => setSelectedRotationDay(parseInt(e.target.value))}
+                      className="bg-surface-raised text-cream text-sm rounded-md border border-border px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple"
+                    >
+                      {ROTATION_DAYS.map((d) => (
+                        <option key={d.value} value={d.value}>{d.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
               <button
                 onClick={handleCreateRotation}

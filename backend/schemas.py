@@ -393,11 +393,14 @@ class RotationCreate(BaseModel):
     chore_id: int
     kid_ids: list[int]
     cadence: RotationCadence
+    # 0=Monday … 6=Sunday; used by weekly/fortnightly cadences
+    rotation_day: int = 0
 
 
 class RotationUpdate(BaseModel):
     kid_ids: list[int] | None = None
     cadence: RotationCadence | None = None
+    rotation_day: int | None = None
 
 
 class RotationResponse(BaseModel):
@@ -405,6 +408,7 @@ class RotationResponse(BaseModel):
     chore_id: int
     kid_ids: list[int]
     cadence: RotationCadence
+    rotation_day: int
     current_index: int
     last_rotated: datetime | None
     created_at: datetime

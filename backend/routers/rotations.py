@@ -44,11 +44,16 @@ async def create_rotation(
     if existing is not None:
         raise HTTPException(status_code=409, detail="A rotation already exists for this chore")
 
+    # Set last_rotated to now so the first daily reset doesn't immediately
+    # advance past kid_ids[0]. Without this, should_advance_rotation() sees
+    # last_rotated=None → returns True → Kid A is skipped on the very first run.
     rotation = ChoreRotation(
         chore_id=body.chore_id,
         kid_ids=body.kid_ids,
         cadence=body.cadence,
+        rotation_day=body.rotation_day,
         current_index=0,
+        last_rotated=datetime.now(timezone.utc),
     )
     db.add(rotation)
     await db.commit()
@@ -83,6 +88,12 @@ async def update_rotation(
 
     if body.cadence is not None:
         rotation.cadence = body.cadence
+
+    if body.rotation_day is not None:
+        rotation.rotation_day = body.rotation_day
+        # Reset last_rotated so the new boundary is measured from now,
+        # giving the current kid the full period from the new rotation_day.
+        rotation.last_rotated = datetime.now(timezone.utc)
 
     rotation.updated_at = datetime.now(timezone.utc)
     await db.commit()
