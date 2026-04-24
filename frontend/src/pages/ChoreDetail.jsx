@@ -238,6 +238,7 @@ export default function ChoreDetail() {
         showToast('Quest skipped for today.', 'info');
       }
       await fetchChore();
+      setConfirmAction(null);
     } catch (err) {
       const fallbackMessage =
         type === 'uncomplete'
@@ -248,7 +249,6 @@ export default function ChoreDetail() {
       showToast(err.message || fallbackMessage, 'error');
     } finally {
       setActionLoading('');
-      setConfirmAction(null);
     }
   };
 
