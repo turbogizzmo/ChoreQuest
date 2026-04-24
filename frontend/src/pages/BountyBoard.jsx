@@ -6,7 +6,7 @@
  *          review completed claims, approve or reject.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ScrollText, CheckCircle2, Clock, XCircle, Loader2,
@@ -49,6 +49,7 @@ export default function BountyBoard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
+  const actionInFlight = useRef(false);
   const [tab, setTab] = useState('board'); // 'board' | 'review'
 
   const fetchData = useCallback(async () => {
@@ -82,6 +83,8 @@ export default function BountyBoard() {
   }, [fetchData]);
 
   const handleClaim = async (choreId) => {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setActionLoading(`claim-${choreId}`);
     try {
       await api(`/api/bounty/${choreId}/claim`, { method: 'POST' });
@@ -90,11 +93,14 @@ export default function BountyBoard() {
     } catch (err) {
       showToast(err.message || 'Could not accept bounty', 'error');
     } finally {
+      actionInFlight.current = false;
       setActionLoading('');
     }
   };
 
   const handleComplete = async (choreId) => {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setActionLoading(`complete-${choreId}`);
     try {
       const fd = new FormData();
@@ -104,11 +110,14 @@ export default function BountyBoard() {
     } catch (err) {
       showToast(err.message || 'Could not mark bounty complete', 'error');
     } finally {
+      actionInFlight.current = false;
       setActionLoading('');
     }
   };
 
   const handleAbandon = async (choreId) => {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setActionLoading(`abandon-${choreId}`);
     try {
       await api(`/api/bounty/${choreId}/claim`, { method: 'DELETE' });
@@ -117,6 +126,7 @@ export default function BountyBoard() {
     } catch (err) {
       showToast(err.message || 'Could not abandon bounty', 'error');
     } finally {
+      actionInFlight.current = false;
       setActionLoading('');
     }
   };

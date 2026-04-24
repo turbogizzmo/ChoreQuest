@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
@@ -108,6 +108,7 @@ export default function ChoreDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
+  const actionInFlight = useRef(false);
 
   // Rotation state (parent only)
   const [rotation, setRotation] = useState(null);
@@ -162,6 +163,8 @@ export default function ChoreDetail() {
   }, [fetchChore, fetchRotation]);
 
   const handleComplete = async () => {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setActionLoading('complete');
     try {
       await api(`/api/chores/${id}/complete`, { method: 'POST' });
@@ -170,6 +173,7 @@ export default function ChoreDetail() {
     } catch (err) {
       showToast(err.message || 'Failed to complete the quest.', 'error');
     } finally {
+      actionInFlight.current = false;
       setActionLoading('');
     }
   };
