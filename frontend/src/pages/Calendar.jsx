@@ -299,14 +299,13 @@ export default function Calendar() {
 
       {/* Loading */}
       {loading && (
-        <div className="flex items-center justify-center py-20">
+        <div className="flex items-center justify-center py-6">
           <Loader2 size={24} className="text-accent animate-spin" />
         </div>
       )}
 
       {/* Calendar Grid — 7 days starting from startDate */}
-      {!loading && (
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+      <div className={`grid grid-cols-1 md:grid-cols-7 gap-3 ${loading ? 'opacity-30 pointer-events-none select-none' : ''}`}>
           {Array.from({ length: 7 }, (_, i) => {
             const dayStr = addDays(startDate, i);
             const d = new Date(dayStr + 'T00:00:00');
@@ -337,7 +336,7 @@ export default function Calendar() {
 
                 {/* Assignments */}
                 <div className="space-y-2 mt-2 min-h-[80px]">
-                  {dayAssignments.length === 0 && (
+                  {!loading && dayAssignments.length === 0 && (
                     <p className="text-muted text-xs text-center py-4">
                       No quests
                     </p>
@@ -416,7 +415,6 @@ export default function Calendar() {
             );
           })}
         </div>
-      )}
 
       {/* Empty state */}
       {!loading &&
