@@ -221,7 +221,13 @@ export default function ChoreDetail() {
       }
       await fetchChore();
     } catch (err) {
-      showToast(err.message || 'Action failed.', 'error');
+      const fallbackMessage =
+        type === 'uncomplete'
+          ? 'Could not mark quest as incomplete.'
+          : type === 'skip'
+            ? 'Could not skip quest for today.'
+            : 'Action failed.';
+      showToast(err.message || fallbackMessage, 'error');
     } finally {
       setActionLoading('');
     }
