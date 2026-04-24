@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import { useTheme } from '../hooks/useTheme';
 import { todayLocalISO } from '../utils/dates';
 import { themedTitle, themedDescription } from '../utils/questThemeText';
+import Modal from '../components/Modal';
 import {
   ArrowLeft,
   Star,
@@ -110,6 +111,7 @@ export default function ChoreDetail() {
   const [actionLoading, setActionLoading] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
   const photoInputRef = useRef(null);
+  const [confirmAction, setConfirmAction] = useState(null); // { type: 'skip'|'uncomplete', assignmentId }
   const actionInFlight = useRef(false);
 
   useEffect(() => {
@@ -209,35 +211,44 @@ export default function ChoreDetail() {
     }
   };
 
-  const handleUncomplete = async (assignmentId) => {
-    setActionLoading('uncomplete');
-    try {
-      const path = assignmentId
-        ? `/api/chores/assignments/${assignmentId}/uncomplete`
-        : `/api/chores/${id}/uncomplete`;
-      await api(path, { method: 'POST' });
-      showToast('Quest marked as incomplete.', 'info');
-      await fetchChore();
-    } catch (err) {
-      showToast(err.message || 'Could not undo completion.', 'error');
-    } finally {
-      setActionLoading('');
-    }
+  const handleUncomplete = (assignmentId) => {
+    setConfirmAction({ type: 'uncomplete', assignmentId });
   };
 
-  const handleSkip = async (assignmentId) => {
-    setActionLoading('skip');
+  const handleSkip = (assignmentId) => {
+    setConfirmAction({ type: 'skip', assignmentId });
+  };
+
+  const confirmDestructiveAction = async () => {
+    if (!confirmAction || actionLoading) return;
+    const { type, assignmentId } = confirmAction;
+    setActionLoading(type);
     try {
-      const path = assignmentId
-        ? `/api/chores/assignments/${assignmentId}/skip`
-        : `/api/chores/${id}/skip`;
-      await api(path, { method: 'POST' });
-      showToast('Quest skipped for today.', 'info');
+      if (type === 'uncomplete') {
+        const path = assignmentId
+          ? `/api/chores/assignments/${assignmentId}/uncomplete`
+          : `/api/chores/${id}/uncomplete`;
+        await api(path, { method: 'POST' });
+        showToast('Quest marked as incomplete.', 'info');
+      } else if (type === 'skip') {
+        const path = assignmentId
+          ? `/api/chores/assignments/${assignmentId}/skip`
+          : `/api/chores/${id}/skip`;
+        await api(path, { method: 'POST' });
+        showToast('Quest skipped for today.', 'info');
+      }
       await fetchChore();
     } catch (err) {
-      showToast(err.message || 'Could not skip the quest.', 'error');
+      const fallbackMessage =
+        type === 'uncomplete'
+          ? 'Could not mark quest as incomplete.'
+          : type === 'skip'
+            ? 'Could not skip quest for today.'
+            : 'Action failed.';
+      showToast(err.message || fallbackMessage, 'error');
     } finally {
       setActionLoading('');
+      setConfirmAction(null);
     }
   };
 
@@ -837,6 +848,35 @@ export default function ChoreDetail() {
           </div>
         </div>
       )}
+
+      {/* Confirmation modal for destructive actions */}
+      <Modal
+        isOpen={!!confirmAction}
+        onClose={() => { if (!actionLoading) setConfirmAction(null); }}
+        title={confirmAction?.type === 'skip' ? 'Skip Quest Today?' : 'Uncomplete Quest?'}
+        actions={[
+          {
+            label: 'Cancel',
+            onClick: () => setConfirmAction(null),
+            className: 'game-btn game-btn-blue',
+            disabled: !!actionLoading,
+          },
+          {
+            label: actionLoading
+              ? (confirmAction?.type === 'skip' ? 'Skipping...' : 'Undoing...')
+              : (confirmAction?.type === 'skip' ? 'Skip Today' : 'Uncomplete'),
+            onClick: confirmDestructiveAction,
+            className: 'game-btn game-btn-red',
+            disabled: !!actionLoading,
+          },
+        ]}
+      >
+        <p className="text-muted">
+          {confirmAction?.type === 'skip'
+            ? "Are you sure you want to skip this quest today? The hero will lose today's opportunity to earn XP."
+            : 'Are you sure you want to mark this quest as incomplete? The XP award will be rolled back.'}
+        </p>
+      </Modal>
 
     </div>
   );
