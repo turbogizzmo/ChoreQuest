@@ -117,10 +117,12 @@ export default function BountyBoard() {
   const confirmAbandon = async () => {
     if (abandonTarget === null) return;
     const choreId = abandonTarget;
-    setAbandonTarget(null);
-    setActionLoading(`abandon-${choreId}`);
+    const actionKey = `abandon-${choreId}`;
+    if (actionLoading === actionKey) return;
+    setActionLoading(actionKey);
     try {
       await api(`/api/bounty/${choreId}/claim`, { method: 'DELETE' });
+      setAbandonTarget(null);
       showToast('Bounty abandoned.', 'info');
       await fetchData();
     } catch (err) {
