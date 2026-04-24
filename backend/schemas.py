@@ -105,6 +105,16 @@ class ChoreUpdate(BaseModel):
     assigned_user_ids: list[int] | None = None
 
 
+class RotationSummary(BaseModel):
+    current_kid_id: int
+    current_kid_name: str
+    cadence: RotationCadence
+    kid_ids: list[int]
+    current_index: int
+
+    model_config = {"from_attributes": True}
+
+
 class ChoreResponse(BaseModel):
     id: int
     title: str
@@ -121,6 +131,7 @@ class ChoreResponse(BaseModel):
     is_bounty: bool = False
     created_by: int
     created_at: datetime
+    rotation_summary: RotationSummary | None = None
 
     model_config = {"from_attributes": True}
 

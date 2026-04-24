@@ -110,6 +110,7 @@ export default function ChoreDetail() {
   const [actionLoading, setActionLoading] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
   const photoInputRef = useRef(null);
+  const actionInFlight = useRef(false);
 
   useEffect(() => {
     setPhotoFile(null);
@@ -169,6 +170,8 @@ export default function ChoreDetail() {
 
   const handleComplete = async () => {
     if (chore?.requires_photo && !photoFile) return;
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setActionLoading('complete');
     try {
       if (chore?.requires_photo && photoFile) {
@@ -185,6 +188,7 @@ export default function ChoreDetail() {
     } catch (err) {
       showToast(err.message || 'Failed to complete the quest.', 'error');
     } finally {
+      actionInFlight.current = false;
       setActionLoading('');
     }
   };
@@ -499,6 +503,42 @@ export default function ChoreDetail() {
           </div>
         )}
       </div>
+
+      {/* Rotation info for kids */}
+      {isKid && chore.rotation_summary && (
+        <div
+          className={`game-panel p-4 flex items-start gap-3 ${
+            chore.rotation_summary.current_kid_id === user?.id
+              ? 'border-purple/40 bg-purple/10'
+              : 'border-border bg-surface-raised/30'
+          }`}
+        >
+          <RotateCw
+            size={16}
+            className={`flex-shrink-0 mt-0.5 ${
+              chore.rotation_summary.current_kid_id === user?.id
+                ? 'text-purple'
+                : 'text-muted'
+            }`}
+          />
+          <div className="text-sm leading-snug">
+            {chore.rotation_summary.current_kid_id === user?.id ? (
+              <span className="text-cream">
+                🔄 Rotating quest —{' '}
+                <span className="font-semibold text-purple">it's your turn!</span>
+              </span>
+            ) : (
+              <span className="text-muted">
+                🔄 Rotating quest — currently{' '}
+                <span className="font-semibold text-cream">
+                  {chore.rotation_summary.current_kid_name}
+                </span>
+                's turn. Check back next cycle.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Actions for kids */}
       {isKid && hasPendingToday && (
