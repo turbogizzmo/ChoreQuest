@@ -503,7 +503,7 @@ export default function Chores() {
                   {isNotMyRotationTurn && (
                     <span className="flex items-center gap-1 text-muted text-xs border border-border rounded px-1.5 py-0.5">
                       <RotateCw size={10} />
-                      Not your week
+                      Not your turn
                     </span>
                   )}
                 </div>
