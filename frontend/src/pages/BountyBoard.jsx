@@ -288,18 +288,20 @@ export default function BountyBoard() {
       {/* Confirmation modal for abandoning a bounty */}
       <Modal
         isOpen={abandonTarget !== null}
-        onClose={() => setAbandonTarget(null)}
+        onClose={() => { if (!actionLoading) setAbandonTarget(null); }}
         title="Abandon Bounty?"
         actions={[
           {
             label: 'Cancel',
             onClick: () => setAbandonTarget(null),
             className: 'game-btn game-btn-blue',
+            disabled: !!actionLoading,
           },
           {
-            label: 'Abandon',
+            label: actionLoading === `abandon-${abandonTarget}` ? 'Abandoning...' : 'Abandon',
             onClick: confirmAbandon,
             className: 'game-btn game-btn-red',
+            disabled: !!actionLoading,
           },
         ]}
       >

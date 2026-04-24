@@ -201,9 +201,8 @@ export default function ChoreDetail() {
   };
 
   const confirmDestructiveAction = async () => {
-    if (!confirmAction) return;
+    if (!confirmAction || actionLoading) return;
     const { type, assignmentId } = confirmAction;
-    setConfirmAction(null);
     setActionLoading(type);
     try {
       if (type === 'uncomplete') {
@@ -230,6 +229,7 @@ export default function ChoreDetail() {
       showToast(err.message || fallbackMessage, 'error');
     } finally {
       setActionLoading('');
+      setConfirmAction(null);
     }
   };
 
@@ -782,18 +782,22 @@ export default function ChoreDetail() {
       {/* Confirmation modal for destructive actions */}
       <Modal
         isOpen={!!confirmAction}
-        onClose={() => setConfirmAction(null)}
+        onClose={() => { if (!actionLoading) setConfirmAction(null); }}
         title={confirmAction?.type === 'skip' ? 'Skip Quest Today?' : 'Uncomplete Quest?'}
         actions={[
           {
             label: 'Cancel',
             onClick: () => setConfirmAction(null),
             className: 'game-btn game-btn-blue',
+            disabled: !!actionLoading,
           },
           {
-            label: confirmAction?.type === 'skip' ? 'Skip Today' : 'Uncomplete',
+            label: actionLoading
+              ? (confirmAction?.type === 'skip' ? 'Skipping...' : 'Undoing...')
+              : (confirmAction?.type === 'skip' ? 'Skip Today' : 'Uncomplete'),
             onClick: confirmDestructiveAction,
             className: 'game-btn game-btn-red',
+            disabled: !!actionLoading,
           },
         ]}
       >
