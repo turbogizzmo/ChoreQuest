@@ -426,9 +426,22 @@ async def get_chore(
     user: User = Depends(get_current_user),
 ):
     chore = await _get_chore_or_404(db, chore_id, load_category=True)
-    summaries = await _build_rotation_summaries(db, [chore_id])
     response = ChoreResponse.model_validate(chore)
-    return response.model_copy(update={"rotation_summary": summaries.get(chore_id)})
+    summaries = await _build_rotation_summaries(db, [chore_id])
+    updates: dict = {"rotation_summary": summaries.get(chore_id)}
+    # Apply per-kid requires_photo rule override when a kid fetches the chore
+    if user.role == UserRole.kid:
+        rule_result = await db.execute(
+            select(ChoreAssignmentRule).where(
+                ChoreAssignmentRule.chore_id == chore_id,
+                ChoreAssignmentRule.user_id == user.id,
+                ChoreAssignmentRule.is_active == True,
+            )
+        )
+        rule = rule_result.scalar_one_or_none()
+        if rule is not None:
+            updates["requires_photo"] = rule.requires_photo
+    return response.model_copy(update=updates)
 
 
 @router.put("/{chore_id}", response_model=ChoreResponse)
