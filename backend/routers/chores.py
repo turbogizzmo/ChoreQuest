@@ -377,7 +377,20 @@ async def get_chore(
     user: User = Depends(get_current_user),
 ):
     chore = await _get_chore_or_404(db, chore_id, load_category=True)
-    return ChoreResponse.model_validate(chore)
+    data = ChoreResponse.model_validate(chore).model_dump()
+    # Apply per-kid requires_photo rule override when a kid fetches the chore
+    if user.role == UserRole.kid:
+        rule_result = await db.execute(
+            select(ChoreAssignmentRule).where(
+                ChoreAssignmentRule.chore_id == chore_id,
+                ChoreAssignmentRule.user_id == user.id,
+                ChoreAssignmentRule.is_active == True,
+            )
+        )
+        rule = rule_result.scalar_one_or_none()
+        if rule is not None:
+            data["requires_photo"] = rule.requires_photo
+    return data
 
 
 @router.put("/{chore_id}", response_model=ChoreResponse)

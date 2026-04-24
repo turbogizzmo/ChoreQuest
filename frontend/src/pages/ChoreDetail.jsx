@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
@@ -109,9 +109,11 @@ export default function ChoreDetail() {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
+  const photoInputRef = useRef(null);
 
   useEffect(() => {
     setPhotoFile(null);
+    if (photoInputRef.current) photoInputRef.current.value = '';
   }, [id]);
   // Rotation state (parent only)
   const [rotation, setRotation] = useState(null);
@@ -177,6 +179,7 @@ export default function ChoreDetail() {
         await api(`/api/chores/${id}/complete`, { method: 'POST' });
       }
       setPhotoFile(null);
+      if (photoInputRef.current) photoInputRef.current.value = '';
       showToast('Quest completed! XP awarded! 🎉', 'success');
       await fetchChore();
     } catch (err) {
@@ -510,6 +513,7 @@ export default function ChoreDetail() {
                   <Camera size={12} />
                   <span>{photoFile ? photoFile.name : 'Attach proof photo'}</span>
                   <input
+                    ref={photoInputRef}
                     type="file"
                     accept="image/*"
                     className="hidden"
