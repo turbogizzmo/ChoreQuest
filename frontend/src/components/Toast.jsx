@@ -89,7 +89,7 @@ function ToastStack({ toasts, onDismiss }) {
             <p className={`${s.text} text-sm flex-1 leading-snug`}>{toast.message}</p>
             <button
               onClick={() => onDismiss(toast.id)}
-              className="text-muted hover:text-cream transition-colors flex-shrink-0 -mr-1"
+              className="text-muted hover:text-cream transition-colors flex-shrink-0 -mr-1 min-w-[44px] min-h-[44px] flex items-center justify-center"
               aria-label="Dismiss"
             >
               <X size={14} />

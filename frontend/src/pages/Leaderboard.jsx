@@ -67,9 +67,10 @@ export default function Leaderboard() {
       )}
 
       {leaderboard_enabled && !loading && !error && entries.length === 0 && (
-        <div className="game-panel p-8 text-center">
+        <div className="game-panel p-8 text-center flex flex-col items-center gap-3">
+          <Trophy size={36} className="text-muted" />
           <p className="text-muted text-sm">
-            No XP earned this week yet.
+            No scores yet — complete some quests!
           </p>
         </div>
       )}
