@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
@@ -110,6 +110,7 @@ export default function ChoreDetail() {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'skip'|'uncomplete', assignmentId }
+  const actionInFlight = useRef(false);
 
   // Rotation state (parent only)
   const [rotation, setRotation] = useState(null);
@@ -164,6 +165,8 @@ export default function ChoreDetail() {
   }, [fetchChore, fetchRotation]);
 
   const handleComplete = async () => {
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setActionLoading('complete');
     try {
       await api(`/api/chores/${id}/complete`, { method: 'POST' });
@@ -172,6 +175,7 @@ export default function ChoreDetail() {
     } catch (err) {
       showToast(err.message || 'Failed to complete the quest.', 'error');
     } finally {
+      actionInFlight.current = false;
       setActionLoading('');
     }
   };
@@ -495,6 +499,42 @@ export default function ChoreDetail() {
           </div>
         )}
       </div>
+
+      {/* Rotation info for kids */}
+      {isKid && chore.rotation_summary && (
+        <div
+          className={`game-panel p-4 flex items-start gap-3 ${
+            chore.rotation_summary.current_kid_id === user?.id
+              ? 'border-purple/40 bg-purple/10'
+              : 'border-border bg-surface-raised/30'
+          }`}
+        >
+          <RotateCw
+            size={16}
+            className={`flex-shrink-0 mt-0.5 ${
+              chore.rotation_summary.current_kid_id === user?.id
+                ? 'text-purple'
+                : 'text-muted'
+            }`}
+          />
+          <div className="text-sm leading-snug">
+            {chore.rotation_summary.current_kid_id === user?.id ? (
+              <span className="text-cream">
+                🔄 Rotating quest —{' '}
+                <span className="font-semibold text-purple">it's your turn!</span>
+              </span>
+            ) : (
+              <span className="text-muted">
+                🔄 Rotating quest — currently{' '}
+                <span className="font-semibold text-cream">
+                  {chore.rotation_summary.current_kid_name}
+                </span>
+                's turn. Check back next cycle.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Actions for kids */}
       {isKid && hasPendingToday && (

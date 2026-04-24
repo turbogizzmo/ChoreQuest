@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
@@ -27,6 +27,7 @@ import {
   Users,
   ScrollText,
   Zap,
+  RotateCw,
 } from 'lucide-react';
 
 const DIFFICULTY_OPTIONS = [
@@ -126,6 +127,7 @@ export default function Chores() {
   const [deleting, setDeleting] = useState(false);
 
   const [completingId, setCompletingId] = useState(null);
+  const completeInFlight = useRef(false);
   const [photoFiles, setPhotoFiles] = useState({});
 
   const fetchChores = useCallback(async () => {
@@ -191,9 +193,10 @@ export default function Chores() {
   }, [fetchChores, fetchAssignments]);
 
   const handleKidComplete = async (chore) => {
+    if (completeInFlight.current) return;
     const choreId = chore.id;
     if (chore.requires_photo && !photoFiles[choreId]) return;
-
+    completeInFlight.current = true;
     setCompletingId(choreId);
     try {
       if (chore.requires_photo && photoFiles[choreId]) {
@@ -209,6 +212,7 @@ export default function Chores() {
     } catch (err) {
       showToast(err.message || 'Failed to complete quest', 'error');
     } finally {
+      completeInFlight.current = false;
       setCompletingId(null);
     }
   };
@@ -389,12 +393,16 @@ export default function Chores() {
             const isPending = isKid && (kidStatus === 'pending' || kidStatus === 'assigned');
             const isCompleting = completingId === chore.id;
             const assignCount = chore.assignment_count || 0;
+            const isNotMyRotationTurn =
+              isKid &&
+              chore.rotation_summary &&
+              chore.rotation_summary.current_kid_id !== user?.id;
 
             return (
               <div
                 key={chore.id}
                 className={`game-panel p-3 flex flex-col gap-2 cursor-pointer hover:border-accent/40 transition-colors ${
-                  isDone ? 'opacity-50' : ''
+                  isDone || isNotMyRotationTurn ? 'opacity-50' : ''
                 }`}
                 onClick={() => {
                   if (isParent && activeTab === 'library' && assignCount === 0) {
@@ -493,6 +501,12 @@ export default function Chores() {
                   {isParent && assignCount === 0 && (
                     <span className="text-muted/60 text-xs">
                       Unassigned
+                    </span>
+                  )}
+                  {isNotMyRotationTurn && (
+                    <span className="flex items-center gap-1 text-muted text-xs border border-border rounded px-1.5 py-0.5">
+                      <RotateCw size={10} />
+                      Not your turn
                     </span>
                   )}
                 </div>
