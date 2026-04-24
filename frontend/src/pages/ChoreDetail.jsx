@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
@@ -108,7 +108,14 @@ export default function ChoreDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState('');
+  const [photoFile, setPhotoFile] = useState(null);
+  const photoInputRef = useRef(null);
+  const actionInFlight = useRef(false);
 
+  useEffect(() => {
+    setPhotoFile(null);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+  }, [id]);
   // Rotation state (parent only)
   const [rotation, setRotation] = useState(null);
   const [allKids, setAllKids] = useState([]);
@@ -162,14 +169,26 @@ export default function ChoreDetail() {
   }, [fetchChore, fetchRotation]);
 
   const handleComplete = async () => {
+    if (chore?.requires_photo && !photoFile) return;
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setActionLoading('complete');
     try {
-      await api(`/api/chores/${id}/complete`, { method: 'POST' });
+      if (chore?.requires_photo && photoFile) {
+        const fd = new FormData();
+        fd.append('file', photoFile);
+        await api(`/api/chores/${id}/complete`, { method: 'POST', body: fd });
+      } else {
+        await api(`/api/chores/${id}/complete`, { method: 'POST' });
+      }
+      setPhotoFile(null);
+      if (photoInputRef.current) photoInputRef.current.value = '';
       showToast('Quest completed! XP awarded! 🎉', 'success');
       await fetchChore();
     } catch (err) {
       showToast(err.message || 'Failed to complete the quest.', 'error');
     } finally {
+      actionInFlight.current = false;
       setActionLoading('');
     }
   };
@@ -485,6 +504,42 @@ export default function ChoreDetail() {
         )}
       </div>
 
+      {/* Rotation info for kids */}
+      {isKid && chore.rotation_summary && (
+        <div
+          className={`game-panel p-4 flex items-start gap-3 ${
+            chore.rotation_summary.current_kid_id === user?.id
+              ? 'border-purple/40 bg-purple/10'
+              : 'border-border bg-surface-raised/30'
+          }`}
+        >
+          <RotateCw
+            size={16}
+            className={`flex-shrink-0 mt-0.5 ${
+              chore.rotation_summary.current_kid_id === user?.id
+                ? 'text-purple'
+                : 'text-muted'
+            }`}
+          />
+          <div className="text-sm leading-snug">
+            {chore.rotation_summary.current_kid_id === user?.id ? (
+              <span className="text-cream">
+                🔄 Rotating quest —{' '}
+                <span className="font-semibold text-purple">it's your turn!</span>
+              </span>
+            ) : (
+              <span className="text-muted">
+                🔄 Rotating quest — currently{' '}
+                <span className="font-semibold text-cream">
+                  {chore.rotation_summary.current_kid_name}
+                </span>
+                's turn. Check back next cycle.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Actions for kids */}
       {isKid && hasPendingToday && (
         <div className="game-panel p-5">
@@ -492,16 +547,31 @@ export default function ChoreDetail() {
             <div>
               <p className="text-cream text-sm font-semibold mb-1">Today's Quest</p>
             </div>
-            <button
-              onClick={handleComplete}
-              disabled={!!actionLoading}
-              className={`game-btn game-btn-blue flex items-center gap-2 ${
-                actionLoading === 'complete' ? 'opacity-60 cursor-wait' : ''
-              }`}
-            >
-              <CheckCircle2 size={16} />
-              {actionLoading === 'complete' ? 'Completing...' : 'Complete Quest'}
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              {chore.requires_photo && (
+                <label className="inline-flex items-center gap-1.5 text-xs text-muted cursor-pointer hover:text-cream transition-colors bg-surface-raised px-2.5 py-1.5 rounded-md border border-border">
+                  <Camera size={12} />
+                  <span>{photoFile ? photoFile.name : 'Attach proof photo'}</span>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => setPhotoFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+              )}
+              <button
+                onClick={handleComplete}
+                disabled={!!actionLoading || (chore.requires_photo && !photoFile)}
+                className={`game-btn game-btn-blue flex items-center gap-2 ${
+                  actionLoading === 'complete' ? 'opacity-60 cursor-wait' : ''
+                } ${chore.requires_photo && !photoFile ? 'opacity-40 cursor-not-allowed' : ''}`}
+              >
+                <CheckCircle2 size={16} />
+                {actionLoading === 'complete' ? 'Completing...' : 'Complete Quest'}
+              </button>
+            </div>
           </div>
         </div>
       )}

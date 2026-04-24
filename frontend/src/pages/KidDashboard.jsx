@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toLocalISO, todayLocalISO } from '../utils/dates';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -211,9 +211,11 @@ export default function KidDashboard() {
   // ---- complete overdue quest ----
 
   const [completingOverdue, setCompletingOverdue] = useState(null);
+  const completeInFlight = useRef(false);
 
   const handleCompleteOverdue = async (assignment) => {
-    if (completingOverdue) return;
+    if (completeInFlight.current || completingOverdue) return;
+    completeInFlight.current = true;
     setCompletingOverdue(assignment.id);
     try {
       await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
@@ -224,6 +226,7 @@ export default function KidDashboard() {
       showToast(err.message || 'Could not complete quest', 'error');
       await fetchData();
     } finally {
+      completeInFlight.current = false;
       setCompletingOverdue(null);
     }
   };
@@ -233,7 +236,8 @@ export default function KidDashboard() {
   const [completingToday, setCompletingToday] = useState(null);
 
   const handleCompleteToday = async (assignment) => {
-    if (completingToday) return;
+    if (completeInFlight.current || completingToday) return;
+    completeInFlight.current = true;
     setCompletingToday(assignment.id);
     try {
       await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
@@ -243,6 +247,7 @@ export default function KidDashboard() {
     } catch (err) {
       showToast(err.message || 'Could not complete quest', 'error');
     } finally {
+      completeInFlight.current = false;
       setCompletingToday(null);
     }
   };

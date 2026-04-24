@@ -40,6 +40,7 @@ from backend.schemas import (
     AssignmentRuleUpdate,
     QuestTemplateResponse,
     RotationResponse,
+    RotationSummary,
     QuestFeedbackRequest,
 )
 from backend.config import settings
@@ -116,6 +117,48 @@ def _quest_assigned_notification(user_id: int, chore: Chore) -> Notification:
         reference_type="chore",
         reference_id=chore.id,
     )
+
+
+async def _build_rotation_summaries(
+    db: AsyncSession, chore_ids: list[int]
+) -> dict[int, RotationSummary]:
+    """Batch-load rotations for the given chore IDs and return a map of
+    chore_id → RotationSummary (only for chores that have an active rotation)."""
+    if not chore_ids:
+        return {}
+
+    rot_result = await db.execute(
+        select(ChoreRotation).where(ChoreRotation.chore_id.in_(chore_ids))
+    )
+    rotations = rot_result.scalars().all()
+    if not rotations:
+        return {}
+
+    # Gather all kid IDs referenced by any rotation
+    all_kid_ids: set[int] = set()
+    for r in rotations:
+        all_kid_ids.update(r.kid_ids or [])
+
+    kid_result = await db.execute(
+        select(User.id, User.display_name).where(User.id.in_(all_kid_ids))
+    )
+    kid_names: dict[int, str] = {row.id: row.display_name for row in kid_result.all()}
+
+    summaries: dict[int, RotationSummary] = {}
+    for r in rotations:
+        kid_ids = r.kid_ids or []
+        if not kid_ids:
+            continue
+        idx = r.current_index % len(kid_ids)
+        current_kid_id = kid_ids[idx]
+        summaries[r.chore_id] = RotationSummary(
+            current_kid_id=current_kid_id,
+            current_kid_name=kid_names.get(current_kid_id, f"Kid #{current_kid_id}"),
+            cadence=r.cadence,
+            kid_ids=kid_ids,
+            current_index=idx,
+        )
+    return summaries
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +320,12 @@ async def list_chores(
             if c.id in photo_overrides:
                 data["requires_photo"] = photo_overrides[c.id]
             enriched.append(data)
+
+        # Batch-load rotation summaries so the kid UI can show whose turn it is
+        rotation_summaries = await _build_rotation_summaries(db, chore_ids)
+        for data in enriched:
+            data["rotation_summary"] = rotation_summaries.get(data["id"])
+
         return enriched
 
 
@@ -377,7 +426,22 @@ async def get_chore(
     user: User = Depends(get_current_user),
 ):
     chore = await _get_chore_or_404(db, chore_id, load_category=True)
-    return ChoreResponse.model_validate(chore)
+    response = ChoreResponse.model_validate(chore)
+    summaries = await _build_rotation_summaries(db, [chore_id])
+    updates: dict = {"rotation_summary": summaries.get(chore_id)}
+    # Apply per-kid requires_photo rule override when a kid fetches the chore
+    if user.role == UserRole.kid:
+        rule_result = await db.execute(
+            select(ChoreAssignmentRule).where(
+                ChoreAssignmentRule.chore_id == chore_id,
+                ChoreAssignmentRule.user_id == user.id,
+                ChoreAssignmentRule.is_active == True,
+            )
+        )
+        rule = rule_result.scalar_one_or_none()
+        if rule is not None:
+            updates["requires_photo"] = rule.requires_photo
+    return response.model_copy(update=updates)
 
 
 @router.put("/{chore_id}", response_model=ChoreResponse)
