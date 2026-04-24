@@ -110,6 +110,9 @@ export default function ChoreDetail() {
   const [actionLoading, setActionLoading] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
 
+  useEffect(() => {
+    setPhotoFile(null);
+  }, [id]);
   // Rotation state (parent only)
   const [rotation, setRotation] = useState(null);
   const [allKids, setAllKids] = useState([]);
