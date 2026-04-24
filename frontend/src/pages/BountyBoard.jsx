@@ -16,6 +16,7 @@ import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import ChoreIcon from '../components/ChoreIcon';
 import { useToast } from '../components/Toast';
+import Modal from '../components/Modal';
 
 const DIFFICULTY_COLORS = {
   easy: 'text-green-400',
@@ -51,6 +52,7 @@ export default function BountyBoard() {
   const [actionLoading, setActionLoading] = useState('');
   const actionInFlight = useRef(false);
   const [tab, setTab] = useState('board'); // 'board' | 'review'
+  const [abandonTarget, setAbandonTarget] = useState(null); // choreId pending confirmation
 
   const fetchData = useCallback(async () => {
     setLoadError('');
@@ -115,18 +117,24 @@ export default function BountyBoard() {
     }
   };
 
-  const handleAbandon = async (choreId) => {
-    if (actionInFlight.current) return;
-    actionInFlight.current = true;
-    setActionLoading(`abandon-${choreId}`);
+  const handleAbandon = (choreId) => {
+    setAbandonTarget(choreId);
+  };
+
+  const confirmAbandon = async () => {
+    if (abandonTarget === null) return;
+    const choreId = abandonTarget;
+    const actionKey = `abandon-${choreId}`;
+    if (actionLoading === actionKey) return;
+    setActionLoading(actionKey);
     try {
       await api(`/api/bounty/${choreId}/claim`, { method: 'DELETE' });
+      setAbandonTarget(null);
       showToast('Bounty abandoned.', 'info');
       await fetchData();
     } catch (err) {
       showToast(err.message || 'Could not abandon bounty', 'error');
     } finally {
-      actionInFlight.current = false;
       setActionLoading('');
     }
   };
@@ -283,6 +291,32 @@ export default function BountyBoard() {
           )}
         </>
       )}
+
+      {/* Confirmation modal for abandoning a bounty */}
+      <Modal
+        isOpen={abandonTarget !== null}
+        onClose={() => { if (!actionLoading) setAbandonTarget(null); }}
+        title="Abandon Bounty?"
+        actions={[
+          {
+            label: 'Cancel',
+            onClick: () => setAbandonTarget(null),
+            className: 'game-btn game-btn-blue',
+            disabled: !!actionLoading,
+          },
+          {
+            label: actionLoading === `abandon-${abandonTarget}` ? 'Abandoning...' : 'Abandon',
+            onClick: confirmAbandon,
+            className: 'game-btn game-btn-red',
+            disabled: !!actionLoading,
+          },
+        ]}
+      >
+        <p className="text-muted">
+          Are you sure you want to abandon this bounty? Your in-progress work will be lost.
+        </p>
+      </Modal>
+
     </div>
   );
 }
