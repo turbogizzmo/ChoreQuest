@@ -44,6 +44,9 @@ class AppErrorBoundary extends Component {
     console.error('[AppErrorBoundary]', error, errorInfo);
   }
   render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6 bg-navy text-cream">
           <p className="text-base font-semibold">Something went wrong</p>
           <p className="text-sm text-muted text-center max-w-xs">
             {this.state.error?.message || 'An unexpected error occurred.'}
