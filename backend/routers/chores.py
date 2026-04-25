@@ -429,7 +429,9 @@ async def get_chore(
     response = ChoreResponse.model_validate(chore)
     summaries = await _build_rotation_summaries(db, [chore_id])
     updates: dict = {"rotation_summary": summaries.get(chore_id)}
-    # Apply per-kid requires_photo rule override when a kid fetches the chore
+    # Apply per-kid requires_photo rule override when a kid fetches the chore,
+    # and include the kid's recent assignments so ChoreDetail can determine
+    # hasPendingToday and show the Complete Quest button.
     if user.role == UserRole.kid:
         rule_result = await db.execute(
             select(ChoreAssignmentRule).where(
@@ -441,6 +443,33 @@ async def get_chore(
         rule = rule_result.scalar_one_or_none()
         if rule is not None:
             updates["requires_photo"] = rule.requires_photo
+
+        # Load this kid's assignments for this chore (today + last 7 days)
+        # so the frontend knows whether a pending assignment exists today.
+        today = date.today()
+        week_ago = today - timedelta(days=7)
+        a_result = await db.execute(
+            select(ChoreAssignment)
+            .where(
+                ChoreAssignment.chore_id == chore_id,
+                ChoreAssignment.user_id == user.id,
+                ChoreAssignment.date >= week_ago,
+                ChoreAssignment.date <= today,
+            )
+            .order_by(ChoreAssignment.date.desc())
+        )
+        kid_assignments = a_result.scalars().all()
+        updates["assignments"] = [
+            {
+                "id": a.id,
+                "date": a.date.isoformat(),
+                "status": a.status.value,
+                "completed_at": a.completed_at.isoformat() if a.completed_at else None,
+                "verified_at": a.verified_at.isoformat() if a.verified_at else None,
+                "photo_proof_path": a.photo_proof_path,
+            }
+            for a in kid_assignments
+        ]
     return response.model_copy(update=updates)
 
 
