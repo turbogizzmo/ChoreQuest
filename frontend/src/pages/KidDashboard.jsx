@@ -15,6 +15,7 @@ import {
   HandHeart,
   Gamepad2,
   ShieldOff,
+  AlertTriangle,
 } from 'lucide-react';
 import { useToast } from '../components/Toast';
 import { api } from '../api/client';
