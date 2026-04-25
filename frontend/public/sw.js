@@ -10,8 +10,13 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  // Don't call skipWaiting() automatically — wait for the app to signal
-  // via postMessage so we can show an "Update available" prompt first.
+  // Auto-skip waiting so the new SW activates immediately.
+  // This prevents Safari PWA home-screen bookmarks from getting stuck on a
+  // blank screen when the app is redeployed: without skipWaiting() the new SW
+  // sits in "waiting" forever if the page is already blank (can't tap the
+  // update banner). The controllerchange handler in main.jsx auto-reloads
+  // the page once this SW takes control, so all clients get fresh assets.
+  self.skipWaiting();
 });
 
 self.addEventListener('message', (event) => {
