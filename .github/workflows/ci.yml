@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 1 — Backend unit tests (pytest, in-memory SQLite, ~10 s)
+# Runs independently of the e2e suite so a Python bug surfaces fast.
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+  backend-unit-tests:
+    name: Backend unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install test dependencies
+        # requirements-test.txt lands with PR #57 — gracefully skip if not merged yet
+        run: |
+          if [ -f requirements-test.txt ]; then
+            pip install -r requirements-test.txt
+          else
+            pip install pytest pytest-asyncio aiosqlite
+          fi
+
+      - name: Run pytest unit tests
+        # Only run if tests/unit/ exists (present after PR #57 merges)
+        run: |
+          if [ -d tests/unit ]; then
+            SECRET_KEY=ci-unit-test-secret-key pytest tests/unit/ -v --tb=short
+          else
+            echo "tests/unit/ not found — skipping (will be added by PR #57)"
+          fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 2 — Playwright e2e tests
+# Starts the full stack (FastAPI + Vite dev server) via playwright.config.js
+# webServer config, then runs all spec files.
+# ─────────────────────────────────────────────────────────────────────────────
+  e2e-tests:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Python / backend ───────────────────────────────────────────────────
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt
+
+      # ── Node / frontend + Playwright ───────────────────────────────────────
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      - name: Install root dependencies (Playwright CLI)
+        run: npm ci
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      # ── Run tests ─────────────────────────────────────────────────────────
+      - name: Run Playwright e2e tests
+        run: npm run test:e2e -- --reporter=github,html
+        env:
+          # Forward to playwright.config.js webServer command
+          SECRET_KEY: e2e_test_secret_key_1234
+          REGISTRATION_ENABLED: "true"
+          TZ: America/Chicago
+          CI: "true"
+
+      # ── Artifacts ─────────────────────────────────────────────────────────
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload test traces (failures only)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-${{ github.run_id }}
+          path: test-results/
+          retention-days: 7
