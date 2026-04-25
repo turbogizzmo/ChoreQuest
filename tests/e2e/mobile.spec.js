@@ -48,17 +48,16 @@ test.describe('Mobile — kid dashboard', () => {
 
   test('nav links are present on mobile (bottom bar or visible nav)', async ({ loginAsKid: page }) => {
     await setMobile(page);
-    // On mobile the sidebar is hidden; bottom nav appears later in the DOM.
-    // Use .last() so we get the bottom-nav link, not the hidden sidebar link.
+    // Bottom nav renders <button> elements (not <a> tags) — target by visible label text
     await expect(
-      page.locator('a[href="/rewards"], a[href="/chores"]').last()
+      page.locator('button:has-text("Rewards"), button:has-text("Quests")').first()
     ).toBeVisible({ timeout: 5_000 });
   });
 
   test('Rewards nav link works on mobile', async ({ loginAsKid: page }) => {
     await setMobile(page);
-    // Sidebar a[href="/rewards"] is hidden on mobile; bottom nav comes later in DOM → .last()
-    await page.locator('a[href="/rewards"]').last().click();
+    // Bottom nav uses <button onClick={() => navigate('/rewards')}> not <a href>
+    await page.locator('button:has-text("Rewards")').last().click();
     await expect(page).toHaveURL(/\/rewards/);
     await expect(page).not.toHaveURL(/error/);
   });
@@ -97,11 +96,9 @@ test.describe('Mobile — kid dashboard', () => {
 test.describe('Mobile — parent dashboard', () => {
   test('parent dashboard renders on iPhone viewport', async ({ loginAsParent: page }) => {
     await setMobile(page);
-    // Sidebar nav is hidden on mobile — verify page content loaded instead
-    // Use .or() because text= cannot be combined with CSS selectors via comma
-    await expect(
-      page.locator('main, .game-panel').or(page.locator('text=/quest|pending|dashboard/i')).first()
-    ).toBeVisible({ timeout: 8_000 });
+    // Verify the page content loaded — <main> is always present and visible
+    // Avoid text=/quest/i which matches the hidden "ChoreQuest" logo in the sidebar
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 8_000 });
     await expect(page).not.toHaveURL(/error|login/);
   });
 
