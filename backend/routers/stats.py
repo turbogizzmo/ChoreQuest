@@ -297,7 +297,10 @@ async def get_kid_detail(
                 ChoreAssignment.date == today,
                 and_(
                     ChoreAssignment.date < today,
-                    ChoreAssignment.status == AssignmentStatus.completed,
+                    ChoreAssignment.status.in_([
+                        AssignmentStatus.completed,
+                        AssignmentStatus.verified,
+                    ]),
                 ),
             ),
         )
