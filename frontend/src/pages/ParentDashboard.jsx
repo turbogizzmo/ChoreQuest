@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { todayLocalISO } from '../utils/dates';
+import { todayLocalISO, toLocalISO } from '../utils/dates';
 import {
   Flame,
   Star,
@@ -14,6 +14,7 @@ import {
   Camera,
   MessageSquare,
   Send,
+  CalendarDays,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { themedTitle } from '../utils/questThemeText';
@@ -21,6 +22,18 @@ import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
 import AvatarDisplay from '../components/AvatarDisplay';
 import Modal from '../components/Modal';
+
+/** Return a human-readable label for an assignment date string (YYYY-MM-DD). */
+function getDateLabel(dateStr) {
+  if (!dateStr) return '';
+  const today = todayLocalISO();
+  const yesterday = toLocalISO(new Date(Date.now() - 86400000));
+  if (dateStr === today) return 'Today';
+  if (dateStr === yesterday) return 'Yesterday';
+  // Older: show short weekday + date
+  const d = new Date(`${dateStr}T00:00:00`);
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
 
 export default function ParentDashboard() {
   const { user } = useAuth();
@@ -55,11 +68,12 @@ export default function ParentDashboard() {
 
       setFamilyStats(familyRes);
 
-      const today = todayLocalISO();
-      const todayAssignments = (calendarRes.days && calendarRes.days[today]) || [];
-      const needsVerification = todayAssignments.filter(
-        (a) => a.status === 'completed'
-      );
+      // Collect completed assignments from ALL days (grace-period submissions
+      // from previous days appear here too, not just today's).
+      const allAssignments = Object.values(calendarRes.days || {}).flat();
+      const needsVerification = allAssignments
+        .filter((a) => a.status === 'completed')
+        .sort((a, b) => a.date > b.date ? -1 : a.date < b.date ? 1 : 0);
       setPendingVerifications(needsVerification);
     } catch (err) {
       setError(err.message || 'Failed to load family data');
@@ -295,6 +309,19 @@ export default function ParentDashboard() {
                         )}
                         <span className="ml-2 text-gold font-medium">+{assignment.chore?.points} XP</span>
                       </p>
+                      {assignment.date && (
+                        <p className="flex items-center gap-1 text-xs mt-1">
+                          <CalendarDays size={11} className={assignment.date === todayLocalISO() ? 'text-accent' : 'text-orange-400'} />
+                          <span className={assignment.date === todayLocalISO() ? 'text-accent font-medium' : 'text-orange-400 font-medium'}>
+                            {getDateLabel(assignment.date)}
+                          </span>
+                          {assignment.completed_at && (
+                            <span className="text-muted ml-1">
+                              · submitted {new Date(assignment.completed_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button
