@@ -129,14 +129,12 @@ export default function App() {
     return (
       <AppErrorBoundary>
         <ToastProvider>
-          <Suspense fallback={<Loading />}>
-            <UpdatePrompt />
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="*" element={<Navigate to="/login" replace />} />
-            </Routes>
-          </Suspense>
+          <UpdatePrompt />
+          <Routes>
+            <Route path="/login" element={<Page pageKey="login"><Login /></Page>} />
+            <Route path="/register" element={<Page pageKey="register"><Register /></Page>} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
         </ToastProvider>
       </AppErrorBoundary>
     );
