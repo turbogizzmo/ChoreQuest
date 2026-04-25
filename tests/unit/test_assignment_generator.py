@@ -13,7 +13,7 @@ import pytest
 
 from sqlalchemy import select
 
-from backend.models import ChoreAssignment, RotationCadence, Recurrence
+from backend.models import ChoreAssignment, RotationCadence, Recurrence, UserRole
 from backend.services.assignment_generator import auto_generate_week_assignments
 
 from tests.unit.conftest import (
@@ -44,7 +44,7 @@ async def _count_assignments(db, chore_id: int) -> int:
 async def test_generates_daily_assignments_for_week(db):
     """A daily chore with one rule should produce 7 assignments for a full week."""
     cat = await make_category(db)
-    parent = await make_user(db, "parent1", role="parent")  # type: ignore[arg-type]
+    parent = await make_user(db, "parent1", role=UserRole.parent)
     kid = await make_user(db, "kid1")
 
     chore = await make_chore(db, parent.id, cat.id, recurrence=Recurrence.daily)
@@ -63,7 +63,7 @@ async def test_generates_weekly_assignments_for_correct_day(db):
     """A weekly chore created on a Monday should produce 1 assignment for the week
     starting on that same weekday."""
     cat = await make_category(db)
-    parent = await make_user(db, "parent2", role="parent")  # type: ignore[arg-type]
+    parent = await make_user(db, "parent2", role=UserRole.parent)
     kid = await make_user(db, "kid2")
 
     # Chore created on a Monday → recurs on Mondays
@@ -94,7 +94,7 @@ async def test_generates_weekly_assignments_for_correct_day(db):
 async def test_idempotent_generation_no_duplicate_rows(db):
     """Calling auto_generate_week_assignments twice must not duplicate rows."""
     cat = await make_category(db)
-    parent = await make_user(db, "parent3", role="parent")  # type: ignore[arg-type]
+    parent = await make_user(db, "parent3", role=UserRole.parent)
     kid = await make_user(db, "kid3")
 
     chore = await make_chore(db, parent.id, cat.id, recurrence=Recurrence.daily)
@@ -116,7 +116,7 @@ async def test_idempotent_generation_no_duplicate_rows(db):
 async def test_idempotent_with_rotation(db):
     """Idempotency holds when a rotation is involved."""
     cat = await make_category(db)
-    parent = await make_user(db, "parent4", role="parent")  # type: ignore[arg-type]
+    parent = await make_user(db, "parent4", role=UserRole.parent)
     kid_a = await make_user(db, "kid_a")
     kid_b = await make_user(db, "kid_b")
 
@@ -157,7 +157,7 @@ async def test_rotation_assigns_only_current_kid(db):
     """With a weekly rotation at index 0, only kid_a should receive an assignment
     for the reference week — not kid_b."""
     cat = await make_category(db)
-    parent = await make_user(db, "parent5", role="parent")  # type: ignore[arg-type]
+    parent = await make_user(db, "parent5", role=UserRole.parent)
     kid_a = await make_user(db, "kid_c")
     kid_b = await make_user(db, "kid_d")
 
@@ -207,7 +207,7 @@ async def test_excluded_slot_is_not_recreated(db):
     from backend.models import ChoreExclusion
 
     cat = await make_category(db)
-    parent = await make_user(db, "parent6", role="parent")  # type: ignore[arg-type]
+    parent = await make_user(db, "parent6", role=UserRole.parent)
     kid = await make_user(db, "kid_e")
 
     chore = await make_chore(db, parent.id, cat.id, recurrence=Recurrence.daily)

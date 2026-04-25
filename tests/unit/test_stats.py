@@ -9,7 +9,7 @@ from datetime import date
 
 import pytest
 
-from backend.models import ChoreAssignment, AssignmentStatus
+from backend.models import ChoreAssignment, AssignmentStatus, UserRole
 from backend.services.stats_helpers import completion_rate, count_assignments
 
 from tests.unit.conftest import make_category, make_chore, make_user
@@ -44,7 +44,7 @@ async def _add_assignment(
 class TestCountAssignments:
     @pytest.mark.asyncio
     async def test_returns_zero_with_no_assignments(self, db):
-        parent = await make_user(db, "stats_parent1", role="parent")  # type: ignore[arg-type]
+        parent = await make_user(db, "stats_parent1", role=UserRole.parent)
         kid = await make_user(db, "stats_kid1")
         await db.commit()
         count = await count_assignments(db, kid.id, since=date(2024, 1, 1))
@@ -53,7 +53,7 @@ class TestCountAssignments:
     @pytest.mark.asyncio
     async def test_counts_all_assignments(self, db):
         cat = await make_category(db)
-        parent = await make_user(db, "stats_parent2", role="parent")  # type: ignore[arg-type]
+        parent = await make_user(db, "stats_parent2", role=UserRole.parent)
         kid = await make_user(db, "stats_kid2")
         chore = await make_chore(db, parent.id, cat.id)
         await _add_assignment(db, chore.id, kid.id, date(2024, 4, 8))
@@ -67,7 +67,7 @@ class TestCountAssignments:
     @pytest.mark.asyncio
     async def test_completed_only_filter(self, db):
         cat = await make_category(db)
-        parent = await make_user(db, "stats_parent3", role="parent")  # type: ignore[arg-type]
+        parent = await make_user(db, "stats_parent3", role=UserRole.parent)
         kid = await make_user(db, "stats_kid3")
         chore = await make_chore(db, parent.id, cat.id)
         await _add_assignment(db, chore.id, kid.id, date(2024, 4, 8))  # pending
@@ -81,7 +81,7 @@ class TestCountAssignments:
     @pytest.mark.asyncio
     async def test_since_filter_excludes_older_assignments(self, db):
         cat = await make_category(db)
-        parent = await make_user(db, "stats_parent4", role="parent")  # type: ignore[arg-type]
+        parent = await make_user(db, "stats_parent4", role=UserRole.parent)
         kid = await make_user(db, "stats_kid4")
         chore = await make_chore(db, parent.id, cat.id)
         await _add_assignment(db, chore.id, kid.id, date(2024, 3, 31))  # before window
@@ -94,7 +94,7 @@ class TestCountAssignments:
     @pytest.mark.asyncio
     async def test_counts_only_for_specified_user(self, db):
         cat = await make_category(db)
-        parent = await make_user(db, "stats_parent5", role="parent")  # type: ignore[arg-type]
+        parent = await make_user(db, "stats_parent5", role=UserRole.parent)
         kid_a = await make_user(db, "stats_kid5a")
         kid_b = await make_user(db, "stats_kid5b")
         chore = await make_chore(db, parent.id, cat.id)
@@ -113,7 +113,7 @@ class TestCountAssignments:
 class TestCompletionRate:
     @pytest.mark.asyncio
     async def test_zero_total_returns_zero_percent(self, db):
-        parent = await make_user(db, "rate_parent1", role="parent")  # type: ignore[arg-type]
+        parent = await make_user(db, "rate_parent1", role=UserRole.parent)
         kid = await make_user(db, "rate_kid1")
         await db.commit()
         total, completed, rate = await completion_rate(db, kid.id, since=date(2024, 4, 1))
@@ -124,7 +124,7 @@ class TestCompletionRate:
     @pytest.mark.asyncio
     async def test_100_percent_completion(self, db):
         cat = await make_category(db)
-        parent = await make_user(db, "rate_parent2", role="parent")  # type: ignore[arg-type]
+        parent = await make_user(db, "rate_parent2", role=UserRole.parent)
         kid = await make_user(db, "rate_kid2")
         chore = await make_chore(db, parent.id, cat.id)
         for i in range(5):
@@ -140,7 +140,7 @@ class TestCompletionRate:
     @pytest.mark.asyncio
     async def test_partial_completion_rate(self, db):
         cat = await make_category(db)
-        parent = await make_user(db, "rate_parent3", role="parent")  # type: ignore[arg-type]
+        parent = await make_user(db, "rate_parent3", role=UserRole.parent)
         kid = await make_user(db, "rate_kid3")
         chore = await make_chore(db, parent.id, cat.id)
         # 3 completed, 1 pending → 75%

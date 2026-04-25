@@ -17,7 +17,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import User, VacationPeriod
+from backend.models import User, VacationPeriod, UserRole
 from backend.routers.vacation import is_vacation_day
 
 from tests.unit.conftest import make_user
@@ -145,7 +145,7 @@ class TestVacationPreservesStreak:
 
     @pytest.mark.asyncio
     async def test_vacation_gap_preserves_streak(self, db):
-        parent = await make_user(db, "vac_parent", role="parent")  # type: ignore[arg-type]
+        parent = await make_user(db, "vac_parent", role=UserRole.parent)
         kid = await make_user(
             db, "streak_kid5", current_streak=5,
             last_streak_date=date(2024, 4, 8),
@@ -168,7 +168,7 @@ class TestVacationPreservesStreak:
     async def test_partial_vacation_gap_breaks_streak_with_freeze(self, db):
         """If only SOME gap days are vacation, the streak would break — but a
         streak freeze (1 per calendar month) absorbs the first break."""
-        parent = await make_user(db, "vac_parent2", role="parent")  # type: ignore[arg-type]
+        parent = await make_user(db, "vac_parent2", role=UserRole.parent)
         kid = await make_user(
             db, "streak_kid6", current_streak=4,
             last_streak_date=date(2024, 4, 8),
