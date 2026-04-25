@@ -44,6 +44,9 @@ class AppErrorBoundary extends Component {
     console.error('[AppErrorBoundary]', error, errorInfo);
   }
   render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6 text-cream">
           <p className="text-base font-semibold">Something went wrong</p>
           <p className="text-sm text-muted text-center max-w-xs">
             {this.state.error?.message || 'An unexpected error occurred.'}
@@ -126,14 +129,12 @@ export default function App() {
     return (
       <AppErrorBoundary>
         <ToastProvider>
-          <Suspense fallback={<Loading />}>
-            <UpdatePrompt />
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="*" element={<Navigate to="/login" replace />} />
-            </Routes>
-          </Suspense>
+          <UpdatePrompt />
+          <Routes>
+            <Route path="/login" element={<Page pageKey="login"><Login /></Page>} />
+            <Route path="/register" element={<Page pageKey="register"><Register /></Page>} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
         </ToastProvider>
       </AppErrorBoundary>
     );
