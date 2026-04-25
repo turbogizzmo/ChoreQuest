@@ -371,8 +371,10 @@ export default function ChoreDetail() {
   const categoryColorClass =
     CATEGORY_COLORS[categoryName?.toLowerCase()] || CATEGORY_COLORS.default;
 
-  // Determine today's assignment
-  const assignments = chore.assignments || chore.history || [];
+  // Determine today's assignment.
+  // kid_assignments is populated by the backend when a kid fetches a chore
+  // so the Complete Quest button has the data it needs without a second API call.
+  const assignments = chore.kid_assignments || chore.assignments || chore.history || [];
   const today = todayLocalISO();
   const todayAssignment = assignments.find(
     (a) => a.date === today || a.assigned_date === today || a.due_date === today

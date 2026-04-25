@@ -34,8 +34,10 @@ async function loginAs(page, role = 'parent') {
 
   await page.goto('/');
   await page.waitForLoadState('networkidle');
-  // Confirm we landed on the authenticated app (nav present)
-  await page.waitForSelector('nav', { timeout: 10_000 });
+  // Confirm we landed on the authenticated app.
+  // Use the test's own timeout (no explicit cap) so slow CI/dev-server startups
+  // don't trip a hard 10s wall after many prior tests have warmed up resources.
+  await page.waitForSelector('nav');
 }
 
 export const test = base.extend({

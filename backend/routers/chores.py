@@ -459,7 +459,7 @@ async def get_chore(
             .order_by(ChoreAssignment.date.desc())
         )
         kid_assignments = a_result.scalars().all()
-        updates["assignments"] = [
+        updates["kid_assignments"] = [
             {
                 "id": a.id,
                 "date": a.date.isoformat(),
