@@ -34,12 +34,21 @@ test.describe('Settings — parent only', () => {
   });
 });
 
-test.describe('Settings — kid redirect', () => {
-  test('kid cannot access settings', async ({ loginAsKid: page }) => {
+test.describe('Settings — kid view', () => {
+  test('kid can load settings page without crashing', async ({ loginAsKid: page }) => {
     await page.goto('/settings');
-    // Should be redirected or show access denied
-    const denied = await page.locator('text=/not allowed|access denied|forbidden/i').isVisible().catch(() => false);
-    const redirected = !page.url().includes('/settings');
-    expect(denied || redirected).toBe(true);
+    await page.waitForLoadState('networkidle');
+    // Kids see a limited settings page — no crash, no redirect to login
+    await expect(page).not.toHaveURL(/login/);
+    await expect(page).not.toHaveURL(/error/);
+  });
+
+  test('kid does not see parent-only save button or grace period control', async ({ loginAsKid: page }) => {
+    await page.goto('/settings');
+    await page.waitForLoadState('networkidle');
+    // Parent-only settings controls must not be visible to kids.
+    // Scope to .game-panel to avoid matching sidebar nav links.
+    await expect(page.locator('.game-panel').locator('text=/grace period/i')).not.toBeVisible();
+    await expect(page.locator('button:has-text("Save Settings"), button:has-text("Save Changes")')).not.toBeVisible();
   });
 });

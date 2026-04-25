@@ -62,7 +62,8 @@ test.describe('Kid Dashboard', () => {
     // If there are overdue quests, the Mark Done button must be present (not just a clickable card)
     const forgottenSection = page.locator('text=Forgotten Quests');
     if (await forgottenSection.isVisible()) {
-      await expect(page.locator('button:has-text("Mark Done")')).toBeVisible();
+      // Multiple overdue quests each have their own Mark Done button — use .first()
+      await expect(page.locator('button:has-text("Mark Done")').first()).toBeVisible();
     }
   });
 });

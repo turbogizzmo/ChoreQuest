@@ -346,14 +346,19 @@ test.describe('Double-submit guard — UI', () => {
       }
     });
 
+    // Wait for the Complete Quest button to be present and enabled.
+    // isVisible() is instantaneous and can race with React's first render;
+    // waitFor ensures the button is actually stable before we start clicking.
     const completeBtn = page.locator('button:has-text("Complete Quest")').first();
-    if (!(await completeBtn.isVisible({ timeout: 5_000 }).catch(() => false))) return;
+    const btnVisible = await completeBtn.waitFor({ state: 'visible', timeout: 15_000 })
+      .then(() => true).catch(() => false);
+    if (!btnVisible) return; // no pending assignment today — skip gracefully
 
-    // Rapid-fire 3 clicks
-    await completeBtn.click();
-    await completeBtn.click({ force: true });
-    await completeBtn.click({ force: true });
-    await page.waitForTimeout(600);
+    // Fire 3 rapid synthetic clicks via JS — this bypasses Playwright's
+    // actionability wait so all 3 fire before the button text changes to
+    // "Completing..." (which would make the locator stale and time out).
+    await completeBtn.evaluate((el) => { el.click(); el.click(); el.click(); });
+    await page.waitForTimeout(800);
 
     // In-flight guard should have collapsed all taps into a single request
     expect(completionRequests.length).toBe(1);
