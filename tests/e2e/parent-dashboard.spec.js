@@ -98,10 +98,10 @@ test.describe('Parent Dashboard — approval workflow', () => {
     await page.reload();
     await page.waitForLoadState('networkidle');
 
-    // Pending quest should surface as an "Approve" button or a pending badge
-    await expect(
-      page.locator('button:has-text("Approve"), button:has-text("Verify"), text=/pending/i').first()
-    ).toBeVisible({ timeout: 10_000 });
+    // Pending quest should surface as an "Approve" button, Verify button, or pending text
+    const approveOrPending = page.locator('button:has-text("Approve"), button:has-text("Verify")')
+      .or(page.locator('text=/pending/i'));
+    await expect(approveOrPending.first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('clicking Approve removes item from pending queue', async ({ loginAsParent: page }) => {

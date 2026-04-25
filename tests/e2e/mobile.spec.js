@@ -46,14 +46,18 @@ test.describe('Mobile — kid dashboard', () => {
     expect(overflow).toBeLessThanOrEqual(2); // 2 px tolerance for sub-pixel rendering
   });
 
-  test('nav bar renders on mobile', async ({ loginAsKid: page }) => {
+  test('nav links are present on mobile (bottom bar or visible nav)', async ({ loginAsKid: page }) => {
     await setMobile(page);
-    await expect(page.locator('nav').first()).toBeVisible({ timeout: 5_000 });
+    // On mobile the sidebar is hidden — check for any visible navigation link instead
+    await expect(
+      page.locator('a[href="/rewards"], a[href="/chores"], button:has-text("Rewards")').first()
+    ).toBeVisible({ timeout: 5_000 });
   });
 
   test('Rewards nav link works on mobile', async ({ loginAsKid: page }) => {
     await setMobile(page);
-    await page.locator('nav >> text=Rewards').click();
+    // Use first() to avoid strict-mode violation when sidebar + bottom nav both exist
+    await page.locator('a[href="/rewards"]').first().click();
     await expect(page).toHaveURL(/\/rewards/);
     await expect(page).not.toHaveURL(/error/);
   });
@@ -92,7 +96,8 @@ test.describe('Mobile — kid dashboard', () => {
 test.describe('Mobile — parent dashboard', () => {
   test('parent dashboard renders on iPhone viewport', async ({ loginAsParent: page }) => {
     await setMobile(page);
-    await expect(page.locator('nav').first()).toBeVisible({ timeout: 8_000 });
+    // Sidebar nav is hidden on mobile — verify the page content loaded instead
+    await expect(page.locator('main, .game-panel, text=/quest|pending|dashboard/i').first()).toBeVisible({ timeout: 8_000 });
     await expect(page).not.toHaveURL(/error|login/);
   });
 
