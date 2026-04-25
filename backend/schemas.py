@@ -132,6 +132,9 @@ class ChoreResponse(BaseModel):
     created_by: int
     created_at: datetime
     rotation_summary: RotationSummary | None = None
+    # Populated by GET /api/chores/{id} when the requester is a kid so
+    # ChoreDetail can show the Complete Quest button without a second API call.
+    assignments: list[dict] | None = None
 
     model_config = {"from_attributes": True}
 
