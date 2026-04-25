@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     VAPID_PRIVATE_KEY: str = ""
     VAPID_PUBLIC_KEY: str = ""
     VAPID_CLAIM_EMAIL: str = "mailto:admin@example.com"
+    # Set ENABLE_DEBUG_ENDPOINTS=true to expose internal /debug routes (dev only)
+    ENABLE_DEBUG_ENDPOINTS: bool = False
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

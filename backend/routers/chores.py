@@ -795,7 +795,14 @@ async def debug_chore(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_parent),
 ):
-    """Debug endpoint: show all DB state for a chore's rotation/assignments."""
+    """Debug endpoint: show all DB state for a chore's rotation/assignments.
+
+    Disabled in production by default. Set ENABLE_DEBUG_ENDPOINTS=true in
+    the environment to expose this route. Even when enabled, parent auth
+    is still required.
+    """
+    if not settings.ENABLE_DEBUG_ENDPOINTS:
+        raise HTTPException(status_code=404, detail="Not found")
     chore = await _get_chore_or_404(db, chore_id, active_only=False)
 
     rot_result = await db.execute(
