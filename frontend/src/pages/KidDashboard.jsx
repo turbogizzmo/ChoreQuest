@@ -101,13 +101,21 @@ export default function KidDashboard() {
   const [petMessage, setPetMessage] = useState('');
   const [interactionsRemaining, setInteractionsRemaining] = useState(3);
 
-  // Board theme — stored in localStorage
-  const [boardTheme, setBoardTheme] = useState(() =>
-    localStorage.getItem('chorequest-board-theme') || 'default'
-  );
+  // Board theme — stored in localStorage.
+  // Wrapped in try/catch: iOS Safari throws SecurityError when localStorage is
+  // restricted (Private Browsing, or Settings → Safari → Block All Cookies).
+  // An unprotected call inside useState's lazy initializer runs during render
+  // and — with no Error Boundary — unmounts the entire tree → blank screen.
+  const [boardTheme, setBoardTheme] = useState(() => {
+    try {
+      return localStorage.getItem('chorequest-board-theme') || 'default';
+    } catch {
+      return 'default';
+    }
+  });
   const changeBoardTheme = (id) => {
     setBoardTheme(id);
-    localStorage.setItem('chorequest-board-theme', id);
+    try { localStorage.setItem('chorequest-board-theme', id); } catch { /* storage restricted */ }
     setShowThemePicker(false);
   };
 
