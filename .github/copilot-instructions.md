@@ -10,8 +10,6 @@ Gamified family chore-management app. Python/FastAPI + async SQLAlchemy on SQLit
 
 ## Commands
 
-No test suite exists in this repo. There is no Python linter configured.
-
 ```bash
 # Backend (from repo root) — requires SECRET_KEY (>=16 chars, not in WEAK_SECRETS)
 pip install -r requirements.txt
@@ -28,6 +26,39 @@ docker compose up -d   # needs SECRET_KEY in .env
 ```
 
 Health check: `GET /api/health`.
+
+## Test suites
+
+Two separate test suites exist. **Always run them before merging a PR.**
+
+### 1 — Playwright end-to-end tests (browser + API)
+
+Covers 19 spec files × multiple tests across: auth flows, kid dashboard, parent dashboard, quest lifecycle, bounty board, rewards, calendar, settings, navigation, chore detail, mobile layout, leaderboard, profile, API security (RBAC), and more.
+
+```bash
+# From repo root — starts backend on :8199 + Vite dev server on :5174 automatically
+npm install
+cd frontend && npm install && cd ..
+npx playwright install --with-deps chromium
+npm run test:e2e                     # headless, full suite
+npm run test:e2e:ui                  # interactive Playwright UI mode
+```
+
+The playwright config (`playwright.config.js`) spins up both servers via `webServer`. Tests use an isolated in-memory SQLite DB (`/tmp/chorequest_e2e.db`). Tokens are written to `/tmp/chorequest_e2e_tokens.json` by `global-setup.js`.
+
+**CI:** runs automatically on every PR via `.github/workflows/ci.yml`. HTML reports are uploaded as artifacts.
+
+### 2 — pytest backend unit tests (fast, no server needed)
+
+Covers rotation logic, assignment generation, streak edge cases, and stats helpers. Uses in-memory SQLite — no external deps.
+
+```bash
+pip install -r requirements.txt
+pip install -r requirements-test.txt   # pytest, pytest-asyncio, aiosqlite
+SECRET_KEY=any-16-char-key pytest tests/unit/ -v
+```
+
+**CI:** runs as a separate fast job before the e2e suite in `.github/workflows/ci.yml`.
 
 ## Architecture
 
@@ -66,4 +97,4 @@ Health check: `GET /api/health`.
 - **Config is env-only** via `backend/config.py` (`pydantic-settings`). `SECRET_KEY` must be ≥16 chars and not match `WEAK_SECRETS`; the app hard-exits otherwise. Add new settings to the `Settings` class with a default, and document in README's env-var table.
 - **SQLite WAL mode** is enabled in `init_db()`. Data lives in `/app/data` (`chores_os.db` + `uploads/`); this is the Docker volume to back up.
 - **CSP is strict**: `script-src 'self'` only — no inline scripts or external CDNs. Adding a third-party script means updating the CSP header in `main.py`'s `security_headers` middleware.
-- **No build/test CI in repo.** Verify changes manually by running both servers; there's no lint or typecheck gate.
+- **CI runs on every PR.** Two jobs: `backend-unit-tests` (pytest, ~10 s) and `e2e-tests` (Playwright, ~5 min). Both must pass before merging. Playwright reports and failure traces are uploaded as artifacts.
