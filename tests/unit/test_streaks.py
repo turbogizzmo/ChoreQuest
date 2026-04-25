@@ -10,7 +10,7 @@ We test the same logic via database-backed helpers that mirror what the
 router does, keeping tests independent of the HTTP layer.
 """
 
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta
 
 import pytest
 
