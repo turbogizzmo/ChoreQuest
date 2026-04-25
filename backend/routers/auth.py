@@ -39,11 +39,15 @@ REFRESH_COOKIE_NAME = "refresh_token"
 
 
 def _set_refresh_cookie(response: Response, token: str):
+    # SameSite=None requires Secure=True (required by Safari PWA and modern browsers).
+    # In local dev (COOKIE_SECURE=False) fall back to SameSite=Lax so the cookie
+    # still works over plain HTTP.
+    samesite = "none" if settings.COOKIE_SECURE else "lax"
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=token,
         httponly=True,
-        samesite="lax",
+        samesite=samesite,
         path="/api/auth",
         secure=settings.COOKIE_SECURE,
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
@@ -51,11 +55,12 @@ def _set_refresh_cookie(response: Response, token: str):
 
 
 def _clear_refresh_cookie(response: Response):
+    samesite = "none" if settings.COOKIE_SECURE else "lax"
     response.delete_cookie(
         key=REFRESH_COOKIE_NAME,
         path="/api/auth",
         httponly=True,
-        samesite="lax",
+        samesite=samesite,
         secure=settings.COOKIE_SECURE,
     )
 

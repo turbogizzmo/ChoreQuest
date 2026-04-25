@@ -40,10 +40,10 @@ class AppErrorBoundary extends Component {
   static getDerivedStateFromError(error) {
     return { error };
   }
+  componentDidCatch(error, errorInfo) {
+    console.error('[AppErrorBoundary]', error, errorInfo);
+  }
   render() {
-    if (this.state.error) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6 bg-navy text-cream">
           <p className="text-base font-semibold">Something went wrong</p>
           <p className="text-sm text-muted text-center max-w-xs">
             {this.state.error?.message || 'An unexpected error occurred.'}
@@ -59,6 +59,54 @@ class AppErrorBoundary extends Component {
     }
     return this.props.children;
   }
+}
+
+class PageErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('[PageErrorBoundary]', error, errorInfo);
+  }
+  componentDidUpdate(prevProps) {
+    // Reset when navigating to a different page so the error doesn't persist
+    if (prevProps.pageKey !== this.props.pageKey && this.state.error) {
+      this.setState({ error: null });
+    }
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-6 text-cream">
+          <p className="text-base font-semibold">This page ran into a problem</p>
+          <p className="text-sm text-muted text-center max-w-xs">
+            {this.state.error?.message || 'An unexpected error occurred.'}
+          </p>
+          <button
+            className="game-btn game-btn-blue"
+            onClick={() => this.setState({ error: null })}
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function Page({ pageKey, children }) {
+  return (
+    <PageErrorBoundary pageKey={pageKey}>
+      <Suspense fallback={<Loading />}>
+        {children}
+      </Suspense>
+    </PageErrorBoundary>
+  );
 }
 
 export default function App() {
@@ -100,27 +148,25 @@ export default function App() {
       <ToastProvider>
         <Layout>
           <UpdatePrompt />
-          <Suspense fallback={<Loading />}>
-            <Routes>
-            <Route path="/" element={<DashboardComponent />} />
-            <Route path="/chores" element={<Chores />} />
-            <Route path="/chores/:id" element={<ChoreDetail />} />
-            <Route path="/rewards" element={<Rewards />} />
+          <Routes>
+            <Route path="/" element={<Page pageKey="dashboard"><DashboardComponent /></Page>} />
+            <Route path="/chores" element={<Page pageKey="chores"><Chores /></Page>} />
+            <Route path="/chores/:id" element={<Page pageKey="chore-detail"><ChoreDetail /></Page>} />
+            <Route path="/rewards" element={<Page pageKey="rewards"><Rewards /></Page>} />
             <Route path="/inventory" element={<Navigate to="/rewards?tab=inventory" replace />} />
             <Route path="/wishlist" element={<Navigate to="/rewards?tab=wishlist" replace />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/party" element={<Party />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/avatar" element={<AvatarEditor />} />
-            <Route path="/events" element={<Events />} />
-            <Route path="/kids/:kidId" element={<KidQuests />} />
-            <Route path="/bounty" element={<BountyBoard />} />
-            <Route path="/settings" element={<Settings />} />
-            {user.role === 'admin' && <Route path="/admin" element={<AdminDashboard />} />}
+            <Route path="/calendar" element={<Page pageKey="calendar"><Calendar /></Page>} />
+            <Route path="/party" element={<Page pageKey="party"><Party /></Page>} />
+            <Route path="/leaderboard" element={<Page pageKey="leaderboard"><Leaderboard /></Page>} />
+            <Route path="/profile" element={<Page pageKey="profile"><Profile /></Page>} />
+            <Route path="/avatar" element={<Page pageKey="avatar"><AvatarEditor /></Page>} />
+            <Route path="/events" element={<Page pageKey="events"><Events /></Page>} />
+            <Route path="/kids/:kidId" element={<Page pageKey="kid-quests"><KidQuests /></Page>} />
+            <Route path="/bounty" element={<Page pageKey="bounty"><BountyBoard /></Page>} />
+            <Route path="/settings" element={<Page pageKey="settings"><Settings /></Page>} />
+            {user.role === 'admin' && <Route path="/admin" element={<Page pageKey="admin"><AdminDashboard /></Page>} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          </Suspense>
         </Layout>
       </ToastProvider>
     </AppErrorBoundary>
