@@ -88,7 +88,7 @@ test.describe('Authentication — invalid credentials', () => {
     await expect(page).toHaveURL(/login/);
     // Error div or message must appear
     await expect(
-      page.locator('.text-crimson, text=/invalid|incorrect|not found/i').first()
+      page.locator('.text-crimson').or(page.locator('text=/invalid|incorrect|not found/i')).first()
     ).toBeVisible({ timeout: 6_000 });
   });
 

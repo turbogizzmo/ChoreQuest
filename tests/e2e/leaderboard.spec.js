@@ -30,7 +30,7 @@ test.describe('Leaderboard — parent', () => {
   test('no 4xx errors from leaderboard API on load', async ({ loginAsParent: page }) => {
     const errors = [];
     page.on('response', (res) => {
-      if (res.url().includes('/api/leaderboard') && res.status() >= 400) {
+      if (res.url().includes('/api/stats/leaderboard') && res.status() >= 400) {
         errors.push(`${res.status()} ${res.url()}`);
       }
     });
@@ -51,7 +51,7 @@ test.describe('Leaderboard — parent', () => {
     await page.goto('/leaderboard');
     await page.waitForLoadState('networkidle');
     await expect(
-      page.locator('button:has-text("Weekly"), text=Weekly').first()
+      page.locator('button:has-text("Weekly")').first()
     ).toBeVisible({ timeout: 5_000 });
   });
 
@@ -102,9 +102,9 @@ test.describe('Leaderboard — kid', () => {
 // ─── API ──────────────────────────────────────────────────────────────────────
 
 test.describe('Leaderboard — API', () => {
-  test('GET /api/leaderboard returns an array', async () => {
+  test('GET /api/stats/leaderboard returns an array', async () => {
     const { parentToken } = loadTokens();
-    const res = await fetch(`${BASE}/api/leaderboard`, {
+    const res = await fetch(`${BASE}/api/stats/leaderboard`, {
       headers: { Authorization: `Bearer ${parentToken}` },
     });
     expect(res.status).toBe(200);
@@ -114,7 +114,7 @@ test.describe('Leaderboard — API', () => {
 
   test('leaderboard entries have expected fields (user_id, display_name, points)', async () => {
     const { parentToken } = loadTokens();
-    const res = await fetch(`${BASE}/api/leaderboard`, {
+    const res = await fetch(`${BASE}/api/stats/leaderboard`, {
       headers: { Authorization: `Bearer ${parentToken}` },
     });
     const data = await res.json();
@@ -129,7 +129,7 @@ test.describe('Leaderboard — API', () => {
 
   test('kid token can also fetch leaderboard', async () => {
     const { kidToken } = loadTokens();
-    const res = await fetch(`${BASE}/api/leaderboard`, {
+    const res = await fetch(`${BASE}/api/stats/leaderboard`, {
       headers: { Authorization: `Bearer ${kidToken}` },
     });
     expect(res.status).toBe(200);
