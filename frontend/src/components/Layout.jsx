@@ -274,13 +274,20 @@ export default function Layout({ children }) {
                             key={n.id}
                             onClick={() => {
                               if (!n.is_read && !isTrade) markRead(n.id);
+                              setShowNotifs(false);
                               if (n.reference_type === 'kid_quest' && n.reference_id) {
-                                setShowNotifs(false);
                                 navigate(`/kids/${n.reference_id}`);
                               } else if (n.type === 'chore_completed') {
-                                setShowNotifs(false);
                                 navigate('/');
                               }
+                              // Force a data refresh on the target page — handles the case
+                              // where the parent is already on that page (React Router won't
+                              // remount) or missed the WebSocket event while their screen was off.
+                              setTimeout(() => {
+                                window.dispatchEvent(
+                                  new CustomEvent('ws:message', { detail: { type: 'data_changed' } })
+                                );
+                              }, 100);
                             }}
                             className={`w-full text-left px-4 py-3 border-b border-border/50 hover:bg-surface-raised transition-colors cursor-pointer ${
                               !n.is_read ? 'bg-accent/5' : ''
