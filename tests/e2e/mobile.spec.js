@@ -48,9 +48,10 @@ test.describe('Mobile — kid dashboard', () => {
 
   test('nav links are present on mobile (bottom bar or visible nav)', async ({ loginAsKid: page }) => {
     await setMobile(page);
-    // Bottom nav renders <button> elements (not <a> tags) — target by visible label text
+    // Both the desktop sidebar (hidden on mobile) and bottom nav render <button>
+    // with the same labels. Use .last() to get the bottom-nav (visible) one.
     await expect(
-      page.locator('button:has-text("Rewards"), button:has-text("Quests")').first()
+      page.locator('button:has-text("Rewards"), button:has-text("Quests")').last()
     ).toBeVisible({ timeout: 5_000 });
   });
 
