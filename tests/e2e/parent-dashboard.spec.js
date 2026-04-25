@@ -188,7 +188,9 @@ test.describe('Parent — party and kid detail', () => {
     await page.goto(`/kids/${kidId}`);
     await page.waitForLoadState('networkidle');
     await expect(page).not.toHaveURL(/error|login/);
-    await expect(page.locator('.game-panel, text=/quest|assignment/i').first()).toBeVisible({ timeout: 8_000 });
+    await expect(
+      page.locator('.game-panel').or(page.locator('text=/quest|assignment/i')).first()
+    ).toBeVisible({ timeout: 8_000 });
   });
 
   test('parent can navigate from party card to kid detail', async ({ loginAsParent: page }) => {

@@ -37,7 +37,7 @@ test.describe('API Security — unauthenticated access returns 401', () => {
     ['GET',  '/api/chores'],
     ['GET',  '/api/rewards'],
     ['GET',  '/api/admin/users'],
-    ['GET',  '/api/leaderboard'],
+    ['GET',  '/api/stats/leaderboard'],
     ['GET',  '/api/bounty'],
     ['GET',  '/api/notifications'],
     ['GET',  '/api/calendar?week_start=2024-04-08'],

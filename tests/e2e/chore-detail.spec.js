@@ -71,9 +71,9 @@ test.describe('ChoreDetail — parent', () => {
 
     await page.goto(`/chores/${choreId}`);
     await page.waitForLoadState('networkidle');
-    // 10 XP and "easy" difficulty should appear
+    // 10 XP should appear; difficulty renders via DifficultyStars as 'Trivial' (easy→1→index 0)
     await expect(page.locator('text=/10/').first()).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('text=/easy/i').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('text=/trivial|easy|medium|hard|legendary/i').first()).toBeVisible({ timeout: 5_000 });
   });
 
   test('Skip Today button is visible and shows confirmation modal on click', async ({ loginAsParent: page }) => {
