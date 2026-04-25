@@ -107,9 +107,7 @@ export default async function globalSetup() {
   if (chores.length > 0 && kidId) {
     const chore = chores[0];
     await post(`/api/chores/${chore.id}/assign`, {
-      user_ids: [kidId],
-      recurrence: 'once',
-      requires_photo: false,
+      assignments: [{ user_id: kidId, recurrence: 'once', requires_photo: false }],
     }, parentToken, { label: 'assign quest to kid', retries: 2 }).catch(() => {
       // Ignore — assignment may already exist or chore may not need assigning
     });
