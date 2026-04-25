@@ -73,7 +73,7 @@ export default function ParentDashboard() {
       const allAssignments = Object.values(calendarRes.days || {}).flat();
       const needsVerification = allAssignments
         .filter((a) => a.status === 'completed')
-        .sort((a, b) => a.date > b.date ? -1 : a.date < b.date ? 1 : 0);
+        .sort((a, b) => b.date.localeCompare(a.date));
       setPendingVerifications(needsVerification);
     } catch (err) {
       setError(err.message || 'Failed to load family data');
