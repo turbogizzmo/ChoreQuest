@@ -7,6 +7,7 @@ import {
   BookTemplate,
   Star,
   Scroll,
+  CheckCircle2,
 } from 'lucide-react';
 
 const DIFFICULTY_OPTIONS = [
@@ -41,6 +42,7 @@ export default function QuestCreateModal({
   const [submitting, setSubmitting] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [existingTitles, setExistingTitles] = useState(new Set());
 
   useEffect(() => {
     if (isOpen) {
@@ -62,9 +64,18 @@ export default function QuestCreateModal({
 
   useEffect(() => {
     if (isOpen && !editingChore) {
-      api('/api/chores/templates')
-        .then((data) => setTemplates(Array.isArray(data) ? data : []))
-        .catch(() => setTemplates([]));
+      Promise.all([
+        api('/api/chores/templates').catch(() => []),
+        api('/api/chores').catch(() => []),
+      ]).then(([tplData, choreData]) => {
+        setTemplates(Array.isArray(tplData) ? tplData : []);
+        const titles = new Set(
+          (Array.isArray(choreData) ? choreData : []).map((c) =>
+            c.title.toLowerCase()
+          )
+        );
+        setExistingTitles(titles);
+      });
     }
   }, [isOpen, editingChore]);
 
@@ -180,28 +191,43 @@ export default function QuestCreateModal({
                       {cat}
                     </p>
                     <div className="space-y-1">
-                      {tpls.map((tpl) => (
-                        <button
-                          key={tpl.id}
-                          onClick={() => applyTemplate(tpl)}
-                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-raised transition-colors border border-transparent hover:border-accent/30"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-cream text-sm font-medium">
-                              {themedTitle(tpl.title, colorTheme)}
-                            </span>
-                            <span className="flex items-center gap-1 text-gold text-xs">
-                              <Star size={10} className="fill-gold" />
-                              {tpl.suggested_points} XP
-                            </span>
-                          </div>
-                          {tpl.description && (
-                            <p className="text-muted text-xs line-clamp-1 mt-0.5">
-                              {themedDescription(tpl.title, tpl.description, colorTheme)}
-                            </p>
-                          )}
-                        </button>
-                      ))}
+                      {tpls.map((tpl) => {
+                        const inUse = existingTitles.has(tpl.title.toLowerCase());
+                        return (
+                          <button
+                            key={tpl.id}
+                            onClick={() => applyTemplate(tpl)}
+                            className={`w-full text-left px-3 py-2 rounded-lg transition-colors border ${
+                              inUse
+                                ? 'border-emerald/30 bg-emerald/5 hover:bg-emerald/10'
+                                : 'border-transparent hover:bg-surface-raised hover:border-accent/30'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`text-sm font-medium ${inUse ? 'text-cream/70' : 'text-cream'}`}>
+                                {themedTitle(tpl.title, colorTheme)}
+                              </span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {inUse && (
+                                  <span className="flex items-center gap-1 text-emerald text-xs font-medium">
+                                    <CheckCircle2 size={11} />
+                                    Created
+                                  </span>
+                                )}
+                                <span className="flex items-center gap-1 text-gold text-xs">
+                                  <Star size={10} className="fill-gold" />
+                                  {tpl.suggested_points} XP
+                                </span>
+                              </div>
+                            </div>
+                            {tpl.description && (
+                              <p className={`text-xs line-clamp-1 mt-0.5 ${inUse ? 'text-muted/60' : 'text-muted'}`}>
+                                {themedDescription(tpl.title, tpl.description, colorTheme)}
+                              </p>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
