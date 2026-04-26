@@ -116,6 +116,21 @@ test.describe('Authentication — unauthenticated redirect', () => {
       await expect(page).toHaveURL(/login/, { timeout: 6_000 });
     });
   }
+
+  test('after login, user is redirected back to the originally-requested URL', async ({ page }) => {
+    // Navigate to a protected URL with a query string while unauthenticated
+    await visitUnauthenticated(page, '/rewards?tab=wishlist');
+    await expect(page).toHaveURL(/login/, { timeout: 6_000 });
+
+    // Log in
+    await page.locator('input[name="username"], input[placeholder*="sername"]').first().fill('e2e_parent');
+    await page.locator('input[type="password"]').first().fill('password123');
+    await page.locator('button[type="submit"], button:has-text("Sign in"), button:has-text("Login"), button:has-text("Log in")').first().click();
+
+    // Should land back on /rewards?tab=wishlist, not /
+    await page.waitForURL(/rewards/, { timeout: 10_000 });
+    await expect(page).toHaveURL(/rewards.*tab=wishlist/);
+  });
 });
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
