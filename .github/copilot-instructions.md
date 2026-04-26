@@ -86,6 +86,7 @@ SECRET_KEY=any-16-char-key pytest tests/unit/ -v
 - `backend/services/` — cross-cutting logic (assignment generation, recurrence rules, rotation, ranks, pet leveling, push dispatch). `push_hook.py`'s `install_push_hooks()` wires notification events → Web Push at startup.
 - `backend/seed.py` — seeds default categories, 20 achievements, 24 quest templates, and app settings on first boot.
 - `backend/auth.py` — JWT encode/decode, bcrypt password & PIN hashing, refresh-token creation.
+- `backend/dependencies.py` — `get_current_user` accepts **two auth methods**: `Authorization: Bearer <jwt>` (web app) and `X-API-Key: <raw-key>` (automation/integrations). API keys are SHA-256-hashed at creation and never stored raw; a valid key authenticates as its creator (always admin). `last_used_at` is stamped on each use. The `require_parent` / `require_admin` / `require_kid` guards layer on top unchanged.
 - `backend/websocket_manager.py` — process-local `ws_manager` singleton; fan-out helpers: `send_to_user`, `broadcast`, `send_to_parents`.
 
 **Frontend layout (`frontend/src/`):**
