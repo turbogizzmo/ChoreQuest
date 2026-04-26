@@ -350,6 +350,8 @@ QUEST_TEMPLATES = [
     {"title": "The Endurance Trial", "description": "Every great hero must train their body as well as their mind. Mount the enchanted running machine and complete your allotted time upon it. Only those who endure the trial grow stronger.", "category_name": "General", "difficulty": Difficulty.medium, "suggested_points": 20, "icon": "home"},
     {"title": "The Nighttime Tome", "description": "As the castle falls silent and the torches dim, a true scholar does not yet sleep. Take up a book of your choosing, settle beneath the reading lantern, and let the words carry you through the quiet hours before slumber takes you.", "category_name": "Homework", "difficulty": Difficulty.easy, "suggested_points": 10, "icon": "book-open"},
     {"title": "The Hound's Chalice Renewed", "description": "Your loyal hound has drained the sacred water bowl to the last drop. Rinse the vessel clean of all traces, carry it to the wellspring, and fill it to the brim with fresh cool water so your faithful companion may drink and be refreshed.", "category_name": "Pets", "difficulty": Difficulty.easy, "suggested_points": 5, "icon": "paw-print"},
+    # Bug Bounty (Bounty Board only)
+    {"title": "🐛 Bug Hunter", "description": "A strange anomaly has been detected within the realm's enchanted systems. Seek out the glitch, document its dark nature, and report your findings to the Guild Masters so the curse may be lifted.", "category_name": "General", "difficulty": Difficulty.hard, "suggested_points": 30, "icon": "bug"},
 ]
 
 
