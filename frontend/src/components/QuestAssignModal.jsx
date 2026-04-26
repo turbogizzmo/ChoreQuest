@@ -56,6 +56,10 @@ export default function QuestAssignModal({
   const [rotationEnabled, setRotationEnabled] = useState(false);
   const [rotationCadence, setRotationCadence] = useState('daily');
   const [rotationFirstKid, setRotationFirstKid] = useState(null);
+  // Inverse linking: ID of the *chore* (not rotation) this should mirror
+  const [rotationInverseOfChoreId, setRotationInverseOfChoreId] = useState(null);
+  // Other rotated chores available for inverse linking
+  const [rotatedChores, setRotatedChores] = useState([]);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -111,25 +115,37 @@ export default function QuestAssignModal({
         setScheduleDays([]);
       });
 
-    // Fetch existing rotation
-    api(`/api/chores/${chore.id}/rotation`)
-      .then((rot) => {
-        if (rot && rot.kid_ids && rot.kid_ids.length >= 2) {
-          setRotationEnabled(true);
-          setRotationCadence(rot.cadence || 'daily');
-          const currentIdx = rot.current_index ?? 0;
-          setRotationFirstKid(rot.kid_ids[currentIdx] ?? rot.kid_ids[0]);
-        } else {
-          setRotationEnabled(false);
-          setRotationCadence('daily');
-          setRotationFirstKid(null);
-        }
-      })
-      .catch(() => {
+    // Fetch existing rotation + list of all rotated chores (for inverse linking)
+    Promise.all([
+      api(`/api/chores/${chore.id}/rotation`).catch(() => null),
+      api('/api/rotations').catch(() => []),
+      api('/api/chores').catch(() => []),
+    ]).then(([rot, allRotations, allChores]) => {
+      if (rot && rot.kid_ids && rot.kid_ids.length >= 2) {
+        setRotationEnabled(true);
+        setRotationCadence(rot.cadence || 'daily');
+        const currentIdx = rot.current_index ?? 0;
+        setRotationFirstKid(rot.kid_ids[currentIdx] ?? rot.kid_ids[0]);
+        setRotationInverseOfChoreId(rot.inverse_of_chore_id ?? null);
+      } else {
         setRotationEnabled(false);
         setRotationCadence('daily');
         setRotationFirstKid(null);
-      });
+        setRotationInverseOfChoreId(null);
+      }
+      // Build list of other chores that already have rotations (exclude self)
+      // Enrich with chore title so the dropdown is human-readable
+      const choreMap = {};
+      if (Array.isArray(allChores)) {
+        for (const c of allChores) choreMap[c.id] = c.title;
+      }
+      const others = Array.isArray(allRotations)
+        ? allRotations
+            .filter((r) => r.chore_id !== chore.id)
+            .map((r) => ({ ...r, title: choreMap[r.chore_id] ?? `Quest #${r.chore_id}` }))
+        : [];
+      setRotatedChores(others);
+    });
 
     setError('');
   }, [isOpen, chore, kids]);
@@ -209,7 +225,11 @@ export default function QuestAssignModal({
           assignments.unshift(first);
         }
       }
-      body.rotation = { enabled: true, cadence: rotationCadence };
+      body.rotation = {
+        enabled: true,
+        cadence: rotationCadence,
+        inverse_of_chore_id: rotationInverseOfChoreId ?? null,
+      };
     }
 
     try {
@@ -574,6 +594,34 @@ export default function QuestAssignModal({
                     This hero gets the quest first, then it rotates.
                   </p>
                 </div>
+
+                {/* Inverse linking — only show when other rotated chores exist */}
+                {rotatedChores.length > 0 && (
+                  <div>
+                    <label className="block text-muted text-xs font-medium mb-1">
+                      Inverse Of <span className="text-muted/60">(optional)</span>
+                    </label>
+                    <select
+                      value={rotationInverseOfChoreId ?? ''}
+                      onChange={(e) =>
+                        setRotationInverseOfChoreId(
+                          e.target.value ? Number(e.target.value) : null
+                        )
+                      }
+                      className={`${selectClass} w-full`}
+                    >
+                      <option value="">— None —</option>
+                      {rotatedChores.map((r) => (
+                        <option key={r.chore_id} value={r.chore_id}>
+                          {r.title}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-muted text-xs mt-1">
+                      Advance in lock-step with another quest's rotation (opposite assignment).
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

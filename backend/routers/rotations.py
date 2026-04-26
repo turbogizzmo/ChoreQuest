@@ -9,6 +9,7 @@ from backend.models import ChoreRotation
 from backend.schemas import RotationCreate, RotationUpdate, RotationResponse
 from backend.dependencies import require_parent
 from backend.websocket_manager import ws_manager
+from backend.services.rotation import advance_rotation_and_mirror
 
 router = APIRouter(prefix="/api/rotations", tags=["rotations"])
 
@@ -143,9 +144,9 @@ async def advance_rotation(
     if not rotation.kid_ids:
         raise HTTPException(status_code=400, detail="Rotation has no kids to advance through")
 
-    rotation.current_index = (rotation.current_index + 1) % len(rotation.kid_ids)
-    rotation.last_rotated = datetime.now(timezone.utc)
-    rotation.updated_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    await advance_rotation_and_mirror(rotation, db, now)
+    rotation.updated_at = now
 
     await db.commit()
     await db.refresh(rotation)

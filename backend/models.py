@@ -213,10 +213,17 @@ class ChoreRotation(Base):
     rotation_day: Mapped[int] = mapped_column(Integer, default=0)
     current_index: Mapped[int] = mapped_column(Integer, default=0)
     last_rotated: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Inverse linking: when set, this rotation advances in step with the rotation
+    # for `inverse_of_chore_id`.  Useful for paired chores where kids swap duties
+    # simultaneously (e.g. Dishwasher ↔ Countertop).
+    inverse_of_chore_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("chores.id"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    chore = relationship("Chore")
+    chore = relationship("Chore", foreign_keys=[chore_id])
+    inverse_of_chore = relationship("Chore", foreign_keys=[inverse_of_chore_id])
 
 
 class ChoreExclusion(Base):

@@ -364,6 +364,9 @@ class AssignmentRuleItem(BaseModel):
 class AssignmentRuleRotation(BaseModel):
     enabled: bool = False
     cadence: RotationCadence = RotationCadence.weekly
+    # Optional: link this rotation as the inverse of another chore's rotation.
+    # When set, this rotation advances in lock-step with the referenced chore.
+    inverse_of_chore_id: int | None = None
 
 
 class ChoreAssignRequest(BaseModel):
@@ -427,6 +430,7 @@ class RotationResponse(BaseModel):
     rotation_day: int
     current_index: int
     last_rotated: datetime | None
+    inverse_of_chore_id: int | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

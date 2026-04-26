@@ -1,8 +1,14 @@
 """Shared rotation logic for chore rotation scheduling."""
 
+from __future__ import annotations
+
 from datetime import date, datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
 from backend.models import ChoreRotation, RotationCadence
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +92,32 @@ def advance_rotation(rotation: ChoreRotation, now: datetime) -> None:
     """Advance the rotation to the next kid and record the timestamp."""
     rotation.current_index = (rotation.current_index + 1) % len(rotation.kid_ids)
     rotation.last_rotated = now
+
+
+async def advance_rotation_and_mirror(
+    rotation: ChoreRotation,
+    db: "AsyncSession",
+    now: datetime,
+) -> None:
+    """Advance *rotation* and mirror the advance to any inverse-linked rotation.
+
+    An *inverse-linked* rotation is one whose ``inverse_of_chore_id`` equals
+    ``rotation.chore_id``.  This keeps paired chores (e.g. Dishwasher ↔
+    Countertop) in perfect lock-step without any extra manual intervention.
+    """
+    from sqlalchemy import select  # local import avoids top-level circular risk
+
+    advance_rotation(rotation, now)
+
+    # Find any rotation that declares itself the inverse of this one
+    mirror_result = await db.execute(
+        select(ChoreRotation).where(
+            ChoreRotation.inverse_of_chore_id == rotation.chore_id
+        )
+    )
+    for mirror in mirror_result.scalars().all():
+        if mirror.kid_ids:
+            advance_rotation(mirror, now)
 
 
 def get_rotation_kid_for_day(
