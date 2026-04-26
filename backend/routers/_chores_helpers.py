@@ -7,6 +7,8 @@ These are internal utilities used across the chores router endpoints:
 - _build_rotation_summaries
 """
 
+from datetime import date, datetime, timezone
+
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +23,7 @@ from backend.models import (
     NotificationType,
 )
 from backend.schemas import RotationSummary
+from backend.services.rotation import get_rotation_kid_for_day, should_advance_rotation
 
 
 async def get_chore_or_404(
@@ -105,13 +108,35 @@ async def build_rotation_summaries(
     )
     kid_names: dict[int, str] = {row.id: row.display_name for row in kid_result.all()}
 
+    today = date.today()
+    now = datetime.now(timezone.utc)
+
     summaries: dict[int, RotationSummary] = {}
     for r in rotations:
         kid_ids = r.kid_ids or []
         if not kid_ids:
             continue
-        idx = r.current_index % len(kid_ids)
-        current_kid_id = kid_ids[idx]
+
+        # Use the same projection logic as _generate_from_rules so this
+        # summary stays in sync with actual assignments even when the daily
+        # reset hasn't advanced current_index yet.
+        #
+        # If should_advance_rotation() is True the daily reset hasn't fired
+        # yet — project forward to today using get_rotation_kid_for_day
+        # (identical math to the calendar/week assignment generator).
+        # Otherwise current_index is already at the right position.
+        if should_advance_rotation(r, now):
+            reference_day = (
+                r.last_rotated.date()
+                if r.last_rotated and hasattr(r.last_rotated, "date")
+                else today
+            )
+            current_kid_id = get_rotation_kid_for_day(r, today, reference_day)
+            idx = kid_ids.index(current_kid_id) if current_kid_id in kid_ids else r.current_index % len(kid_ids)
+        else:
+            idx = r.current_index % len(kid_ids)
+            current_kid_id = kid_ids[idx]
+
         summaries[r.chore_id] = RotationSummary(
             current_kid_id=current_kid_id,
             current_kid_name=kid_names.get(current_kid_id, f"Kid #{current_kid_id}"),
