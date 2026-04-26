@@ -29,7 +29,17 @@ Health check: `GET /api/health`.
 
 ## Test suites
 
-Two separate test suites exist. **Always run them before merging a PR.**
+Three CI jobs run on every PR. **All must pass before merging.**
+
+### 0 — Shell lint & deploy smoke test (~5 s)
+
+Runs ShellCheck against `deploy.sh`, `watchdog.sh`, and `run-e2e.sh`, then validates that `docker-compose config` resolves all `.env` variables correctly. Catches shell script bugs (unquoted variables, masked exit codes, etc.) and deploy pipeline regressions before they reach the NAS.
+
+```bash
+shellcheck deploy.sh watchdog.sh run-e2e.sh
+```
+
+**CI:** fastest job, runs first. Fails immediately on any ShellCheck warning — fix warnings locally before pushing.
 
 ### 1 — Playwright end-to-end tests (browser + API)
 
@@ -97,4 +107,7 @@ SECRET_KEY=any-16-char-key pytest tests/unit/ -v
 - **Config is env-only** via `backend/config.py` (`pydantic-settings`). `SECRET_KEY` must be ≥16 chars and not match `WEAK_SECRETS`; the app hard-exits otherwise. Add new settings to the `Settings` class with a default, and document in README's env-var table. Debug/diagnostic endpoints must be gated behind `settings.ENABLE_DEBUG_ENDPOINTS` (default `false`) — never expose them unconditionally.
 - **SQLite WAL mode** is enabled in `init_db()`. Data lives in `/app/data` (`chores_os.db` + `uploads/`); this is the Docker volume to back up.
 - **CSP is strict**: `script-src 'self'` only — no inline scripts or external CDNs. Adding a third-party script means updating the CSP header in `main.py`'s `security_headers` middleware.
-- **CI runs on every PR.** Two jobs: `backend-unit-tests` (pytest, ~10 s) and `e2e-tests` (Playwright, ~5 min). Both must pass before merging. Playwright reports and failure traces are uploaded as artifacts.
+- **CI runs on every PR.** Three jobs — all must pass before merging:
+  - `shell-lint` (~5 s) — ShellCheck lints `deploy.sh`, `watchdog.sh`, and `run-e2e.sh`, then runs a `docker-compose config` smoke test to confirm `.env` variables resolve correctly. Catches shell script bugs and deploy pipeline regressions before they reach the NAS.
+  - `backend-unit-tests` (~10 s) — pytest suite under `tests/unit/` using an in-memory SQLite DB. No server needed; covers rotation logic, assignment generation, streaks, and stats.
+  - `e2e-tests` (~5 min) — Playwright suite spins up the full stack (FastAPI + Vite dev server) against an isolated `/tmp/chorequest_e2e.db`. HTML reports and failure traces are uploaded as artifacts.

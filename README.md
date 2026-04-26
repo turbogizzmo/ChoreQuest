@@ -19,7 +19,7 @@ A gamified family chore management app with full RPG theming. Parents create que
 - Timezone bug fix — no more "week_start must be Monday" errors
 - End-to-end test suite (Playwright, 244 tests, isolated test environment)
 - Backend unit tests (pytest) covering rotation, assignment generation, streaks, and stats
-- GitHub Actions CI — both test suites run automatically on every PR
+- GitHub Actions CI — three jobs run automatically on every PR (shell lint, backend unit tests, E2E)
 
 ---
 
