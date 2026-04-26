@@ -28,6 +28,8 @@ import {
   ScrollText,
   Zap,
   RotateCw,
+  Search,
+  X,
 } from 'lucide-react';
 
 const DIFFICULTY_OPTIONS = [
@@ -117,6 +119,7 @@ export default function Chores() {
 
   const [filterCategory, setFilterCategory] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showCompleted, setShowCompleted] = useState(false);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -239,12 +242,18 @@ export default function Chores() {
     ? (activeTab === 'library' ? libraryChores : activeChores)
     : chores;
 
+  const searchLower = searchQuery.trim().toLowerCase();
   const filteredChores = currentChores.filter((chore) => {
     if (filterCategory && chore.category?.name !== filterCategory) return false;
     if (filterDifficulty && chore.difficulty !== filterDifficulty) return false;
     if (isKid && !showCompleted) {
       const status = assignmentStatusMap[chore.id];
       if (status === 'completed' || status === 'verified') return false;
+    }
+    if (searchLower) {
+      const inTitle = chore.title?.toLowerCase().includes(searchLower);
+      const inDesc = chore.description?.toLowerCase().includes(searchLower);
+      if (!inTitle && !inDesc) return false;
     }
     return true;
   });
@@ -343,7 +352,30 @@ export default function Chores() {
       )}
 
       {/* Filter Bar */}
-      <div className="game-panel p-3">
+      <div className="game-panel p-3 space-y-2">
+        {/* Search */}
+        <div className="relative">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search quests by title or description…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-navy-light border border-border text-cream pl-8 pr-8 py-2 rounded-md text-sm
+                       focus:border-accent focus:outline-none transition-colors placeholder:text-muted/50"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-cream transition-colors"
+              aria-label="Clear search"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+
+        {/* Category + Difficulty filters */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <div className="flex items-center gap-1.5 text-muted">
             <Filter size={14} />
@@ -378,10 +410,20 @@ export default function Chores() {
           <p className="text-muted text-sm">
             {chores.length === 0
               ? 'No quests created yet.'
+              : searchLower
+              ? `No quests match "${searchQuery}".`
               : isParent && activeTab === 'active'
               ? 'No active quests. Assign some from the Library.'
               : 'No quests match your filters.'}
           </p>
+          {searchLower && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="mt-2 text-accent text-sm hover:underline"
+            >
+              Clear search
+            </button>
+          )}
           {isParent && chores.length === 0 && (
             <button
               onClick={() => { setEditingChore(null); setShowCreateModal(true); }}
