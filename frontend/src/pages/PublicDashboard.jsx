@@ -14,6 +14,7 @@ import AvatarDisplay from '../components/AvatarDisplay';
 
 const REFRESH_INTERVAL_MS = 60_000;
 const KIOSK_REFRESH_INTERVAL_MS = 120_000;
+const KIOSK_SLIDE_INTERVAL_MS = 10_000; // how long each kid is shown
 
 // ─── Normal mode subcomponents ───────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ function KidCard({ kid }) {
 function KioskProgressBar({ completed, total }) {
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
   return (
-    <div className="w-full h-4 rounded-full bg-surface-raised overflow-hidden">
+    <div className="w-full h-6 rounded-full bg-surface-raised overflow-hidden">
       <div
         className="h-full rounded-full bg-accent transition-all duration-700"
         style={{ width: `${pct}%` }}
@@ -103,73 +104,77 @@ function KioskProgressBar({ completed, total }) {
 function KioskChoreRow({ chore }) {
   const isDone = chore.status === 'completed' || chore.status === 'verified';
   return (
-    <div className={`flex items-center gap-3 py-1.5 ${isDone ? 'opacity-50' : ''}`}>
+    <div className={`flex items-center gap-4 py-2.5 border-b border-border/30 last:border-0 ${isDone ? 'opacity-50' : ''}`}>
       {isDone ? (
-        <CheckCircle2 size={18} className="text-emerald flex-shrink-0" />
+        <CheckCircle2 size={24} className="text-emerald flex-shrink-0" />
       ) : (
-        <Clock size={18} className="text-muted flex-shrink-0" />
+        <Clock size={24} className="text-muted flex-shrink-0" />
       )}
-      <span className={`text-base flex-1 truncate ${isDone ? 'line-through text-muted' : 'text-cream'}`}>
+      <span className={`text-2xl flex-1 truncate ${isDone ? 'line-through text-muted' : 'text-cream'}`}>
         {chore.chore_title}
       </span>
-      <span className="text-gold text-sm font-semibold flex-shrink-0">+{chore.points} XP</span>
+      <span className="text-gold text-xl font-bold flex-shrink-0">+{chore.points} XP</span>
     </div>
   );
 }
 
-function KioskKidCard({ kid }) {
+function KioskKidSlide({ kid, visible }) {
   const allDone = kid.today_total > 0 && kid.today_completed >= kid.today_total;
+  const pct = kid.today_total > 0 ? Math.round((kid.today_completed / kid.today_total) * 100) : 0;
+
   return (
     <div
-      className={`game-panel flex flex-col gap-5 p-6 h-full ${
-        allDone ? 'border-emerald/40 shadow-[0_0_30px_rgba(16,185,129,0.15)]' : ''
-      }`}
+      className="absolute inset-0 flex flex-col gap-8 p-10 transition-opacity duration-700"
+      style={{ opacity: visible ? 1 : 0, pointerEvents: visible ? 'auto' : 'none' }}
     >
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <AvatarDisplay config={kid.avatar_config} size="lg" name={kid.display_name} animate />
+      {/* Hero header */}
+      <div className="flex items-center gap-8 flex-shrink-0">
+        <AvatarDisplay config={kid.avatar_config} size="xl" name={kid.display_name} animate />
         <div className="min-w-0 flex-1">
-          <h2 className="text-cream text-3xl font-bold truncate leading-tight">
+          <h2 className="text-cream font-bold leading-tight truncate" style={{ fontSize: '4rem' }}>
             {kid.display_name}
           </h2>
-          <div className="flex items-center gap-5 mt-1">
-            <span className="inline-flex items-center gap-1.5 text-gold text-xl font-semibold">
-              <Star size={18} fill="currentColor" />
-              {kid.points_balance.toLocaleString()}
+          <div className="flex items-center gap-8 mt-3">
+            <span className="inline-flex items-center gap-2 text-gold font-semibold" style={{ fontSize: '2rem' }}>
+              <Star size={28} fill="currentColor" />
+              {kid.points_balance.toLocaleString()} XP
             </span>
             {kid.current_streak > 0 && (
-              <span className="inline-flex items-center gap-1.5 text-orange-400 text-xl font-semibold">
-                <Flame size={18} fill="currentColor" />
+              <span className="inline-flex items-center gap-2 text-orange-400 font-semibold" style={{ fontSize: '2rem' }}>
+                <Flame size={28} fill="currentColor" />
                 {kid.current_streak} day streak
               </span>
             )}
           </div>
         </div>
         {allDone && (
-          <div className="flex flex-col items-center gap-1">
-            <CheckCircle2 size={40} className="text-emerald" />
-            <span className="text-emerald text-xs font-bold uppercase tracking-wider">Done!</span>
+          <div className="flex flex-col items-center gap-2 flex-shrink-0">
+            <CheckCircle2 size={64} className="text-emerald" />
+            <span className="text-emerald text-xl font-bold uppercase tracking-widest">All Done!</span>
           </div>
         )}
       </div>
 
-      {/* Progress */}
-      <div className="space-y-2">
+      {/* Progress bar */}
+      <div className="flex-shrink-0 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-muted text-base">Today's Quests</span>
-          <span className="text-cream text-xl font-bold">
-            {kid.today_completed}/{kid.today_total}
+          <span className="text-muted text-2xl">Today's Quests</span>
+          <span className="text-cream text-3xl font-bold">
+            {kid.today_completed} / {kid.today_total} &nbsp;
+            <span className="text-muted text-2xl font-normal">({pct}%)</span>
           </span>
         </div>
         <KioskProgressBar completed={kid.today_completed} total={kid.today_total} />
       </div>
 
-      {/* Quest list */}
+      {/* Quest list — fills remaining space */}
       {kid.chores.length > 0 && (
-        <div className="border-t border-border/50 pt-3 space-y-0.5 flex-1 overflow-hidden">
-          {kid.chores.map((chore) => (
-            <KioskChoreRow key={chore.id} chore={chore} />
-          ))}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <div className="border-t-2 border-border/50 pt-4 flex flex-col overflow-hidden">
+            {kid.chores.map((chore) => (
+              <KioskChoreRow key={chore.id} chore={chore} />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -188,7 +193,9 @@ export default function PublicDashboard() {
   const [error, setError] = useState(null);
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [now, setNow] = useState(new Date());
+  const [activeKidIndex, setActiveKidIndex] = useState(0);
   const intervalRef = useRef(null);
+  const slideRef = useRef(null);
 
   // Live clock for kiosk mode
   useEffect(() => {
@@ -196,6 +203,15 @@ export default function PublicDashboard() {
     const tick = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(tick);
   }, [isKiosk]);
+
+  // Auto-cycle through kids in kiosk mode
+  useEffect(() => {
+    if (!isKiosk || !data || data.kids.length <= 1) return;
+    slideRef.current = setInterval(() => {
+      setActiveKidIndex((i) => (i + 1) % data.kids.length);
+    }, KIOSK_SLIDE_INTERVAL_MS);
+    return () => clearInterval(slideRef.current);
+  }, [isKiosk, data]);
 
   const fetchData = useCallback(async () => {
     if (!token) {
@@ -234,25 +250,27 @@ export default function PublicDashboard() {
 
   // ── Kiosk layout ─────────────────────────────────────────────────────────
   if (isKiosk) {
+    const kids = data?.kids ?? [];
+
     return (
-      <div className="h-screen bg-navy flex flex-col overflow-hidden p-6 gap-5">
+      <div className="h-screen bg-navy flex flex-col overflow-hidden">
         {/* Header bar */}
-        <div className="flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center">
-              <Swords size={20} className="text-navy" />
+        <div className="flex items-center justify-between px-10 py-5 flex-shrink-0 border-b border-border/40">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center">
+              <Swords size={22} className="text-navy" />
             </div>
             <div>
-              <h1 className="text-cream text-2xl font-bold leading-tight">ChoreQuest</h1>
-              <p className="text-muted text-sm">Family Dashboard</p>
+              <h1 className="text-cream text-3xl font-bold leading-tight">ChoreQuest</h1>
+              <p className="text-muted text-base">Family Dashboard</p>
             </div>
           </div>
 
           <div className="text-right">
-            <p className="text-cream text-4xl font-bold tabular-nums">
+            <p className="text-cream font-bold tabular-nums" style={{ fontSize: '3rem' }}>
               {now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
             </p>
-            <p className="text-muted text-base">
+            <p className="text-muted text-lg">
               {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
           </div>
@@ -260,40 +278,56 @@ export default function PublicDashboard() {
 
         {/* Error */}
         {error && (
-          <div className="game-panel p-4 flex items-center gap-3 border-crimson/30 flex-shrink-0">
-            <AlertTriangle size={20} className="text-crimson flex-shrink-0" />
-            <p className="text-crimson text-lg">{error}</p>
+          <div className="mx-10 mt-6 game-panel p-5 flex items-center gap-3 border-crimson/30">
+            <AlertTriangle size={24} className="text-crimson flex-shrink-0" />
+            <p className="text-crimson text-xl">{error}</p>
           </div>
         )}
 
-        {/* Kids grid — fills remaining height */}
-        {data && data.kids.length > 0 && (
-          <div
-            className="grid gap-5 flex-1 min-h-0"
-            style={{
-              gridTemplateColumns: `repeat(${Math.min(data.kids.length, 3)}, 1fr)`,
-            }}
-          >
-            {data.kids.map((kid) => (
-              <KioskKidCard key={kid.id} kid={kid} />
+        {/* Kid slides — one at a time, full remaining height */}
+        {kids.length > 0 && (
+          <div className="flex-1 relative min-h-0">
+            {kids.map((kid, i) => (
+              <KioskKidSlide key={kid.id} kid={kid} visible={i === activeKidIndex} />
             ))}
           </div>
         )}
 
-        {data && data.kids.length === 0 && (
+        {kids.length === 0 && !error && (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <Users size={60} className="text-muted/30 mx-auto mb-4" />
-              <p className="text-muted text-xl">No kids registered yet.</p>
+              <Users size={80} className="text-muted/30 mx-auto mb-6" />
+              <p className="text-muted text-2xl">No kids registered yet.</p>
             </div>
           </div>
         )}
 
-        {/* Footer */}
-        <p className="text-center text-muted/50 text-xs flex-shrink-0">
-          Auto-refreshes every 2 minutes
-          {lastRefreshed && ` · Last updated ${lastRefreshed.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`}
-        </p>
+        {/* Footer — dot indicators + refresh time */}
+        <div className="flex-shrink-0 flex items-center justify-center gap-6 py-4 border-t border-border/30">
+          {kids.length > 1 && (
+            <div className="flex items-center gap-2">
+              {kids.map((kid, i) => (
+                <button
+                  key={kid.id}
+                  onClick={() => setActiveKidIndex(i)}
+                  className="transition-all duration-300"
+                  title={kid.display_name}
+                >
+                  <div className={`rounded-full transition-all duration-300 ${
+                    i === activeKidIndex
+                      ? 'w-8 h-3 bg-accent'
+                      : 'w-3 h-3 bg-muted/40 hover:bg-muted/70'
+                  }`} />
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="text-muted/50 text-sm">
+            {kids.length > 1 && `${kids[activeKidIndex]?.display_name} · `}
+            Auto-refreshes every 2 min
+            {lastRefreshed && ` · ${lastRefreshed.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`}
+          </p>
+        </div>
       </div>
     );
   }
