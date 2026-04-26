@@ -575,6 +575,7 @@ class BountyClaimResponse(BaseModel):
     user_display_name: str | None = None
     status: BountyClaimStatus
     photo_proof_path: str | None
+    kid_note: str | None = None
     claimed_at: datetime
     completed_at: datetime | None
     verified_at: datetime | None

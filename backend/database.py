@@ -48,6 +48,8 @@ async def init_db():
             ("chores", "is_bounty", "INTEGER DEFAULT 0"),
             # Rotation day-of-week (0=Mon…6=Sun); default Monday
             ("chore_rotations", "rotation_day", "INTEGER DEFAULT 0"),
+            # Kid note on bounty claim completion (bug reports, descriptions, etc.)
+            ("bounty_board_claims", "kid_note", "TEXT"),
         ]
         for table, col, typedef in _migrations:
             try:
