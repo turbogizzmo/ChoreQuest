@@ -24,6 +24,7 @@ from backend.services.rotation import (
     get_rotation_kid_for_day,
     should_advance_rotation,
     advance_rotation,
+    advance_rotation_and_mirror,
 )
 
 logger = logging.getLogger(__name__)
@@ -137,7 +138,7 @@ async def generate_daily_assignments(db: AsyncSession, today: date) -> None:
 
             # Only advance rotation on days the chore actually runs
             if rotation and active_rules and should_advance_rotation(rotation, now):
-                advance_rotation(rotation, now)
+                await advance_rotation_and_mirror(rotation, db, now)
 
             for rule in active_rules:
                 # Rotation filtering: only generate for the current rotation kid
@@ -161,7 +162,7 @@ async def generate_daily_assignments(db: AsyncSession, today: date) -> None:
             rotation = await _load_rotation(db, chore.id)
             if rotation:
                 if should_advance_rotation(rotation, now):
-                    advance_rotation(rotation, now)
+                    await advance_rotation_and_mirror(rotation, db, now)
                 user_ids = [rotation.kid_ids[rotation.current_index]]
             else:
                 user_ids = await _get_legacy_user_ids(db, chore.id)

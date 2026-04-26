@@ -535,11 +535,13 @@ async def assign_chore(
 
     if rotation_active:
         kid_ids = [a.user_id for a in body.assignments]
+        inverse_chore_id = getattr(body.rotation, "inverse_of_chore_id", None)
         if existing_rotation:
             existing_rotation.kid_ids = kid_ids
             existing_rotation.cadence = body.rotation.cadence
             existing_rotation.current_index = 0
             existing_rotation.last_rotated = datetime.now(timezone.utc)
+            existing_rotation.inverse_of_chore_id = inverse_chore_id
         else:
             existing_rotation = ChoreRotation(
                 chore_id=chore_id,
@@ -547,6 +549,7 @@ async def assign_chore(
                 cadence=body.rotation.cadence,
                 current_index=0,
                 last_rotated=datetime.now(timezone.utc),
+                inverse_of_chore_id=inverse_chore_id,
             )
             db.add(existing_rotation)
             await db.flush()

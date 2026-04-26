@@ -15,11 +15,16 @@ A gamified family chore management app with full RPG theming. Parents create que
 - Quest template picker fixed (was silently broken due to a route ordering bug)
 - Notification taps now navigate to the correct kid's quest page
 - Full quest and reward descriptions always visible (no truncation)
-- 26 additional RPG-themed quest templates
+- 26 additional RPG-themed quest templates (+ 🐛 Bug Hunter template)
 - Timezone bug fix — no more "week_start must be Monday" errors
 - End-to-end test suite (Playwright, 244 tests, isolated test environment)
-- Backend unit tests (pytest) covering rotation, assignment generation, streaks, and stats
+- Backend unit tests (pytest) covering rotation, assignment generation, streaks, stats, and API key auth
 - GitHub Actions CI — three jobs run automatically on every PR (shell lint, backend unit tests, E2E)
+- Kiosk / wall-display mode for the public family dashboard (`?kiosk=1`)
+- Inverse rotation linking — pair two chores so they always swap between kids together
+- REST API key authentication (`X-API-Key` header) — full read/write access without browser login
+- Debug endpoints toggle in Settings UI — no container restart needed
+- Dashboard share tokens shortened to 8 characters
 
 ---
 
@@ -154,7 +159,7 @@ VAPID_CLAIM_EMAIL=mailto:you@example.com
 | `LOGIN_RATE_LIMIT_MAX` | `10` | Max login attempts per window |
 | `PIN_RATE_LIMIT_MAX` | `5` | Max PIN attempts per window |
 | `REGISTER_RATE_LIMIT_MAX` | `5` | Max registration attempts per window |
-| `ENABLE_DEBUG_ENDPOINTS` | `false` | Expose `/api/debug/*` diagnostic endpoints (dev only) |
+| `ENABLE_DEBUG_ENDPOINTS` | `false` | *(legacy)* Initial seed value — use **Settings → Debug Endpoints** toggle instead |
 | `GITHUB_REPO` | `turbogizzmo/ChoreQuest` | Repo used for in-app update checks |
 | `VAPID_PUBLIC_KEY` | *(empty)* | VAPID public key for push notifications |
 | `VAPID_PRIVATE_KEY` | *(empty)* | VAPID private key for push notifications |
@@ -207,6 +212,23 @@ GET /api/public/dashboard?token=<share-token>
 
 Generate the share token in **Settings → Family Dashboard**. Tokens are 8 characters and can be rotated or revoked at any time.
 
+#### Kiosk / wall-display mode
+
+Add `?kiosk=1` to the public dashboard URL for a full-screen display optimised for TVs and tablets:
+
+```
+https://your-chorequest-url/view?token=abc12345&kiosk=1
+```
+
+In kiosk mode the dashboard:
+- Shows one kid at a time, full-screen, in large readable text
+- Auto-cycles to the next kid every 10 seconds
+- Refreshes data every 2 minutes
+- Shows a live clock in the header
+- Includes tap/click dot indicators for manual navigation
+
+This works well with an Echo Show 15 via the MyPage Alexa skill (or any browser on a wall-mounted tablet).
+
 ### Common endpoints
 
 | Method | Endpoint | Description |
@@ -219,11 +241,35 @@ Generate the share token in **Settings → Family Dashboard**. Tokens are 8 char
 | `GET` | `/api/stats/family` | Family XP, streaks, completion stats |
 | `GET` | `/api/notifications` | Current user's notifications |
 | `POST` | `/api/chores` | Create a chore |
-| `POST` | `/api/chores/{id}/assign` | Assign/rotate a chore |
+| `POST` | `/api/chores/{id}/assign` | Assign/rotate a chore (supports `inverse_of_chore_id`) |
 | `POST` | `/api/rewards/{id}/redeem` | Kid redeems a reward |
 | `GET` | `/api/health` | Server version + build date |
 
 Full interactive docs are available at `/docs` (Swagger UI) and `/redoc` when the server is running.
+
+### Inverse rotation linking
+
+When two chores should always be assigned to opposite kids (e.g. one kid does dishes while the other cleans the counter, then they swap), set up an **inverse rotation link**:
+
+1. Assign the first chore with a rotation enabled (e.g. Dishwasher: Kid A → Kid B)
+2. Assign the second chore with a rotation and select the first chore in the **Inverse of** dropdown (e.g. Countertop: Kid B → Kid A, linked to Dishwasher)
+
+Whenever the primary rotation advances — whether by the daily reset, the weekly boundary, or a manual parent advance — the linked rotation advances in lock-step. No extra configuration needed; the link is stored in the database and works across restarts.
+
+Via the API:
+```bash
+curl -X POST https://your-chorequest-url/api/chores/2/assign \
+  -H "X-API-Key: your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "assignments": [{"user_id": 3, "recurrence": "daily"}, {"user_id": 4, "recurrence": "daily"}],
+    "rotation": {"enabled": true, "cadence": "weekly", "inverse_of_chore_id": 1}
+  }'
+```
+
+### Debug endpoints
+
+Enable the diagnostic endpoint (`/api/chores/{id}/debug`) from **Settings → Feature Toggles → Debug Endpoints** — no container restart required. The endpoint returns the full DB state for a chore's rotation and assignments, useful for troubleshooting scheduling issues.
 
 ### Example — fetch today's family overview
 
