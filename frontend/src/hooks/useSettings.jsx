@@ -4,6 +4,7 @@ import { api } from '../api/client';
 const SettingsContext = createContext({
   leaderboard_enabled: true,
   spin_wheel_enabled: true,
+  spin_requires_verification: true,
   chore_trading_enabled: true,
   grace_period_days: 1,
 });
@@ -12,6 +13,7 @@ export function SettingsProvider({ children }) {
   const [features, setFeatures] = useState({
     leaderboard_enabled: true,
     spin_wheel_enabled: true,
+    spin_requires_verification: true,
     chore_trading_enabled: true,
     grace_period_days: 1,
   });
@@ -22,6 +24,7 @@ export function SettingsProvider({ children }) {
       setFeatures({
         leaderboard_enabled: data.leaderboard_enabled !== 'false',
         spin_wheel_enabled: data.spin_wheel_enabled !== 'false',
+        spin_requires_verification: data.spin_requires_verification !== 'false',
         chore_trading_enabled: data.chore_trading_enabled !== 'false',
         grace_period_days: parseInt(data.grace_period_days ?? '1', 10),
       });

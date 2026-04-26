@@ -304,12 +304,17 @@ export default function Settings() {
     }
   };
 
-  const ToggleSwitch = ({ enabled, onChange, label }) => (
-    <div className="flex items-center justify-between py-3">
-      <span className="text-cream text-sm">{label}</span>
+  const ToggleSwitch = ({ enabled, onChange, label, description, indent }) => (
+    <div className={`flex items-start justify-between py-3 gap-3 ${indent ? 'pl-4 border-l-2 border-border/50' : ''}`}>
+      <div className="min-w-0">
+        <span className={`text-sm ${indent ? 'text-muted' : 'text-cream'}`}>{label}</span>
+        {description && (
+          <p className="text-xs text-muted/70 mt-0.5 leading-relaxed">{description}</p>
+        )}
+      </div>
       <button
         onClick={() => onChange(!enabled)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full border transition-colors flex-shrink-0 ${
+        className={`relative inline-flex h-6 w-11 items-center rounded-full border transition-colors flex-shrink-0 mt-0.5 ${
           enabled
             ? 'bg-accent/30 border-accent/40'
             : 'bg-navy border-border'
@@ -382,6 +387,15 @@ export default function Settings() {
                 onChange={(v) => updateSetting('spin_wheel_enabled', v)}
                 label="Spin Wheel"
               />
+              {(settings.spin_wheel_enabled ?? true) && (
+                <ToggleSwitch
+                  enabled={settings.spin_requires_verification ?? true}
+                  onChange={(v) => updateSetting('spin_requires_verification', v)}
+                  label="Spin requires parent verification"
+                  description="When on, kids must have all quests verified by a parent before spinning. Prevents submitting fake completions just to unlock the wheel."
+                  indent
+                />
+              )}
               <ToggleSwitch
                 enabled={settings.chore_trading_enabled ?? true}
                 onChange={(v) => updateSetting('chore_trading_enabled', v)}
