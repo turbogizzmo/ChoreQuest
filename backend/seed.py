@@ -59,6 +59,8 @@ DEFAULT_SETTINGS = {
     # Require parent verification (not just kid self-report) before spin unlocks.
     # Set to "false" to revert to the old behaviour where marking done is enough.
     "spin_requires_verification": "true",
+    # Expose /api/chores/{id}/debug endpoint (parent auth still required).
+    "enable_debug_endpoints": "false",
 }
 
 # Template quests with RPG-flavoured descriptions

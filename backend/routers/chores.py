@@ -706,11 +706,15 @@ async def debug_chore(
 ):
     """Debug endpoint: show all DB state for a chore's rotation/assignments.
 
-    Disabled in production by default. Set ENABLE_DEBUG_ENDPOINTS=true in
-    the environment to expose this route. Even when enabled, parent auth
-    is still required.
+    Controlled by the 'enable_debug_endpoints' AppSetting (toggle in
+    Settings → Feature Toggles). Parent auth is always required regardless.
     """
-    if not settings.ENABLE_DEBUG_ENDPOINTS:
+    flag = await db.execute(
+        select(AppSetting).where(AppSetting.key == "enable_debug_endpoints")
+    )
+    flag_setting = flag.scalar_one_or_none()
+    enabled = flag_setting.value.lower() not in ("false", "0", "") if flag_setting else False
+    if not enabled:
         raise HTTPException(status_code=404, detail="Not found")
     chore = await _get_chore_or_404(db, chore_id, active_only=False)
 
