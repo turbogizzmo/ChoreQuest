@@ -15,6 +15,10 @@ import {
   CheckCircle2,
   AlertTriangle,
   Wifi,
+  Link2,
+  Copy,
+  Trash2,
+  LayoutDashboard,
 } from 'lucide-react';
 import VacationSettings from '../components/VacationSettings';
 
@@ -211,6 +215,48 @@ export default function Settings() {
   const [achievementsLoading, setAchievementsLoading] = useState(false);
   const [achievementsSaving, setAchievementsSaving] = useState({});
 
+  // Dashboard share token
+  const [dashboardToken, setDashboardToken] = useState(null);
+  const [dashboardTokenLoading, setDashboardTokenLoading] = useState(false);
+  const [dashboardCopied, setDashboardCopied] = useState(false);
+
+  const fetchDashboardToken = useCallback(async () => {
+    try {
+      const data = await api('/api/admin/settings/dashboard-token');
+      setDashboardToken(data.token);
+    } catch {
+      setDashboardToken(null);
+    }
+  }, []);
+
+  const generateDashboardToken = async () => {
+    setDashboardTokenLoading(true);
+    try {
+      const data = await api('/api/admin/settings/dashboard-token', { method: 'POST' });
+      setDashboardToken(data.token);
+    } catch { /* ignore */ } finally {
+      setDashboardTokenLoading(false);
+    }
+  };
+
+  const revokeDashboardToken = async () => {
+    setDashboardTokenLoading(true);
+    try {
+      await api('/api/admin/settings/dashboard-token', { method: 'DELETE' });
+      setDashboardToken(null);
+    } catch { /* ignore */ } finally {
+      setDashboardTokenLoading(false);
+    }
+  };
+
+  const copyDashboardLink = () => {
+    const url = `${window.location.origin}/view?token=${encodeURIComponent(dashboardToken)}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setDashboardCopied(true);
+      setTimeout(() => setDashboardCopied(false), 2000);
+    });
+  };
+
   // Settings are stored as strings in the DB — parse on load, stringify on save
   const parseSettings = (raw) => {
     const parsed = {};
@@ -265,11 +311,12 @@ export default function Settings() {
     if (isParentOrAdmin) {
       fetchSettings();
       fetchAchievements();
+      fetchDashboardToken();
     } else {
       setLoading(false);
       setError('Access denied. Only parents and admins can access settings.');
     }
-  }, [isParentOrAdmin, fetchSettings, fetchAchievements]);
+  }, [isParentOrAdmin, fetchSettings, fetchAchievements, fetchDashboardToken]);
 
   const updateSetting = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -547,6 +594,80 @@ export default function Settings() {
 
           {/* Vacation Mode */}
           <VacationSettings />
+
+          {/* Share Dashboard */}
+          <div className="game-panel p-4">
+            <h2 className="text-cream text-sm font-semibold mb-1 flex items-center gap-2">
+              <LayoutDashboard size={15} className="text-muted" />
+              Public Family Dashboard
+            </h2>
+            <p className="text-muted text-xs mb-3">
+              Generate a shareable read-only link to display all kids&apos; chore progress on a TV, tablet, or second screen — no login required.
+            </p>
+
+            {dashboardToken ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 p-2 rounded-md bg-surface-raised border border-border overflow-hidden">
+                  <Link2 size={12} className="text-accent flex-shrink-0" />
+                  <span className="text-xs text-muted truncate flex-1 font-mono">
+                    {`${window.location.origin}/view?token=${dashboardToken}`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={copyDashboardLink}
+                    className="game-btn game-btn-blue !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                  >
+                    {dashboardCopied ? (
+                      <CheckCircle2 size={12} />
+                    ) : (
+                      <Copy size={12} />
+                    )}
+                    {dashboardCopied ? 'Copied!' : 'Copy Link'}
+                  </button>
+                  <button
+                    onClick={generateDashboardToken}
+                    disabled={dashboardTokenLoading}
+                    className="game-btn game-btn-blue !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                    title="Rotate token (old link will stop working)"
+                  >
+                    {dashboardTokenLoading ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <RefreshCw size={12} />
+                    )}
+                    Rotate
+                  </button>
+                  <button
+                    onClick={revokeDashboardToken}
+                    disabled={dashboardTokenLoading}
+                    className="game-btn game-btn-red !py-1.5 !px-3 !text-xs flex items-center gap-1.5 ml-auto"
+                    title="Revoke link"
+                  >
+                    {dashboardTokenLoading ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={12} />
+                    )}
+                    Revoke
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={generateDashboardToken}
+                disabled={dashboardTokenLoading}
+                className="game-btn game-btn-blue flex items-center gap-2 !text-xs !py-1.5 !px-3"
+              >
+                {dashboardTokenLoading ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Link2 size={12} />
+                )}
+                Generate Share Link
+              </button>
+            )}
+          </div>
 
           {/* Admin link */}
           {user?.role === 'admin' && (

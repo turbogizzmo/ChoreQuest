@@ -340,3 +340,59 @@ async def update_settings(
 
     await db.commit()
     return {"detail": "Settings updated"}
+
+
+# ============================================================
+# Dashboard Share Token
+# ============================================================
+
+_DASHBOARD_TOKEN_KEY = "dashboard_share_token"
+
+
+@router.get("/settings/dashboard-token")
+async def get_dashboard_token(
+    db: AsyncSession = Depends(get_db),
+    _parent: User = Depends(require_parent),
+):
+    """Return the current dashboard share token, or null if none."""
+    result = await db.execute(
+        select(AppSetting).where(AppSetting.key == _DASHBOARD_TOKEN_KEY)
+    )
+    setting = result.scalar_one_or_none()
+    return {"token": setting.value if setting else None}
+
+
+@router.post("/settings/dashboard-token")
+async def generate_dashboard_token(
+    db: AsyncSession = Depends(get_db),
+    _parent: User = Depends(require_parent),
+):
+    """Generate (or replace) the dashboard share token. Returns the new token."""
+    new_token = secrets.token_urlsafe(32)
+    result = await db.execute(
+        select(AppSetting).where(AppSetting.key == _DASHBOARD_TOKEN_KEY)
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        existing.value = new_token
+        existing.updated_at = datetime.now(timezone.utc)
+    else:
+        db.add(AppSetting(key=_DASHBOARD_TOKEN_KEY, value=new_token))
+    await db.commit()
+    return {"token": new_token}
+
+
+@router.delete("/settings/dashboard-token")
+async def revoke_dashboard_token(
+    db: AsyncSession = Depends(get_db),
+    _parent: User = Depends(require_parent),
+):
+    """Revoke the dashboard share token."""
+    result = await db.execute(
+        select(AppSetting).where(AppSetting.key == _DASHBOARD_TOKEN_KEY)
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        await db.delete(existing)
+        await db.commit()
+    return {"detail": "Dashboard token revoked"}
