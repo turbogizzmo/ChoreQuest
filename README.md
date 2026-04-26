@@ -17,7 +17,9 @@ A gamified family chore management app with full RPG theming. Parents create que
 - Full quest and reward descriptions always visible (no truncation)
 - 26 additional RPG-themed quest templates
 - Timezone bug fix — no more "week_start must be Monday" errors
-- End-to-end test suite (Playwright, 58 tests, isolated test environment)
+- End-to-end test suite (Playwright, 244 tests, isolated test environment)
+- Backend unit tests (pytest) covering rotation, assignment generation, streaks, and stats
+- GitHub Actions CI — both test suites run automatically on every PR
 
 ---
 
@@ -76,10 +78,10 @@ The app runs on port **8122**. The first user to register automatically becomes 
 
 The Admin Dashboard checks GitHub Releases on load and shows a banner when a newer version is available (cached for 1 hour, no GitHub account needed).
 
-**To apply an update** — pull the latest image and restart:
+**To apply an update** — pull the latest code and rebuild:
 
 ```bash
-docker-compose pull && docker-compose up -d
+git pull && docker compose up -d --build
 ```
 
 Your data volume (`./data`) is preserved across restarts.
@@ -148,6 +150,12 @@ VAPID_CLAIM_EMAIL=mailto:you@example.com
 | `COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
 | `CORS_ORIGINS` | *(empty)* | Comma-separated allowed origins |
 | `MAX_UPLOAD_SIZE_MB` | `5` | Photo upload size limit |
+| `DAILY_RESET_HOUR` | `0` | Hour (UTC) the daily quest reset runs |
+| `LOGIN_RATE_LIMIT_MAX` | `10` | Max login attempts per window |
+| `PIN_RATE_LIMIT_MAX` | `5` | Max PIN attempts per window |
+| `REGISTER_RATE_LIMIT_MAX` | `5` | Max registration attempts per window |
+| `ENABLE_DEBUG_ENDPOINTS` | `false` | Expose `/api/debug/*` diagnostic endpoints (dev only) |
+| `GITHUB_REPO` | `turbogizzmo/ChoreQuest` | Repo used for in-app update checks |
 | `VAPID_PUBLIC_KEY` | *(empty)* | VAPID public key for push notifications |
 | `VAPID_PRIVATE_KEY` | *(empty)* | VAPID private key for push notifications |
 | `VAPID_CLAIM_EMAIL` | `mailto:admin@example.com` | Contact email for push requests |
@@ -165,7 +173,7 @@ Back up this directory to preserve all app data.
 ## 🧪 End-to-end tests
 
 ```bash
-./run-e2e.sh          # run all 58 tests headless
+./run-e2e.sh          # run all 244 tests headless
 ./run-e2e.sh --ui     # Playwright visual UI
 ./run-e2e.sh --report # HTML report from last run
 ```
@@ -188,7 +196,7 @@ Tests spin up an isolated backend and frontend — production is never touched.
 | **Push** | Web Push / VAPID (pywebpush) |
 | **Auth** | JWT + httpOnly refresh cookies, bcrypt, optional PIN |
 | **Deployment** | Docker, single container |
-| **Testing** | Playwright (E2E) |
+| **Testing** | Playwright (E2E) · pytest (backend unit) · GitHub Actions CI |
 
 ---
 
