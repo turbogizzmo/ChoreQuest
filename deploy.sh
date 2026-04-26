@@ -7,8 +7,10 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 git pull origin main
 
-export GIT_COMMIT=$(git rev-parse --short HEAD)
-export BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+GIT_COMMIT=$(git rev-parse --short HEAD)
+export GIT_COMMIT
+BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+export BUILD_DATE
 
 echo "Deploying commit $GIT_COMMIT (built $BUILD_DATE)"
 
