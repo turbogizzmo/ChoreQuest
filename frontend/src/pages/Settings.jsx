@@ -448,6 +448,12 @@ export default function Settings() {
                 onChange={(v) => updateSetting('chore_trading_enabled', v)}
                 label="Chore Trading"
               />
+              <ToggleSwitch
+                enabled={settings.enable_debug_endpoints ?? false}
+                onChange={(v) => updateSetting('enable_debug_endpoints', v)}
+                label="Debug Endpoints"
+                description="Enables /api/chores/{id}/debug for troubleshooting rotation and assignment issues. Requires parent login or API key."
+              />
             </div>
           </div>
 

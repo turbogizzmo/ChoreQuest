@@ -304,14 +304,16 @@ async def get_feature_settings(
         "spin_requires_verification",
         "chore_trading_enabled",
         "grace_period_days",
+        "enable_debug_endpoints",
     ]
     result = await db.execute(
         select(AppSetting).where(AppSetting.key.in_(feature_keys))
     )
     settings_list = result.scalars().all()
     # Return with defaults for any missing keys
-    bool_keys = {"leaderboard_enabled", "spin_wheel_enabled", "spin_requires_verification", "chore_trading_enabled"}
+    bool_keys = {"leaderboard_enabled", "spin_wheel_enabled", "spin_requires_verification", "chore_trading_enabled", "enable_debug_endpoints"}
     features = {k: "true" for k in feature_keys if k in bool_keys}
+    features["enable_debug_endpoints"] = "false"  # off by default
     features["grace_period_days"] = "1"
     for s in settings_list:
         features[s.key] = s.value

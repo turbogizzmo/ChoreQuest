@@ -7,6 +7,7 @@ const SettingsContext = createContext({
   spin_requires_verification: true,
   chore_trading_enabled: true,
   grace_period_days: 1,
+  enable_debug_endpoints: false,
 });
 
 export function SettingsProvider({ children }) {
@@ -16,6 +17,7 @@ export function SettingsProvider({ children }) {
     spin_requires_verification: true,
     chore_trading_enabled: true,
     grace_period_days: 1,
+    enable_debug_endpoints: false,
   });
 
   const fetchFeatures = useCallback(async () => {
@@ -27,6 +29,7 @@ export function SettingsProvider({ children }) {
         spin_requires_verification: data.spin_requires_verification !== 'false',
         chore_trading_enabled: data.chore_trading_enabled !== 'false',
         grace_period_days: parseInt(data.grace_period_days ?? '1', 10),
+        enable_debug_endpoints: data.enable_debug_endpoints === 'true',
       });
     } catch {
       // If fetch fails, keep defaults (all enabled)
