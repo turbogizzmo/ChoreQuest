@@ -207,6 +207,13 @@ export default function Chores() {
         await api(`/api/chores/${choreId}/complete`, { method: 'POST' });
       }
       setPhotoFiles((prev) => { const next = { ...prev }; delete next[choreId]; return next; });
+      // Optimistically mark the assignment as completed so the card disappears immediately
+      setTodayAssignments((prev) =>
+        prev.map((a) => {
+          const cid = a.chore_id || a.chore?.id;
+          return cid === choreId ? { ...a, status: 'completed' } : a;
+        })
+      );
       showToast('Quest complete! XP awarded! 🎉', 'success');
       await fetchAll();
     } catch (err) {
