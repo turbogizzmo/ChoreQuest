@@ -72,7 +72,7 @@ SECRET_KEY=any-16-char-key pytest tests/unit/ -v
 
 - `backend/models.py` — all SQLAlchemy models (~27 tables) in one file. Schema changes need corresponding ALTER entries in `database.py`'s `_migrations` list (SQLite-only, best-effort, `ADD COLUMN` in a try/except) — `Base.metadata.create_all` cannot add columns to existing tables.
 - `backend/schemas.py` — all Pydantic request/response schemas in one file.
-- `backend/routers/*.py` — one router per feature area, registered explicitly in `main.py`. Routers always import `get_db`, and use the `get_current_user` / `require_parent` / `require_admin` / `require_kid` dependencies from `backend/dependencies.py` for authz.
+- `backend/routers/*.py` — one router per feature area, registered explicitly in `main.py`. Routers always import `get_db`, and use the `get_current_user` / `require_parent` / `require_admin` / `require_kid` dependencies from `backend/dependencies.py` for authz. `routers/_chores_helpers.py` holds shared helpers extracted from `chores.py`: `get_chore_or_404`, `reload_chore_with_category`, `reload_assignment_with_relations`, `quest_assigned_notification`, `build_rotation_summaries`.
 - `backend/services/` — cross-cutting logic (assignment generation, recurrence rules, rotation, ranks, pet leveling, push dispatch). `push_hook.py`'s `install_push_hooks()` wires notification events → Web Push at startup.
 - `backend/seed.py` — seeds default categories, 20 achievements, 24 quest templates, and app settings on first boot.
 - `backend/auth.py` — JWT encode/decode, bcrypt password & PIN hashing, refresh-token creation.
@@ -94,7 +94,7 @@ SECRET_KEY=any-16-char-key pytest tests/unit/ -v
 - **Streaks and vacations are entangled.** Vacation days preserve streaks (see `reset_stale_streaks` in `main.py` and `is_vacation_day` in `routers/vacation.py`). Streak freezes are consumed at quest-verification time in `routers/chores.py`, not in the daily reset.
 - **XP is the canonical currency.** Award via `PointTransaction` rows (see `PointType` enum). Seasonal event multipliers compound when overlapping — look at existing code in `routers/chores.py` / `points.py` before re-implementing.
 - **Display name limit is 10 chars**, enforced in schema, DB column length, and UI. Preserve this when touching user profile code.
-- **Config is env-only** via `backend/config.py` (`pydantic-settings`). `SECRET_KEY` must be ≥16 chars and not match `WEAK_SECRETS`; the app hard-exits otherwise. Add new settings to the `Settings` class with a default, and document in README's env-var table.
+- **Config is env-only** via `backend/config.py` (`pydantic-settings`). `SECRET_KEY` must be ≥16 chars and not match `WEAK_SECRETS`; the app hard-exits otherwise. Add new settings to the `Settings` class with a default, and document in README's env-var table. Debug/diagnostic endpoints must be gated behind `settings.ENABLE_DEBUG_ENDPOINTS` (default `false`) — never expose them unconditionally.
 - **SQLite WAL mode** is enabled in `init_db()`. Data lives in `/app/data` (`chores_os.db` + `uploads/`); this is the Docker volume to back up.
 - **CSP is strict**: `script-src 'self'` only — no inline scripts or external CDNs. Adding a third-party script means updating the CSP header in `main.py`'s `security_headers` middleware.
 - **CI runs on every PR.** Two jobs: `backend-unit-tests` (pytest, ~10 s) and `e2e-tests` (Playwright, ~5 min). Both must pass before merging. Playwright reports and failure traces are uploaded as artifacts.
