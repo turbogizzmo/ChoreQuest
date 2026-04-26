@@ -2,6 +2,9 @@
 # deploy.sh — pull latest code and rebuild with version info baked in
 set -e
 
+# Always run from the repo root so docker compose finds .env and docker-compose.yml
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
 git pull origin main
 
 export GIT_COMMIT=$(git rev-parse --short HEAD)
