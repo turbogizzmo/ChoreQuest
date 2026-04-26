@@ -53,6 +53,8 @@ export default function BountyBoard() {
   const actionInFlight = useRef(false);
   const [tab, setTab] = useState('board'); // 'board' | 'review'
   const [abandonTarget, setAbandonTarget] = useState(null); // choreId pending confirmation
+  const [noteTarget, setNoteTarget] = useState(null);       // choreId awaiting note input
+  const [noteText, setNoteText] = useState('');
 
   const fetchData = useCallback(async () => {
     setLoadError('');
@@ -100,12 +102,19 @@ export default function BountyBoard() {
     }
   };
 
-  const handleComplete = async (choreId) => {
+  const openNoteForm = (choreId) => {
+    setNoteTarget(choreId);
+    setNoteText('');
+  };
+
+  const handleComplete = async (choreId, note = '') => {
     if (actionInFlight.current) return;
     actionInFlight.current = true;
+    setNoteTarget(null);
     setActionLoading(`complete-${choreId}`);
     try {
       const fd = new FormData();
+      if (note.trim()) fd.append('kid_note', note.trim());
       await api(`/api/bounty/${choreId}/complete`, { method: 'POST', body: fd });
       showToast('Bounty turned in! Awaiting parent approval.', 'success');
       await fetchData();
@@ -258,7 +267,12 @@ export default function BountyBoard() {
                   actionLoading={actionLoading}
                   onClaim={handleClaim}
                   onComplete={handleComplete}
+                  onOpenNote={openNoteForm}
                   onAbandon={handleAbandon}
+                  noteTarget={noteTarget}
+                  noteText={noteText}
+                  setNoteText={setNoteText}
+                  setNoteTarget={setNoteTarget}
                   onNavigate={() => navigate(`/chores/${bounty.id}`)}
                 />
               ))}
@@ -326,7 +340,7 @@ export default function BountyBoard() {
 // BountyCard — shown on the board for both kids and parents
 // ---------------------------------------------------------------------------
 
-function BountyCard({ bounty, isParent, actionLoading, onClaim, onComplete, onAbandon, onNavigate }) {
+function BountyCard({ bounty, isParent, actionLoading, onClaim, onComplete, onOpenNote, onAbandon, onNavigate, noteTarget, noteText, setNoteText, setNoteTarget }) {
   const claim = bounty.my_claim;
   const statusCfg = claim ? (STATUS_CONFIG[claim.status] || STATUS_CONFIG.claimed) : null;
   const StatusIcon = statusCfg?.icon;
@@ -404,21 +418,53 @@ function BountyCard({ bounty, isParent, actionLoading, onClaim, onComplete, onAb
 
           {claim?.status === 'claimed' && (
             <>
-              <button
-                onClick={() => onComplete(bounty.id)}
-                disabled={isBusy(`complete-${bounty.id}`)}
-                className="game-btn game-btn-blue !py-1.5 !px-4 !text-xs flex items-center gap-1.5"
-              >
-                {isBusy(`complete-${bounty.id}`) ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                Turn In
-              </button>
-              <button
-                onClick={() => onAbandon(bounty.id)}
-                disabled={isBusy(`abandon-${bounty.id}`)}
-                className="text-muted hover:text-crimson text-xs transition-colors"
-              >
-                Abandon
-              </button>
+              {noteTarget === bounty.id ? (
+                <div className="flex-1 space-y-2">
+                  <textarea
+                    autoFocus
+                    value={noteText}
+                    onChange={(e) => setNoteText(e.target.value)}
+                    placeholder="Describe what you found or did… (optional)"
+                    maxLength={1000}
+                    rows={3}
+                    className="w-full field-input text-xs resize-none"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => onComplete(bounty.id, noteText)}
+                      disabled={isBusy(`complete-${bounty.id}`)}
+                      className="game-btn game-btn-blue !py-1.5 !px-3 !text-xs flex items-center gap-1.5"
+                    >
+                      {isBusy(`complete-${bounty.id}`) ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                      Submit
+                    </button>
+                    <button
+                      onClick={() => setNoteTarget(null)}
+                      className="text-muted hover:text-cream text-xs transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => onOpenNote(bounty.id)}
+                    disabled={isBusy(`complete-${bounty.id}`)}
+                    className="game-btn game-btn-blue !py-1.5 !px-4 !text-xs flex items-center gap-1.5"
+                  >
+                    {isBusy(`complete-${bounty.id}`) ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                    Turn In
+                  </button>
+                  <button
+                    onClick={() => onAbandon(bounty.id)}
+                    disabled={isBusy(`abandon-${bounty.id}`)}
+                    className="text-muted hover:text-crimson text-xs transition-colors"
+                  >
+                    Abandon
+                  </button>
+                </>
+              )}
             </>
           )}
 
@@ -487,6 +533,12 @@ function ClaimReviewCard({ claim, bounties, actionLoading, onVerify, onReject })
               <Star size={11} />
               {bounty.points} XP reward
             </p>
+          )}
+          {claim.kid_note && (
+            <div className="mt-2 p-2 rounded-md bg-surface-raised border border-border/50">
+              <p className="text-muted text-[10px] uppercase tracking-wide font-semibold mb-0.5">Kid's note</p>
+              <p className="text-cream text-xs leading-relaxed">{claim.kid_note}</p>
+            </div>
           )}
           {claim.photo_proof_path && (
             <a

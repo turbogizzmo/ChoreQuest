@@ -8,7 +8,7 @@ chore_assignments.
 
 from datetime import datetime, date, timezone, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,6 +44,7 @@ def _build_claim(claim: BountyBoardClaim, user: User | None = None) -> BountyCla
         user_display_name=user.display_name if user else None,
         status=claim.status,
         photo_proof_path=claim.photo_proof_path,
+        kid_note=claim.kid_note,
         claimed_at=claim.claimed_at,
         completed_at=claim.completed_at,
         verified_at=claim.verified_at,
@@ -264,10 +265,11 @@ async def claim_bounty(
 async def complete_bounty(
     chore_id: int,
     file: UploadFile | None = File(None),
+    kid_note: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Kid marks their claimed bounty as done (optionally with photo proof)."""
+    """Kid marks their claimed bounty as done (optionally with photo proof and a note)."""
     if current_user.role != UserRole.kid:
         raise HTTPException(status_code=403, detail="Only kids can complete bounties")
 
@@ -306,6 +308,8 @@ async def complete_bounty(
 
     claim.status = BountyClaimStatus.completed
     claim.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    if kid_note and kid_note.strip():
+        claim.kid_note = kid_note.strip()[:1000]  # cap at 1000 chars
 
     # Notify parents there's a bounty to review
     parent_result = await db.execute(
