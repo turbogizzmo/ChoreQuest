@@ -170,6 +170,75 @@ Back up this directory to preserve all app data.
 
 ---
 
+## 🔑 API access
+
+ChoreQuest exposes a REST API used by the web app and available for automation, home dashboards, and integrations.
+
+### Authentication
+
+Every endpoint (except the public family dashboard) requires authentication. Two methods are supported:
+
+**JWT Bearer token** — used by the web app after login:
+```
+Authorization: Bearer <token>
+```
+
+**API key** — for automation, scripts, and integrations:
+```
+X-API-Key: <your-api-key>
+```
+
+API keys authenticate as the admin user who created them, giving full read/write access. They never expire unless explicitly revoked.
+
+### Managing API keys
+
+In ChoreQuest → **Settings → API Keys**:
+- **Create** — give the key a name; the raw key is shown once — copy it now
+- **Revoke** — immediately invalidates the key
+- Keys are stored as SHA-256 hashes — the raw value is never retained server-side
+
+### Public family dashboard (no auth)
+
+A read-only overview of all kids' progress — safe to embed in a wall display (Echo Show, Home Assistant, etc.):
+
+```
+GET /api/public/dashboard?token=<share-token>
+```
+
+Generate the share token in **Settings → Family Dashboard**. Tokens are 8 characters and can be rotated or revoked at any time.
+
+### Common endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/chores` | List all active chores |
+| `GET` | `/api/chores/{id}` | Chore detail with rotation summary |
+| `GET` | `/api/assignments` | Today's assignments (all kids) |
+| `GET` | `/api/rewards` | Reward catalogue |
+| `GET` | `/api/users` | All users (parent/admin only) |
+| `GET` | `/api/stats/family` | Family XP, streaks, completion stats |
+| `GET` | `/api/notifications` | Current user's notifications |
+| `POST` | `/api/chores` | Create a chore |
+| `POST` | `/api/chores/{id}/assign` | Assign/rotate a chore |
+| `POST` | `/api/rewards/{id}/redeem` | Kid redeems a reward |
+| `GET` | `/api/health` | Server version + build date |
+
+Full interactive docs are available at `/docs` (Swagger UI) and `/redoc` when the server is running.
+
+### Example — fetch today's family overview
+
+```bash
+curl https://your-chorequest-url/api/stats/family \
+  -H "X-API-Key: your-api-key"
+```
+
+```bash
+# Public dashboard — no API key needed
+curl "https://your-chorequest-url/api/public/dashboard?token=abc12345"
+```
+
+---
+
 ## 🧪 End-to-end tests
 
 ```bash
