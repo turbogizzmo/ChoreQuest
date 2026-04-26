@@ -16,6 +16,36 @@ concurrency:
 # Runs independently of the e2e suite so a Python bug surfaces fast.
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
+# ─────────────────────────────────────────────────────────────────────────────
+# Job 0 — Shell script lint + deploy smoke test (~5 s)
+# Catches shell script bugs and verifies docker-compose finds .env correctly.
+# ─────────────────────────────────────────────────────────────────────────────
+  shell-lint:
+    name: Shell lint & deploy smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Lint shell scripts
+        run: shellcheck deploy.sh watchdog.sh run-e2e.sh
+
+      - name: Install docker-compose for smoke test
+        run: sudo apt-get install -y docker-compose
+
+      - name: Smoke test — docker-compose resolves .env correctly
+        run: |
+          # Create a minimal .env matching .env.example
+          cp .env.example .env
+          sed -i 's|SECRET_KEY=change-me-to-a-long-random-string|SECRET_KEY=ci-smoke-test-secret-key-1234|' .env
+          # Validate compose file resolves all variables without building
+          docker-compose config > /dev/null
+          echo "✅ docker-compose config OK — .env resolves correctly"
+          rm .env
+
   backend-unit-tests:
     name: Backend unit tests
     runs-on: ubuntu-latest
