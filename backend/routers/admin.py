@@ -298,13 +298,20 @@ async def get_feature_settings(
     _user: User = Depends(get_current_user),
 ):
     """Get feature toggle settings (accessible by any authenticated user)."""
-    feature_keys = ["leaderboard_enabled", "spin_wheel_enabled", "chore_trading_enabled", "grace_period_days"]
+    feature_keys = [
+        "leaderboard_enabled",
+        "spin_wheel_enabled",
+        "spin_requires_verification",
+        "chore_trading_enabled",
+        "grace_period_days",
+    ]
     result = await db.execute(
         select(AppSetting).where(AppSetting.key.in_(feature_keys))
     )
     settings_list = result.scalars().all()
     # Return with defaults for any missing keys
-    features = {k: "true" for k in feature_keys if k != "grace_period_days"}
+    bool_keys = {"leaderboard_enabled", "spin_wheel_enabled", "spin_requires_verification", "chore_trading_enabled"}
+    features = {k: "true" for k in feature_keys if k in bool_keys}
     features["grace_period_days"] = "1"
     for s in settings_list:
         features[s.key] = s.value

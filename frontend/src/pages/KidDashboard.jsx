@@ -79,7 +79,7 @@ const cardVariants = {
 
 export default function KidDashboard() {
   const { user, updateUser } = useAuth();
-  const { spin_wheel_enabled, grace_period_days } = useSettings();
+  const { spin_wheel_enabled, spin_requires_verification, grace_period_days } = useSettings();
   const { colorTheme } = useTheme();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -468,6 +468,21 @@ export default function KidDashboard() {
         );
 
         if (pendingAssignments.length === 0 && !loading) {
+          // Determine the right message based on verification state
+          const awaitingVerification = spin_requires_verification
+            && assignments.some((a) => a.status === 'completed');
+          const allVerified = assignments.length > 0
+            && assignments.every((a) => a.status === 'verified' || a.status === 'skipped');
+
+          let doneMessage = 'No quests for today. Take a break!';
+          if (assignments.length > 0) {
+            if (awaitingVerification && !allVerified) {
+              doneMessage = 'Quests submitted! Waiting for a parent to verify before you can spin 🕐';
+            } else {
+              doneMessage = 'All quests complete! Time to spin the wheel! 🎉';
+            }
+          }
+
           return (
             <motion.div
               className="game-panel p-10 flex flex-col items-center gap-3 text-center"
@@ -475,11 +490,7 @@ export default function KidDashboard() {
               animate={{ opacity: 1, y: 0 }}
             >
               <Sword size={36} className="text-muted" />
-              <p className="text-muted text-sm">
-                {assignments.length === 0
-                  ? 'No quests for today. Take a break!'
-                  : 'All quests complete! Time to spin the wheel!'}
-              </p>
+              <p className="text-muted text-sm">{doneMessage}</p>
             </motion.div>
           );
         }

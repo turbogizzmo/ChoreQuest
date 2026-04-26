@@ -56,6 +56,9 @@ DEFAULT_SETTINGS = {
     "leaderboard_enabled": "true",
     "spin_wheel_enabled": "true",
     "chore_trading_enabled": "true",
+    # Require parent verification (not just kid self-report) before spin unlocks.
+    # Set to "false" to revert to the old behaviour where marking done is enough.
+    "spin_requires_verification": "true",
 }
 
 # Template quests with RPG-flavoured descriptions

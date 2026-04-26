@@ -10,6 +10,7 @@ from backend.models import (
     SpinResult,
     ChoreAssignment,
     AssignmentStatus,
+    AppSetting,
     User,
     PointTransaction,
     PointType,
@@ -35,10 +36,15 @@ async def _can_spin_today(db: AsyncSession, user: User) -> tuple[bool, int | Non
     Determine if the user is eligible to spin today.
 
     Rules:
-    1. The user must have completed all of today's assigned chores
+    1. The user must have satisfied all of today's assigned chores
        (or have no assignments today).
     2. The user must not already have a spin result for today.
-    3. Resets at midnight — missed chores lock the spin until the next day.
+    3. Resets at midnight — unfinished chores lock the spin until the next day.
+
+    Whether "satisfied" means parent-verified or just kid self-reported is
+    controlled by the ``spin_requires_verification`` app setting (default: true).
+    When true, only ``verified`` status counts — kids cannot game the wheel by
+    tapping "Mark Done" on chores they haven't actually completed.
 
     Returns (can_spin, last_result_points_or_none, reason_or_none).
     """
@@ -68,6 +74,20 @@ async def _can_spin_today(db: AsyncSession, user: User) -> tuple[bool, int | Non
     if today_spin is not None:
         return False, last_result, "You already spun the wheel today! Come back tomorrow."
 
+    # Load the spin_requires_verification setting (default: true)
+    setting_result = await db.execute(
+        select(AppSetting).where(AppSetting.key == "spin_requires_verification")
+    )
+    spin_setting = setting_result.scalar_one_or_none()
+    requires_verification = (spin_setting is None) or (spin_setting.value != "false")
+
+    # Statuses that count as "done" depends on the setting
+    done_statuses = (
+        (AssignmentStatus.verified,)
+        if requires_verification
+        else (AssignmentStatus.completed, AssignmentStatus.verified)
+    )
+
     # Check today's chore assignments
     result = await db.execute(
         select(ChoreAssignment).where(
@@ -81,16 +101,27 @@ async def _can_spin_today(db: AsyncSession, user: User) -> tuple[bool, int | Non
     if not today_assignments:
         return True, last_result, None
 
-    # All today's assignments must be completed or verified
-    all_done = all(
-        a.status in (AssignmentStatus.completed, AssignmentStatus.verified)
-        for a in today_assignments
-    )
+    all_done = all(a.status in done_statuses for a in today_assignments)
     if not all_done:
-        pending = sum(
-            1 for a in today_assignments
-            if a.status not in (AssignmentStatus.completed, AssignmentStatus.verified)
-        )
+        if requires_verification:
+            # Distinguish between "not submitted yet" and "waiting on parent"
+            awaiting_parent = sum(
+                1 for a in today_assignments
+                if a.status == AssignmentStatus.completed
+            )
+            truly_pending = sum(
+                1 for a in today_assignments
+                if a.status not in done_statuses and a.status != AssignmentStatus.completed
+            )
+            if truly_pending == 0 and awaiting_parent > 0:
+                return (
+                    False,
+                    last_result,
+                    f"Almost there! Waiting for a parent to verify {awaiting_parent} quest(s).",
+                )
+            pending = truly_pending
+        else:
+            pending = sum(1 for a in today_assignments if a.status not in done_statuses)
         return False, last_result, f"Complete all of today's quests to unlock the spin! {pending} remaining."
     return True, last_result, None
 
