@@ -368,7 +368,7 @@ async def generate_dashboard_token(
     _parent: User = Depends(require_parent),
 ):
     """Generate (or replace) the dashboard share token. Returns the new token."""
-    new_token = secrets.token_urlsafe(32)
+    new_token = secrets.token_urlsafe(6)
     result = await db.execute(
         select(AppSetting).where(AppSetting.key == _DASHBOARD_TOKEN_KEY)
     )
