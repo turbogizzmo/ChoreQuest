@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, Component } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
 import Layout from './components/Layout';
@@ -23,6 +23,7 @@ const KidQuests = lazy(() => import('./pages/KidQuests'));
 const Party = lazy(() => import('./pages/Party'));
 const BountyBoard = lazy(() => import('./pages/BountyBoard'));
 const AvatarEditor = lazy(() => import('./components/AvatarEditor'));
+const PublicDashboard = lazy(() => import('./pages/PublicDashboard'));
 
 function Loading() {
   return (
@@ -114,6 +115,7 @@ function Page({ pageKey, children }) {
 
 export default function App() {
   const { user, loading, refreshSession } = useAuth();
+  const location = useLocation();
 
   const handleWsMessage = useCallback((msg) => {
     // Refresh user object (points_balance, etc.) on every WS event
@@ -124,6 +126,17 @@ export default function App() {
   useWebSocket(user?.id, handleWsMessage);
 
   if (loading) return <Loading />;
+
+  // Public routes — no authentication required
+  if (location.pathname === '/view') {
+    return (
+      <AppErrorBoundary>
+        <Suspense fallback={<Loading />}>
+          <PublicDashboard />
+        </Suspense>
+      </AppErrorBoundary>
+    );
+  }
 
   if (!user) {
     return (
