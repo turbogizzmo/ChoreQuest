@@ -146,7 +146,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Page pageKey="login"><Login /></Page>} />
             <Route path="/register" element={<Page pageKey="register"><Register /></Page>} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/login" state={{ from: location }} replace />} />
           </Routes>
         </ToastProvider>
       </AppErrorBoundary>
