@@ -228,6 +228,8 @@ export default function KidDashboard() {
     setCompletingOverdue(assignment.id);
     try {
       await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
+      // Optimistically remove the overdue card immediately so it doesn't linger
+      setOverdueAssignments((prev) => prev.filter((a) => a.id !== assignment.id));
       setShowConfetti(true);
       showToast('Quest complete! XP awarded! 🎉', 'success');
       await fetchData();
@@ -250,6 +252,10 @@ export default function KidDashboard() {
     setCompletingToday(assignment.id);
     try {
       await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
+      // Optimistically mark as completed so the card disappears immediately
+      setAssignments((prev) =>
+        prev.map((a) => (a.id === assignment.id ? { ...a, status: 'completed' } : a))
+      );
       setShowConfetti(true);
       showToast('Quest complete! XP awarded! 🎉', 'success');
       await fetchData();
