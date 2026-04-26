@@ -1,11 +1,15 @@
 import { useState, useRef, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Swords } from 'lucide-react';
 
 export default function Login() {
   const { login, pinLogin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname
+    ? location.state.from.pathname + (location.state.from.search || '') + (location.state.from.hash || '')
+    : '/';
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -79,7 +83,7 @@ export default function Login() {
       } else {
         await login(username.trim(), password);
       }
-      navigate('/');
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err?.message || 'Login failed. Check your credentials.');
     } finally {
