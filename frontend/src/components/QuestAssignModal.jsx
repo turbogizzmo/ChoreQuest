@@ -14,6 +14,7 @@ import {
   RotateCw,
   Loader2,
   CalendarDays,
+  AlertTriangle,
 } from 'lucide-react';
 
 const FREQUENCY_OPTIONS = [
@@ -507,9 +508,19 @@ export default function QuestAssignModal({
                 />
               </button>
             </div>
-            <p className="text-muted text-xs">
-              Alternate which hero is assigned. The schedule above controls when the quest appears.
-            </p>
+            {!rotationEnabled && (scheduleFrequency !== 'once' || hasDaysSelected) ? (
+              <div className="flex items-start gap-2 p-2.5 rounded-lg border border-gold/30 bg-gold/5">
+                <AlertTriangle size={13} className="text-gold flex-shrink-0 mt-0.5" />
+                <p className="text-gold/90 text-xs leading-relaxed">
+                  All selected heroes will receive this quest on every occurrence.
+                  Enable rotation if you want them to take turns.
+                </p>
+              </div>
+            ) : (
+              <p className="text-muted text-xs">
+                Alternate which hero is assigned. The schedule above controls when the quest appears.
+              </p>
+            )}
             {rotationEnabled && (
               <div className="space-y-3">
                 <div>
