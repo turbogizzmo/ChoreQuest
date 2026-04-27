@@ -81,11 +81,13 @@ async def _can_spin_today(db: AsyncSession, user: User) -> tuple[bool, int | Non
     spin_setting = setting_result.scalar_one_or_none()
     requires_verification = (spin_setting is None) or (spin_setting.value != "false")
 
-    # Statuses that count as "done" depends on the setting
+    # Statuses that count as "done" depends on the setting.
+    # Skipped always counts — it means the parent or rotation system
+    # intentionally bypassed the quest for this kid today.
     done_statuses = (
-        (AssignmentStatus.verified,)
+        (AssignmentStatus.verified, AssignmentStatus.skipped)
         if requires_verification
-        else (AssignmentStatus.completed, AssignmentStatus.verified)
+        else (AssignmentStatus.completed, AssignmentStatus.verified, AssignmentStatus.skipped)
     )
 
     # Check today's chore assignments
