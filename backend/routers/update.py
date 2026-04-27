@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from backend.dependencies import require_admin, require_parent
 from backend.models import User
+from backend.websocket_manager import ws_manager
 
 router = APIRouter(prefix="/api/admin/update", tags=["update"])
 
@@ -100,6 +101,15 @@ async def trigger_update(admin: User = Depends(require_admin)):
         FLAG_FILE.touch(exist_ok=True)
     except OSError as e:
         raise HTTPException(500, detail=f"Could not write update flag: {e}")
+
+    # Broadcast to every connected client so all devices show the update overlay.
+    # The triggering admin/parent sees it via the local window event dispatched by
+    # Settings.jsx; everyone else (kids on other devices) gets it here.
+    current_version = os.environ.get("GIT_COMMIT", "unknown")
+    await ws_manager.broadcast({
+        "type": "update_triggered",
+        "version": current_version,
+    })
 
     return {
         "status": "ok",

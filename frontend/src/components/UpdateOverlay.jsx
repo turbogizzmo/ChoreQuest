@@ -86,21 +86,42 @@ export default function UpdateOverlay() {
   const serverWentDownRef       = useRef(false);
 
   // ------------------------------------------------------------------
-  // Listen for the trigger event from Settings.jsx
+  // Show overlay — shared handler used by both trigger sources below.
+  // ------------------------------------------------------------------
+  const showOverlay = (currentVersion) => {
+    startVersionRef.current   = currentVersion ?? null;
+    startTimeRef.current      = Date.now();
+    serverWentDownRef.current = false;
+    setPercent(0);
+    setDone(false);
+    setTimedOut(false);
+    setVisible(true);
+  };
+
+  // ------------------------------------------------------------------
+  // Source 1: local event from Settings.jsx (the admin's own device).
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    const handler = (e) => showOverlay(e.detail?.currentVersion);
+    window.addEventListener('app:update-triggered', handler);
+    return () => window.removeEventListener('app:update-triggered', handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ------------------------------------------------------------------
+  // Source 2: WebSocket broadcast from the server — triggers the overlay
+  // on every other connected device (kids' phones, tablets, PCs) so they
+  // all see the update screen instead of a broken mid-session experience.
   // ------------------------------------------------------------------
   useEffect(() => {
     const handler = (e) => {
-      startVersionRef.current   = e.detail?.currentVersion ?? null;
-      startTimeRef.current      = Date.now();
-      serverWentDownRef.current = false;
-      setPercent(0);
-      setDone(false);
-      setTimedOut(false);
-      setVisible(true);
+      const msg = e.detail;
+      if (msg?.type === 'update_triggered') {
+        showOverlay(msg.version ?? null);
+      }
     };
-    window.addEventListener('app:update-triggered', handler);
-    return () => window.removeEventListener('app:update-triggered', handler);
-  }, []);
+    window.addEventListener('ws:message', handler);
+    return () => window.removeEventListener('ws:message', handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ------------------------------------------------------------------
   // Lock body scroll + touch while the overlay is up.
