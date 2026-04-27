@@ -84,6 +84,11 @@ export default function UpdateOverlay() {
   // that is the definitive "container restarted" signal even when GIT_COMMIT
   // is "unknown" on both old and new builds.
   const serverWentDownRef       = useRef(false);
+  // Passive background monitor — tracks baseline version so we can detect
+  // a restart even when the WS broadcast was missed (mobile sleeping tab).
+  const bgVersionRef            = useRef(null);
+  const bgWasDownRef            = useRef(false);
+  const visibleRef              = useRef(false);
 
   // ------------------------------------------------------------------
   // Show overlay — shared handler used by both trigger sources below.
@@ -105,6 +110,50 @@ export default function UpdateOverlay() {
     const handler = (e) => showOverlay(e.detail?.currentVersion);
     window.addEventListener('app:update-triggered', handler);
     return () => window.removeEventListener('app:update-triggered', handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep visibleRef in sync so the background monitor can read it without
+  // being a dependency of that effect.
+  useEffect(() => { visibleRef.current = visible; }, [visible]);
+
+  // ------------------------------------------------------------------
+  // Passive background health monitor — runs every 15 s regardless of
+  // whether the overlay is visible.  Catches devices whose WebSocket was
+  // asleep / disconnected when the broadcast fired (e.g. Android with a
+  // backgrounded tab).  When the server goes down then comes back, we
+  // show the overlay so the user isn't left on a broken/stale page.
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    const check = async () => {
+      if (visibleRef.current) return; // overlay already up, don't interfere
+      try {
+        const res  = await fetch('/api/health', { cache: 'no-store' });
+        const data = await res.json();
+        const v    = data?.version;
+
+        if (bgVersionRef.current === null) {
+          bgVersionRef.current = v; // baseline on first check
+          return;
+        }
+
+        if (bgWasDownRef.current) {
+          // Server was unreachable and just came back — we missed the broadcast.
+          // Show the overlay; phase-2 detection will fire immediately and reload.
+          bgWasDownRef.current = false;
+          showOverlay(bgVersionRef.current);
+          return;
+        }
+
+        bgVersionRef.current = v;
+      } catch {
+        // Server is unreachable — flag it so we show the overlay when it returns
+        bgWasDownRef.current = true;
+      }
+    };
+
+    check(); // baseline immediately on mount
+    const interval = setInterval(check, 15_000);
+    return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ------------------------------------------------------------------

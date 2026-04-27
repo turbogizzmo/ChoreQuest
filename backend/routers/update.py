@@ -96,20 +96,24 @@ async def trigger_update(admin: User = Depends(require_admin)):
     The host-side watchdog.sh picks this up and runs deploy.sh.
     Admin-only.
     """
-    try:
-        FLAG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        FLAG_FILE.touch(exist_ok=True)
-    except OSError as e:
-        raise HTTPException(500, detail=f"Could not write update flag: {e}")
-
-    # Broadcast to every connected client so all devices show the update overlay.
-    # The triggering admin/parent sees it via the local window event dispatched by
-    # Settings.jsx; everyone else (kids on other devices) gets it here.
+    # Broadcast FIRST so all connected clients show the overlay before the
+    # container starts shutting down.  Writing the flag file afterwards (with
+    # a short delay) gives WebSocket messages time to reach every device.
     current_version = os.environ.get("GIT_COMMIT", "unknown")
     await ws_manager.broadcast({
         "type": "update_triggered",
         "version": current_version,
     })
+
+    # Small pause — lets the WS frames be flushed to all clients before the
+    # watchdog picks up the flag file and begins the container restart.
+    await asyncio.sleep(1.5)
+
+    try:
+        FLAG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        FLAG_FILE.touch(exist_ok=True)
+    except OSError as e:
+        raise HTTPException(500, detail=f"Could not write update flag: {e}")
 
     return {
         "status": "ok",
