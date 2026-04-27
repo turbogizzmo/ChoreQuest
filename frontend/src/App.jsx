@@ -4,6 +4,7 @@ import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
 import Layout from './components/Layout';
 import UpdatePrompt from './components/UpdatePrompt';
+import UpdateOverlay from './components/UpdateOverlay';
 import { ToastProvider } from './components/Toast';
 
 const Login = lazy(() => import('./pages/Login'));
@@ -143,6 +144,7 @@ export default function App() {
       <AppErrorBoundary>
         <ToastProvider>
           <UpdatePrompt />
+          <UpdateOverlay />
           <Routes>
             <Route path="/login" element={<Page pageKey="login"><Login /></Page>} />
             <Route path="/register" element={<Page pageKey="register"><Register /></Page>} />
@@ -162,6 +164,7 @@ export default function App() {
       <ToastProvider>
         <Layout>
           <UpdatePrompt />
+          <UpdateOverlay />
           <Routes>
             <Route path="/" element={<Page pageKey="dashboard"><DashboardComponent /></Page>} />
             <Route path="/chores" element={<Page pageKey="chores"><Chores /></Page>} />
