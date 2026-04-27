@@ -1,24 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 /**
  * Full-screen Windows-Update-style overlay shown when an in-app update is triggered.
  *
  * Flow:
  *  1. Listen for the custom 'app:update-triggered' event dispatched by Settings.jsx.
- *  2. Fade the app out and show the overlay with a spinning ring + percentage counter.
- *  3. Fake-count from 0 → ~80 % over ~90 seconds (covers the container restart time).
- *  4. Poll /api/health every 4 s.  Once the returned `version` differs from the one
+ *  2. Rendered via React Portal directly into document.body so it is never trapped
+ *     inside Layout's overflow / stacking context (fixes iOS Safari fixed-position bug).
+ *  3. While visible: body scroll + touch-action are locked so nothing behind the
+ *     overlay is tappable or navigable on mobile.
+ *  4. Fake-count from 0 → ~80 % over ~90 seconds (covers the container restart time).
+ *  5. Poll /api/health every 4 s.  Once the returned `version` differs from the one
  *     that was running when the update started, snap to 100 % and reload.
- *  5. Hard-safety: if the app hasn't come back after 5 minutes, show a manual-reload
+ *  6. Hard-safety: if the app hasn't come back after 5 minutes, show a manual-reload
  *     button so the user is never stuck.
  */
 
 const POLL_INTERVAL_MS  = 4_000;
-const SAFETY_TIMEOUT_MS = 5 * 60_000;
+const SAFETY_TIMEOUT_MS = 3 * 60_000; // 3 min — generous but not 5
 
 // Eased fake-progress: rises fast at first, then slows to a crawl near 80 %.
 function fakePercent(elapsedMs) {
-  const t = Math.min(elapsedMs / 90_000, 1); // normalise to [0, 1] over 90 s
+  const t = Math.min(elapsedMs / 90_000, 1);
   return Math.round(80 * (1 - Math.pow(1 - t, 2.5)));
 }
 
@@ -30,9 +34,7 @@ function SpinDots() {
         <span
           key={i}
           className="block w-3 h-3 rounded-full bg-white/80"
-          style={{
-            animation: `win-dot 1.4s ease-in-out ${i * 0.2}s infinite`,
-          }}
+          style={{ animation: `win-dot 1.4s ease-in-out ${i * 0.2}s infinite` }}
         />
       ))}
     </div>
@@ -41,17 +43,15 @@ function SpinDots() {
 
 // Large ring spinner (mimics the Windows Update circular progress).
 function RingSpinner({ percent }) {
-  const r  = 54;
-  const cx = 64;
+  const r            = 54;
+  const cx           = 64;
   const circumference = 2 * Math.PI * r;
-  const offset = circumference * (1 - percent / 100);
+  const offset       = circumference * (1 - percent / 100);
 
   return (
     <div className="relative flex items-center justify-center w-32 h-32 mx-auto">
       <svg className="absolute inset-0 -rotate-90" width="128" height="128" viewBox="0 0 128 128">
-        {/* Track */}
         <circle cx={cx} cy={cx} r={r} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="6" />
-        {/* Progress arc */}
         <circle
           cx={cx} cy={cx} r={r}
           fill="none"
@@ -63,7 +63,6 @@ function RingSpinner({ percent }) {
           style={{ transition: 'stroke-dashoffset 0.8s ease' }}
         />
       </svg>
-      {/* Percentage number in the middle */}
       <span className="text-2xl font-light text-white tabular-nums select-none">
         {percent}%
       </span>
@@ -72,23 +71,28 @@ function RingSpinner({ percent }) {
 }
 
 export default function UpdateOverlay() {
-  const [visible, setVisible]     = useState(false);
-  const [percent, setPercent]     = useState(0);
-  const [done, setDone]           = useState(false);
-  const [timedOut, setTimedOut]   = useState(false);
-  const startVersionRef           = useRef(null);
-  const startTimeRef              = useRef(null);
-  const pollTimerRef              = useRef(null);
-  const safetyTimerRef            = useRef(null);
-  const progressTimerRef          = useRef(null);
+  const [visible, setVisible]   = useState(false);
+  const [percent, setPercent]   = useState(0);
+  const [done, setDone]         = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+  const startVersionRef         = useRef(null);
+  const startTimeRef            = useRef(null);
+  const pollTimerRef            = useRef(null);
+  const safetyTimerRef          = useRef(null);
+  const progressTimerRef        = useRef(null);
+  // Two-phase restart detection: if the server goes offline then comes back,
+  // that is the definitive "container restarted" signal even when GIT_COMMIT
+  // is "unknown" on both old and new builds.
+  const serverWentDownRef       = useRef(false);
 
   // ------------------------------------------------------------------
   // Listen for the trigger event from Settings.jsx
   // ------------------------------------------------------------------
   useEffect(() => {
     const handler = (e) => {
-      startVersionRef.current = e.detail?.currentVersion ?? null;
-      startTimeRef.current    = Date.now();
+      startVersionRef.current   = e.detail?.currentVersion ?? null;
+      startTimeRef.current      = Date.now();
+      serverWentDownRef.current = false;
       setPercent(0);
       setDone(false);
       setTimedOut(false);
@@ -99,44 +103,81 @@ export default function UpdateOverlay() {
   }, []);
 
   // ------------------------------------------------------------------
+  // Lock body scroll + touch while the overlay is up.
+  // This stops iOS Safari from letting kids tap the nav or swipe away.
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    if (!visible) return;
+
+    const prevOverflow    = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+    const prevPosition    = document.body.style.position;
+
+    document.body.style.overflow    = 'hidden';
+    document.body.style.touchAction = 'none';
+    // iOS Safari needs position:fixed to truly lock scrolling
+    document.body.style.position    = 'fixed';
+    document.body.style.width       = '100%';
+
+    return () => {
+      document.body.style.overflow    = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+      document.body.style.position    = prevPosition;
+      document.body.style.width       = '';
+    };
+  }, [visible]);
+
+  // ------------------------------------------------------------------
   // While visible: fake progress + poll health
   // ------------------------------------------------------------------
   useEffect(() => {
     if (!visible || done) return;
 
-    // Fake progress ticker — update every 800 ms
     progressTimerRef.current = setInterval(() => {
       const elapsed = Date.now() - startTimeRef.current;
       setPercent(fakePercent(elapsed));
     }, 800);
 
-    // Health poller
+    const completeUpdate = () => {
+      clearInterval(progressTimerRef.current);
+      clearInterval(pollTimerRef.current);
+      clearTimeout(safetyTimerRef.current);
+      setPercent(100);
+      setDone(true);
+      setTimeout(() => window.location.reload(), 1800);
+    };
+
     const poll = async () => {
       try {
         const res  = await fetch('/api/health', { cache: 'no-store' });
         const data = await res.json();
         const newVersion = data?.version;
+
+        // Phase 1: version string changed (GIT_COMMIT is set on the server)
         if (
           newVersion &&
           startVersionRef.current &&
+          startVersionRef.current !== 'unknown' &&
           newVersion !== startVersionRef.current
         ) {
-          // New version is live — finish up
-          clearInterval(progressTimerRef.current);
-          clearInterval(pollTimerRef.current);
-          clearTimeout(safetyTimerRef.current);
-          setPercent(100);
-          setDone(true);
-          setTimeout(() => window.location.reload(), 1800);
+          completeUpdate();
+          return;
+        }
+
+        // Phase 2: server went offline then came back — container restarted.
+        // Reliable even when GIT_COMMIT is "unknown" on both old and new builds.
+        if (serverWentDownRef.current) {
+          completeUpdate();
+          return;
         }
       } catch {
-        // Server is still restarting — ignore and keep polling
+        // Server is offline / restarting — flag it so phase 2 can fire
+        serverWentDownRef.current = true;
       }
     };
-    poll(); // immediate first check
-    pollTimerRef.current = setInterval(poll, POLL_INTERVAL_MS);
+    poll();
+    pollTimerRef.current  = setInterval(poll, POLL_INTERVAL_MS);
 
-    // Safety escape hatch
     safetyTimerRef.current = setTimeout(() => {
       clearInterval(progressTimerRef.current);
       clearInterval(pollTimerRef.current);
@@ -152,9 +193,9 @@ export default function UpdateOverlay() {
 
   if (!visible) return null;
 
-  return (
+  const overlay = (
     <>
-      {/* Global keyframe injected once */}
+      {/* Keyframes injected once into the document head via a portal sibling */}
       <style>{`
         @keyframes win-dot {
           0%, 60%, 100% { opacity: 0.15; transform: scale(0.8); }
@@ -166,13 +207,33 @@ export default function UpdateOverlay() {
         }
       `}</style>
 
-      {/* Full-screen overlay — sits above everything */}
+      {/*
+        Rendered via portal so it sits directly on document.body, completely
+        outside Layout's overflow / stacking context.  This is what makes
+        position:fixed cover the whole viewport on iOS Safari.
+        touch-action:none + pointer-events:all ensure no tap leaks through.
+      */}
       <div
-        className="fixed inset-0 z-[99999] flex flex-col items-center justify-between py-16 px-8 text-white select-none"
+        data-testid="update-overlay"
+        className="fixed inset-0 flex flex-col items-center justify-between py-16 px-8 text-white select-none"
         style={{
+          zIndex: 2147483647,           // max possible z-index
           background: 'linear-gradient(160deg, #0f1729 0%, #0a0e1a 100%)',
           animation: 'win-fade-in 0.6s ease forwards',
+          touchAction: 'none',          // block iOS scroll-through
+          pointerEvents: 'all',         // absorb every tap
+          // Use dvh (dynamic viewport height) so iOS address-bar chrome is handled
+          height: '100dvh',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
         }}
+        // Belt-and-suspenders: swallow touch/pointer events explicitly
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerMove={(e) => e.stopPropagation()}
       >
         {/* Top: branding */}
         <div className="flex flex-col items-center gap-2 mt-8">
@@ -185,14 +246,12 @@ export default function UpdateOverlay() {
         {/* Middle: ring + status */}
         <div className="flex flex-col items-center gap-4">
           {done ? (
-            // Completion state
             <div className="flex flex-col items-center gap-4">
               <span className="text-6xl animate-bounce">✅</span>
               <p className="text-white text-xl font-light">Update complete!</p>
               <p className="text-white/50 text-sm">Reloading the realm…</p>
             </div>
           ) : timedOut ? (
-            // Safety timeout state
             <div className="flex flex-col items-center gap-5 text-center">
               <p className="text-white text-lg font-light">Taking longer than expected…</p>
               <p className="text-white/50 text-sm max-w-xs">
@@ -207,7 +266,6 @@ export default function UpdateOverlay() {
               </button>
             </div>
           ) : (
-            // In-progress state
             <>
               <RingSpinner percent={percent} />
               <SpinDots />
@@ -227,7 +285,7 @@ export default function UpdateOverlay() {
           )}
         </div>
 
-        {/* Bottom: Windows-style disclaimer */}
+        {/* Bottom: disclaimer */}
         <p className="text-white/25 text-xs text-center">
           {done || timedOut
             ? ''
@@ -236,4 +294,7 @@ export default function UpdateOverlay() {
       </div>
     </>
   );
+
+  // Portal to document.body bypasses Layout's overflow/stacking context entirely
+  return createPortal(overlay, document.body);
 }

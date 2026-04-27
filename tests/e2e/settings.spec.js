@@ -82,7 +82,7 @@ test.describe('Update overlay', () => {
     // Wait for the overlay to render before measuring
     await expect(page.locator('text=Working on updates')).toBeVisible({ timeout: 5_000 });
 
-    const overlay = page.locator('.fixed.inset-0[class*="z-"]').last();
+    const overlay = page.locator('[data-testid="update-overlay"]');
     const box = await overlay.boundingBox();
     const vp = page.viewportSize();
     if (box && vp) {
