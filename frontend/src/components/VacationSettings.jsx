@@ -1,16 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
 import { todayLocalISO } from '../utils/dates';
-import { Palmtree, Trash2, Plus, Loader2 } from 'lucide-react';
+import { Palmtree, Trash2, Plus, Loader2, Users, User } from 'lucide-react';
 
 export default function VacationSettings() {
-  const [vacations, setVacations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [vacations, setVacations]   = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [showForm, setShowForm]     = useState(false);
+  const [startDate, setStartDate]   = useState('');
+  const [endDate, setEndDate]       = useState('');
+  const [scope, setScope]           = useState('family'); // 'family' | 'kid'
+  const [selectedKid, setSelectedKid] = useState('');
+  const [kids, setKids]             = useState([]);
+  const [kidsLoading, setKidsLoading] = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [error, setError]           = useState('');
 
   const fetchVacations = useCallback(async () => {
     try {
@@ -23,22 +27,45 @@ export default function VacationSettings() {
     }
   }, []);
 
+  useEffect(() => { fetchVacations(); }, [fetchVacations]);
+
+  // Load kids list when the form opens so we have names for the dropdown
   useEffect(() => {
-    fetchVacations();
-  }, [fetchVacations]);
+    if (!showForm) return;
+    setKidsLoading(true);
+    api('/api/stats/kids')
+      .then((data) => setKids(data || []))
+      .catch(() => {})
+      .finally(() => setKidsLoading(false));
+  }, [showForm]);
+
+  const resetForm = () => {
+    setShowForm(false);
+    setStartDate('');
+    setEndDate('');
+    setScope('family');
+    setSelectedKid('');
+    setError('');
+  };
 
   const create = async () => {
     if (!startDate || !endDate) return;
+    if (scope === 'kid' && !selectedKid) {
+      setError('Please select a hero');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
       await api('/api/vacation', {
         method: 'POST',
-        body: { start_date: startDate, end_date: endDate },
+        body: {
+          start_date: startDate,
+          end_date: endDate,
+          user_id: scope === 'kid' ? parseInt(selectedKid, 10) : null,
+        },
       });
-      setShowForm(false);
-      setStartDate('');
-      setEndDate('');
+      resetForm();
       fetchVacations();
     } catch (err) {
       setError(err.message || 'Failed to create vacation');
@@ -76,10 +103,67 @@ export default function VacationSettings() {
 
       <p className="text-muted text-xs mb-3">
         During vacation, recurring quests are paused and streaks are preserved.
+        You can put the whole family on vacation or just one hero.
       </p>
 
       {showForm && (
         <div className="mb-4 p-3 rounded-lg bg-surface-raised/50 border border-border/50 space-y-3">
+
+          {/* Scope toggle */}
+          <div>
+            <p className="text-muted text-[10px] font-semibold uppercase mb-1.5">Who is on vacation?</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setScope('family')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+                  scope === 'family'
+                    ? 'border-emerald/50 bg-emerald/10 text-emerald'
+                    : 'border-border/50 text-muted hover:text-cream'
+                }`}
+              >
+                <Users size={12} />
+                Whole Family
+              </button>
+              <button
+                onClick={() => setScope('kid')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${
+                  scope === 'kid'
+                    ? 'border-accent/50 bg-accent/10 text-accent'
+                    : 'border-border/50 text-muted hover:text-cream'
+                }`}
+              >
+                <User size={12} />
+                One Hero
+              </button>
+            </div>
+          </div>
+
+          {/* Kid picker (shown when scope = kid) */}
+          {scope === 'kid' && (
+            <div>
+              <label className="text-muted text-[10px] font-semibold uppercase">Hero</label>
+              {kidsLoading ? (
+                <div className="flex items-center gap-2 mt-1 text-muted text-xs">
+                  <Loader2 size={12} className="animate-spin" /> Loading heroes…
+                </div>
+              ) : (
+                <select
+                  value={selectedKid}
+                  onChange={(e) => setSelectedKid(e.target.value)}
+                  className="field-input text-sm mt-1"
+                >
+                  <option value="">— Select hero —</option>
+                  {kids.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.display_name || k.username}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* Date range */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-muted text-[10px] font-semibold uppercase">Start</label>
@@ -102,10 +186,12 @@ export default function VacationSettings() {
               />
             </div>
           </div>
+
           {error && <p className="text-crimson text-xs">{error}</p>}
+
           <button
             onClick={create}
-            disabled={saving || !startDate || !endDate}
+            disabled={saving || !startDate || !endDate || (scope === 'kid' && !selectedKid)}
             className="game-btn game-btn-blue w-full flex items-center justify-center gap-1.5"
           >
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Palmtree size={12} />}
@@ -125,8 +211,9 @@ export default function VacationSettings() {
       ) : (
         <div className="space-y-2">
           {vacations.map((v) => {
-            const isPast = v.end_date < today;
-            const isActive = v.start_date <= today && v.end_date >= today;
+            const isPast    = v.end_date < today;
+            const isActive  = v.start_date <= today && v.end_date >= today;
+            const isPerKid  = !!v.user_id;
             return (
               <div
                 key={v.id}
@@ -139,9 +226,23 @@ export default function VacationSettings() {
                 }`}
               >
                 <div>
-                  <p className="text-cream text-sm font-medium">
-                    {v.start_date} &rarr; {v.end_date}
-                  </p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-cream text-sm font-medium">
+                      {v.start_date} &rarr; {v.end_date}
+                    </p>
+                    {/* Scope badge */}
+                    {isPerKid ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-accent/10 text-accent border border-accent/20">
+                        <User size={8} />
+                        {v.kid_name || `Kid #${v.user_id}`}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-emerald/10 text-emerald border border-emerald/20">
+                        <Users size={8} />
+                        Family
+                      </span>
+                    )}
+                  </div>
                   {isActive && (
                     <p className="text-emerald text-[10px] font-semibold uppercase mt-0.5">
                       Active now

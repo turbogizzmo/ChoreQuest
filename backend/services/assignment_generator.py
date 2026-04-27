@@ -44,7 +44,7 @@ async def auto_generate_week_assignments(
     week_end = week_start + timedelta(days=6)
     week_dates = [week_start + timedelta(days=i) for i in range(7)]
 
-    # Filter out vacation days from week generation
+    # Filter out family-wide vacation days from week generation
     from backend.routers.vacation import is_vacation_day
     active_dates = []
     for d in week_dates:
@@ -147,6 +147,14 @@ async def generate_daily_assignments(db: AsyncSession, today: date) -> None:
                 ):
                     continue
 
+                # Skip if this kid is individually on vacation today
+                if await is_vacation_day(db, today, user_id=int(rule.user_id)):
+                    logger.debug(
+                        "Skipping assignment for kid %d — personal vacation %s",
+                        rule.user_id, today,
+                    )
+                    continue
+
                 await _create_if_missing(db, chore.id, rule.user_id, today)
         else:
             # Legacy: chore-level recurrence
@@ -168,6 +176,13 @@ async def generate_daily_assignments(db: AsyncSession, today: date) -> None:
                 user_ids = await _get_legacy_user_ids(db, chore.id)
 
             for uid in user_ids:
+                # Skip if this kid is individually on vacation today
+                if await is_vacation_day(db, today, user_id=int(uid)):
+                    logger.debug(
+                        "Skipping assignment for kid %d — personal vacation %s",
+                        uid, today,
+                    )
+                    continue
                 await _create_if_missing(db, chore.id, uid, today)
 
 
@@ -326,6 +341,11 @@ async def _generate_from_rules(
             if (chore.id, rule.user_id, day) in exclusion_set:
                 continue
 
+            # Skip if this kid is on a personal vacation for this specific day
+            from backend.routers.vacation import is_vacation_day
+            if await is_vacation_day(db, day, user_id=int(rule.user_id)):
+                continue
+
             await _create_if_missing(db, chore.id, rule.user_id, day)
 
 
@@ -387,5 +407,8 @@ async def _generate_legacy(
 
         for user_id in user_ids:
             if (chore.id, user_id, day) in exclusion_set:
+                continue
+            from backend.routers.vacation import is_vacation_day
+            if await is_vacation_day(db, day, user_id=int(user_id)):
                 continue
             await _create_if_missing(db, chore.id, user_id, day)

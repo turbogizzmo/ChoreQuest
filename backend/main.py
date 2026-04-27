@@ -57,12 +57,13 @@ async def reset_stale_streaks(db, today: date):
         if kid.last_streak_date >= yesterday:
             continue
 
-        # Gap is > 1 day. Check if all gap days were vacation days.
+        # Gap is > 1 day. Check if all gap days were vacation days for this kid
+        # (family-wide OR personal vacation both count as a protected day).
         gap = (today - kid.last_streak_date).days
         all_vacation = True
         for offset in range(1, gap):
             gap_day = kid.last_streak_date + timedelta(days=offset)
-            if not await is_vacation_day(db, gap_day):
+            if not await is_vacation_day(db, gap_day, user_id=kid.id):
                 all_vacation = False
                 break
 

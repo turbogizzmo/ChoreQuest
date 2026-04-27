@@ -52,6 +52,8 @@ async def init_db():
             ("bounty_board_claims", "kid_note", "TEXT"),
             # Inverse rotation linking: two chores that advance in lock-step
             ("chore_rotations", "inverse_of_chore_id", "INTEGER REFERENCES chores(id)"),
+            # Per-kid vacation: NULL = family-wide, set = individual kid only
+            ("vacation_periods", "user_id", "INTEGER REFERENCES users(id)"),
         ]
         for table, col, typedef in _migrations:
             try:
