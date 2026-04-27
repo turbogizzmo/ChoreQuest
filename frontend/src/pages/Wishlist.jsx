@@ -311,7 +311,7 @@ export default function Wishlist() {
                   {kidName}'s Wishes
                 </h2>
                 <div className="space-y-3">
-                  {kidItems.map((item) => renderItem(item, false, true))}
+                  {kidItems.map((item) => renderItem(item, true, true))}
                 </div>
               </div>
             ))
