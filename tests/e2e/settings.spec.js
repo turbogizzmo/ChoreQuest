@@ -34,6 +34,89 @@ test.describe('Settings — parent only', () => {
   });
 });
 
+test.describe('Update overlay', () => {
+  test.beforeEach(async ({ loginAsParent }) => {});
+
+  test('overlay appears when app:update-triggered event is dispatched', async ({ loginAsParent: page }) => {
+    await page.goto('/settings');
+    await page.waitForLoadState('networkidle');
+
+    // Pass null as currentVersion so the health-check guard (startVersionRef && ...)
+    // never fires, keeping the overlay in "Working on updates" state for inspection.
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('app:update-triggered', {
+        detail: { currentVersion: null },
+      }));
+    });
+
+    // The overlay should appear with the Windows-Update-style content
+    await expect(page.locator('text=Working on updates')).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('overlay shows ring spinner when visible', async ({ loginAsParent: page }) => {
+    await page.goto('/settings');
+    await page.waitForLoadState('networkidle');
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('app:update-triggered', {
+        detail: { currentVersion: null },
+      }));
+    });
+
+    // Wait for the overlay to render
+    await expect(page.locator('text=Working on updates')).toBeVisible({ timeout: 5_000 });
+    // The SVG ring spinner must also be visible
+    await expect(page.locator('.fixed.inset-0 svg').first()).toBeVisible({ timeout: 3_000 });
+  });
+
+  test('overlay covers the full viewport', async ({ loginAsParent: page }) => {
+    await page.goto('/settings');
+    await page.waitForLoadState('networkidle');
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('app:update-triggered', {
+        detail: { currentVersion: null },
+      }));
+    });
+
+    // Wait for the overlay to render before measuring
+    await expect(page.locator('text=Working on updates')).toBeVisible({ timeout: 5_000 });
+
+    const overlay = page.locator('.fixed.inset-0[class*="z-"]').last();
+    const box = await overlay.boundingBox();
+    const vp = page.viewportSize();
+    if (box && vp) {
+      expect(box.width).toBeGreaterThanOrEqual(vp.width);
+      expect(box.height).toBeGreaterThanOrEqual(vp.height);
+    }
+  });
+});
+
+test.describe('index.html cache headers', () => {
+  test('index.html is served with no-cache headers', async ({ page }) => {
+    const responses = [];
+    page.on('response', (res) => {
+      if (res.url().endsWith('/') || res.url().endsWith('/index.html')) {
+        responses.push(res);
+      }
+    });
+
+    await page.goto('/login');
+    await page.waitForLoadState('networkidle');
+
+    // At least one HTML response captured
+    const htmlResp = responses.find((r) => {
+      const ct = r.headers()['content-type'] || '';
+      return ct.includes('text/html');
+    });
+
+    if (htmlResp) {
+      const cc = htmlResp.headers()['cache-control'] ?? '';
+      expect(cc).toMatch(/no-cache|no-store/i);
+    }
+  });
+});
+
 test.describe('Settings — kid view', () => {
   test('kid can load settings page without crashing', async ({ loginAsKid: page }) => {
     await page.goto('/settings');

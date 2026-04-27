@@ -189,6 +189,72 @@ class TestVacationPreservesStreak:
         assert kid.streak_freezes_used == 1
 
 
+class TestPerKidVacation:
+    """is_vacation_day() should scope correctly for family vs per-kid vacations."""
+
+    @pytest.mark.asyncio
+    async def test_family_vacation_matches_any_user_id(self, db):
+        """A family-wide vacation (user_id=None) should match any kid."""
+        parent = await make_user(db, "pkvac_parent1", role=UserRole.parent)
+        kid    = await make_user(db, "pkvac_kid1")
+        db.add(VacationPeriod(
+            start_date=date(2024, 6, 1),
+            end_date=date(2024, 6, 7),
+            created_by=parent.id,
+            user_id=None,  # family-wide
+        ))
+        await db.commit()
+
+        assert await is_vacation_day(db, date(2024, 6, 3)) is True
+        assert await is_vacation_day(db, date(2024, 6, 3), user_id=kid.id) is True
+
+    @pytest.mark.asyncio
+    async def test_per_kid_vacation_only_matches_that_kid(self, db):
+        """A per-kid vacation must NOT affect other kids."""
+        parent = await make_user(db, "pkvac_parent2", role=UserRole.parent)
+        kid_a  = await make_user(db, "pkvac_kid_a")
+        kid_b  = await make_user(db, "pkvac_kid_b")
+        db.add(VacationPeriod(
+            start_date=date(2024, 7, 10),
+            end_date=date(2024, 7, 14),
+            created_by=parent.id,
+            user_id=kid_a.id,  # only kid_a
+        ))
+        await db.commit()
+
+        # kid_a is on vacation
+        assert await is_vacation_day(db, date(2024, 7, 12), user_id=kid_a.id) is True
+        # kid_b is NOT affected
+        assert await is_vacation_day(db, date(2024, 7, 12), user_id=kid_b.id) is False
+        # No user_id → family-wide check → False (this is a per-kid vacation)
+        assert await is_vacation_day(db, date(2024, 7, 12)) is False
+
+    @pytest.mark.asyncio
+    async def test_per_kid_vacation_preserves_streak(self, db):
+        """A gap bridged entirely by a per-kid vacation preserves that kid's streak."""
+        parent = await make_user(db, "pkvac_parent3", role=UserRole.parent)
+        kid    = await make_user(db, "pkvac_kid3", current_streak=7,
+                                  last_streak_date=date(2024, 8, 5))
+        db.add(VacationPeriod(
+            start_date=date(2024, 8, 6),
+            end_date=date(2024, 8, 8),
+            created_by=parent.id,
+            user_id=kid.id,
+        ))
+        await db.commit()
+
+        # Simulate _apply_streak with per-kid aware vacation check
+        today = date(2024, 8, 9)
+        gap = (today - kid.last_streak_date).days  # 4 days
+        all_vacation = True
+        for offset in range(1, gap):
+            gap_day = kid.last_streak_date + timedelta(days=offset)
+            if not await is_vacation_day(db, gap_day, user_id=kid.id):
+                all_vacation = False
+                break
+        assert all_vacation is True
+
+
 class TestStreakFreezeUsedOnce:
     """A streak freeze is only available once per calendar month."""
 

@@ -48,6 +48,39 @@ test.describe('Rewards shop — kid', () => {
   });
 });
 
+test.describe('Wishlist — parent can delete', () => {
+  test.beforeEach(async ({ loginAsParent }) => {});
+
+  test('wishlist tab loads for parent', async ({ loginAsParent: page }) => {
+    await page.goto('/rewards?tab=wishlist');
+    await page.waitForLoadState('networkidle');
+    await expect(page).not.toHaveURL(/login/);
+    await expect(page).not.toHaveURL(/error/);
+  });
+
+  test('parent wishlist shows delete (trash) button on items', async ({ loginAsParent: page }) => {
+    await page.goto('/rewards');
+    await page.waitForLoadState('networkidle');
+
+    // Switch to wishlist tab
+    await page.locator('button:has-text("Wishlist")').click();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(500);
+
+    const items = page.locator('.game-panel');
+    const count = await items.count();
+    if (count === 0) {
+      // No wish list items seeded — just verify no crash
+      await expect(page).not.toHaveURL(/error/);
+      return;
+    }
+
+    // Trash / delete button must be visible for parents (not just kids)
+    const deleteBtn = page.locator('button[title="Delete"], button svg.lucide-trash2').first();
+    await expect(deleteBtn).toBeVisible();
+  });
+});
+
 test.describe('Rewards shop — parent', () => {
   test.beforeEach(async ({ loginAsParent }) => {});
 

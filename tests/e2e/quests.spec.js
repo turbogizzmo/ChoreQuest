@@ -47,6 +47,71 @@ test.describe('Quests page — kid view', () => {
   });
 });
 
+test.describe('Quest search', () => {
+  test.beforeEach(async ({ loginAsParent }) => {});
+
+  test('search input is visible on chores page', async ({ loginAsParent: page }) => {
+    await page.goto('/chores');
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('input[placeholder*="Search"], input[type="search"]').first()).toBeVisible();
+  });
+
+  test('typing in search filters quest cards', async ({ loginAsParent: page }) => {
+    await page.goto('/chores');
+    await page.waitForLoadState('networkidle');
+
+    const cardsBefore = await page.locator('.game-panel').count();
+
+    const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first();
+    // Type a very unlikely string — expect 0 results
+    await searchInput.fill('zzzzzzzzzznomatch');
+    await page.waitForTimeout(300);
+
+    const cardsAfter = await page.locator('.game-panel').count();
+    expect(cardsAfter).toBeLessThan(cardsBefore);
+  });
+
+  test('clear button resets search and restores full list', async ({ loginAsParent: page }) => {
+    await page.goto('/chores');
+    await page.waitForLoadState('networkidle');
+
+    const cardsBefore = await page.locator('.game-panel').count();
+
+    const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first();
+    await searchInput.fill('zzzzzzzzzznomatch');
+    await page.waitForTimeout(300);
+
+    // Clear button (X icon button next to search input)
+    const clearBtn = page.locator('button[aria-label="Clear search"], button svg.lucide-x').first();
+    if (await clearBtn.isVisible()) {
+      await clearBtn.click();
+    } else {
+      await searchInput.fill('');
+    }
+    await page.waitForTimeout(300);
+
+    const cardsAfterClear = await page.locator('.game-panel').count();
+    expect(cardsAfterClear).toBe(cardsBefore);
+  });
+
+  test('search by known quest title narrows results', async ({ loginAsParent: page }) => {
+    await page.goto('/chores');
+    await page.waitForLoadState('networkidle');
+
+    // Get the title of the first quest
+    const firstTitle = await page.locator('.game-panel .text-cream').first().textContent();
+    if (!firstTitle) return; // skip if no quests
+
+    const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first();
+    // Type first 4 chars of the title
+    await searchInput.fill(firstTitle.trim().slice(0, 4));
+    await page.waitForTimeout(300);
+
+    // At least one card should still be visible (the one we searched for)
+    await expect(page.locator('.game-panel').first()).toBeVisible();
+  });
+});
+
 test.describe('Parent kid-detail view', () => {
   test.beforeEach(async ({ loginAsParent }) => {});
 

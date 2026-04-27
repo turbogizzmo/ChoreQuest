@@ -520,6 +520,7 @@ class ShoutoutResponse(BaseModel):
 class VacationCreate(BaseModel):
     start_date: date
     end_date: date
+    user_id: int | None = None  # None = family-wide; set = specific kid only
 
 
 class VacationResponse(BaseModel):
@@ -527,6 +528,8 @@ class VacationResponse(BaseModel):
     start_date: date
     end_date: date
     created_by: int
+    user_id: int | None = None
+    kid_name: str | None = None  # display name injected by the router
     is_active: bool
     created_at: datetime
 

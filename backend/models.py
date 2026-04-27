@@ -521,16 +521,22 @@ class Announcement(Base):
 
 
 class VacationPeriod(Base):
-    """Family vacation / blackout periods that pause chore generation."""
+    """Vacation / blackout periods that pause chore generation.
+
+    When ``user_id`` is NULL the vacation applies to the whole family.
+    When ``user_id`` is set it only affects that specific kid.
+    """
     __tablename__ = "vacation_periods"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    creator = relationship("User")
+    creator = relationship("User", foreign_keys=[created_by])
+    kid = relationship("User", foreign_keys=[user_id])
 
 
 class BountyBoardClaim(Base):
