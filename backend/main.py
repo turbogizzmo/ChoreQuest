@@ -235,4 +235,9 @@ if STATIC_DIR.is_dir():
         file_path = STATIC_DIR / full_path
         if file_path.resolve().is_relative_to(STATIC_DIR.resolve()) and file_path.is_file():
             return FileResponse(str(file_path))
-        return FileResponse(str(STATIC_DIR / "index.html"))
+        # SPA fallback — always serve index.html with no-cache so browsers
+        # pick up new JS bundles immediately after a container update.
+        return FileResponse(
+            str(STATIC_DIR / "index.html"),
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
