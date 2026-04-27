@@ -75,10 +75,12 @@ function UpdatePanel({ isAdmin }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Trigger failed');
-      setTriggerMsg('Update scheduled! The app will restart in ~1-2 minutes.');
+      // Dispatch event to show the full-screen update overlay
+      window.dispatchEvent(new CustomEvent('app:update-triggered', {
+        detail: { currentVersion: version?.version ?? null },
+      }));
     } catch (err) {
       setTriggerMsg(`Error: ${err.message}`);
-    } finally {
       setTriggering(false);
     }
   };
