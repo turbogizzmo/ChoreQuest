@@ -21,6 +21,8 @@ import {
   Trophy,
   MoreHorizontal,
   ScrollText,
+  Settings,
+  Shield,
 } from 'lucide-react';
 import AvatarDisplay from './AvatarDisplay';
 import { timeAgo } from '../utils/dates';
@@ -34,6 +36,8 @@ const ALL_NAV_ITEMS = [
   { label: 'Calendar', icon: CalendarDays, path: '/calendar', mobileMore: true },
   { label: 'Bounties', icon: ScrollText, path: '/bounty', mobileMore: true },
   { label: 'Events', icon: Sparkles, path: '/events', parentOnly: true, mobileMore: true },
+  { label: 'Family', icon: Settings, path: '/settings', parentOnly: true, mobileMore: true },
+  { label: 'Admin', icon: Shield, path: '/admin', adminOnly: true, mobileMore: true },
 ];
 
 export default function Layout({ children }) {
@@ -109,7 +113,9 @@ export default function Layout({ children }) {
   }, [location.pathname]);
 
   const isParent = user?.role === 'parent' || user?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
   const navItems = ALL_NAV_ITEMS.filter((item) => {
+    if (item.adminOnly && !isAdmin) return false;
     if (item.parentOnly && !isParent) return false;
     if (item.settingKey && settings[item.settingKey] === false) return false;
     return true;
