@@ -9,7 +9,7 @@ chore_assignments.
 from datetime import datetime, date, timezone, timedelta
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
@@ -581,9 +581,43 @@ async def reject_bounty_claim(
 
 
 # ---------------------------------------------------------------------------
+# POST /api/bounty/reset-claims — parent manually resets verified claims
+# ---------------------------------------------------------------------------
+
+@router.post("/reset-claims")
+async def reset_verified_claims(
+    db: AsyncSession = Depends(get_db),
+    parent: User = Depends(require_parent),
+):
+    """Parent-triggered reset: delete all verified bounty claims so every
+    kid can claim and complete those bounties again today."""
+    result = await db.execute(
+        delete(BountyBoardClaim)
+        .where(BountyBoardClaim.status == BountyClaimStatus.verified)
+        .returning(BountyBoardClaim.id)
+    )
+    deleted = result.fetchall()
+    await db.commit()
+    await ws_manager.broadcast(_WS_BOUNTY_CHANGED)
+    return {"reset": len(deleted)}
+
+
+# ---------------------------------------------------------------------------
 # Cleanup helper — called from daily reset task
 # ---------------------------------------------------------------------------
 
 async def expire_stale_bounty_claims(db: AsyncSession) -> None:
-    """Placeholder — no auto-expiry by default. Can be extended later."""
-    pass
+    """Reset verified bounty claims from previous days.
+
+    Deletes claim records whose status is 'verified' and whose verified_at
+    timestamp is before today, so kids can re-claim those bounties fresh
+    each day (useful for bounties that are effectively daily tasks).
+    In-progress claims (claimed/completed) are intentionally left alone.
+    """
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    await db.execute(
+        delete(BountyBoardClaim).where(
+            BountyBoardClaim.status == BountyClaimStatus.verified,
+            BountyBoardClaim.verified_at < today_start,
+        )
+    )
