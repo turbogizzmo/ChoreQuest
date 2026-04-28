@@ -581,6 +581,28 @@ async def reject_bounty_claim(
 
 
 # ---------------------------------------------------------------------------
+# POST /api/bounty/reset-claims — parent manually resets verified claims
+# ---------------------------------------------------------------------------
+
+@router.post("/reset-claims")
+async def reset_verified_claims(
+    db: AsyncSession = Depends(get_db),
+    parent: User = Depends(require_parent),
+):
+    """Parent-triggered reset: delete all verified bounty claims so every
+    kid can claim and complete those bounties again today."""
+    result = await db.execute(
+        delete(BountyBoardClaim)
+        .where(BountyBoardClaim.status == BountyClaimStatus.verified)
+        .returning(BountyBoardClaim.id)
+    )
+    deleted = result.fetchall()
+    await db.commit()
+    await ws_manager.broadcast(_WS_BOUNTY_CHANGED)
+    return {"reset": len(deleted)}
+
+
+# ---------------------------------------------------------------------------
 # Cleanup helper — called from daily reset task
 # ---------------------------------------------------------------------------
 
