@@ -76,8 +76,11 @@ async def create_vacation(
     await db.refresh(vacation)
 
     resp = VacationResponse.model_validate(vacation)
-    if vacation.user_id and vacation.kid:
-        resp.kid_name = vacation.kid.display_name or vacation.kid.username
+    if vacation.user_id:
+        kid_result = await db.execute(select(User).where(User.id == vacation.user_id))
+        kid = kid_result.scalar_one_or_none()
+        if kid:
+            resp.kid_name = kid.display_name or kid.username
     return resp
 
 
