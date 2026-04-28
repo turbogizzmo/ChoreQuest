@@ -10,7 +10,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ScrollText, CheckCircle2, Clock, XCircle, Loader2,
-  Star, Sword, ChevronRight, AlertCircle, Camera,
+  Star, Sword, ChevronRight, AlertCircle, Camera, RefreshCw,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
@@ -55,6 +55,7 @@ export default function BountyBoard() {
   const [abandonTarget, setAbandonTarget] = useState(null); // choreId pending confirmation
   const [noteTarget, setNoteTarget] = useState(null);       // choreId awaiting note input
   const [noteText, setNoteText] = useState('');
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoadError('');
@@ -174,6 +175,20 @@ export default function BountyBoard() {
     }
   };
 
+  const handleResetClaims = async () => {
+    setResetConfirmOpen(false);
+    setActionLoading('reset-claims');
+    try {
+      const res = await api('/api/bounty/reset-claims', { method: 'POST' });
+      showToast(`Reset ${res.reset ?? 0} verified claim(s) — board is fresh!`, 'success');
+      await fetchData();
+    } catch (err) {
+      showToast(err.message || 'Could not reset claims', 'error');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -191,7 +206,7 @@ export default function BountyBoard() {
           <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
             <ScrollText size={20} className="text-accent" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-cream text-lg font-semibold">The Bounty Board</h1>
             <p className="text-muted text-xs">
               {isParent
@@ -199,6 +214,19 @@ export default function BountyBoard() {
                 : 'Optional quests for bonus XP — no penalty for skipping!'}
             </p>
           </div>
+          {isParent && (
+            <button
+              onClick={() => setResetConfirmOpen(true)}
+              disabled={actionLoading === 'reset-claims'}
+              title="Reset all verified claims so kids can claim again"
+              className="game-btn game-btn-blue !py-1.5 !px-3 !text-xs flex items-center gap-1.5 flex-shrink-0"
+            >
+              {actionLoading === 'reset-claims'
+                ? <Loader2 size={13} className="animate-spin" />
+                : <RefreshCw size={13} />}
+              Reset Claims
+            </button>
+          )}
         </div>
       </div>
 
@@ -328,6 +356,31 @@ export default function BountyBoard() {
       >
         <p className="text-muted">
           Are you sure you want to abandon this bounty? Your in-progress work will be lost.
+        </p>
+      </Modal>
+
+      {/* Confirmation modal for resetting verified claims */}
+      <Modal
+        isOpen={resetConfirmOpen}
+        onClose={() => setResetConfirmOpen(false)}
+        title="Reset All Verified Claims?"
+        actions={[
+          {
+            label: 'Cancel',
+            onClick: () => setResetConfirmOpen(false),
+            className: 'game-btn game-btn-blue',
+          },
+          {
+            label: 'Reset Now',
+            onClick: handleResetClaims,
+            className: 'game-btn game-btn-red',
+          },
+        ]}
+      >
+        <p className="text-muted text-sm">
+          This will clear all approved bounty claims so kids can pick them up again.
+          Useful if you want the board to refresh before the midnight reset.
+          Claims still in progress won't be affected.
         </p>
       </Modal>
 
