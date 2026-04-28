@@ -9,7 +9,7 @@ chore_assignments.
 from datetime import datetime, date, timezone, timedelta
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
@@ -585,5 +585,17 @@ async def reject_bounty_claim(
 # ---------------------------------------------------------------------------
 
 async def expire_stale_bounty_claims(db: AsyncSession) -> None:
-    """Placeholder — no auto-expiry by default. Can be extended later."""
-    pass
+    """Reset verified bounty claims from previous days.
+
+    Deletes claim records whose status is 'verified' and whose verified_at
+    timestamp is before today, so kids can re-claim those bounties fresh
+    each day (useful for bounties that are effectively daily tasks).
+    In-progress claims (claimed/completed) are intentionally left alone.
+    """
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    await db.execute(
+        delete(BountyBoardClaim).where(
+            BountyBoardClaim.status == BountyClaimStatus.verified,
+            BountyBoardClaim.verified_at < today_start,
+        )
+    )
