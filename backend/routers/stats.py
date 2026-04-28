@@ -192,7 +192,7 @@ async def get_party(
             "user_name": name_map.get(txn.user_id, "Unknown"),
             "description": txn.description,
             "xp": txn.amount,
-            "timestamp": txn.created_at.isoformat() if txn.created_at else None,
+            "timestamp": txn.created_at.isoformat() + 'Z' if txn.created_at else None,
         })
 
     for drop in recent_drops:
@@ -201,7 +201,7 @@ async def get_party(
             "user_id": drop.user_id,
             "user_name": name_map.get(drop.user_id, "Unknown"),
             "description": drop.message,
-            "timestamp": drop.created_at.isoformat() if drop.created_at else None,
+            "timestamp": drop.created_at.isoformat() + 'Z' if drop.created_at else None,
         })
 
     activity.sort(key=lambda a: a.get("timestamp") or "", reverse=True)
