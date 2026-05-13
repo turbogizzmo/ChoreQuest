@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 import backend.routers.spin as spin_router
-from backend.models import AssignmentStatus, ChoreAssignment, SpinResult, UserRole
+from backend.models import AppSetting, AssignmentStatus, ChoreAssignment, SpinResult, UserRole
 from backend.routers.spin import _can_spin_today, execute_spin
 from tests.unit.conftest import make_category, make_chore, make_user
 
@@ -108,3 +108,28 @@ async def test_no_credit_when_today_still_pending(db):
     assert credit_dates == []
     assert reason is not None
     assert "unlock a spin credit" in reason
+
+
+@pytest.mark.asyncio
+async def test_no_credit_message_omits_verify_when_verification_disabled(db):
+    """When spin_requires_verification=false, the no-credits message should not
+    mention 'verify' since kids don't need parent approval to earn credits."""
+    today = date.today()
+
+    category = await make_category(db)
+    parent = await make_user(db, "spin_parent_4", role=UserRole.parent)
+    kid = await make_user(db, "spin_kid_4")
+    chore = await make_chore(db, parent.id, category.id)
+
+    await _add_assignment(db, chore.id, kid.id, today, AssignmentStatus.pending)
+
+    setting = AppSetting(key="spin_requires_verification", value="false")
+    db.add(setting)
+    await db.commit()
+
+    can_spin, _, reason, spin_credits, credit_dates = await _can_spin_today(db, kid)
+
+    assert can_spin is False
+    assert spin_credits == 0
+    assert reason is not None
+    assert "verify" not in reason.lower()
