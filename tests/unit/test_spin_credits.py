@@ -3,6 +3,7 @@ from datetime import date, timedelta
 import pytest
 from sqlalchemy import select
 
+import backend.routers.spin as spin_router
 from backend.models import AssignmentStatus, ChoreAssignment, SpinResult, UserRole
 from backend.routers.spin import _can_spin_today, execute_spin
 from tests.unit.conftest import make_category, make_chore, make_user
@@ -63,7 +64,7 @@ async def test_execute_spin_consumes_oldest_credit_first(db, monkeypatch):
     await _add_assignment(db, chore.id, kid.id, yesterday, AssignmentStatus.verified)
     await db.commit()
 
-    monkeypatch.setattr("backend.routers.spin.random.choice", lambda values: values[0])
+    monkeypatch.setattr(spin_router.random, "choice", lambda values: values[0])
 
     await execute_spin(db=db, user=kid)
     await execute_spin(db=db, user=kid)
@@ -79,6 +80,13 @@ async def test_execute_spin_consumes_oldest_credit_first(db, monkeypatch):
     assert [result.spin_date for result in results] == [two_days_ago, yesterday]
     assert kid.points_balance == 2
     assert kid.total_points_earned == 2
+
+    # The remaining credit is today's existing no-assignment free spin.
+    can_spin, _, reason, spin_credits, credit_dates = await _can_spin_today(db, kid)
+    assert can_spin is True
+    assert reason is None
+    assert spin_credits == 1
+    assert credit_dates == [today]
 
 
 @pytest.mark.asyncio

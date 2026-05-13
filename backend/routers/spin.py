@@ -81,39 +81,54 @@ async def _can_spin_today(
     )
 
     # Load all assignments up through today. Fully-satisfied dates become spin credits.
+    # This intentionally has no lookback cutoff because spin credits do not expire.
+    # Query cost is controlled by idx_chore_assignments_user_date.
     result = await db.execute(
-        select(ChoreAssignment.date, ChoreAssignment.status).where(
+        select(ChoreAssignment.date, ChoreAssignment.status)
+        .where(
             ChoreAssignment.user_id == user.id,
             ChoreAssignment.date <= today,
         )
+        .order_by(ChoreAssignment.date.asc())
     )
     assignments_by_date: dict[date, list[AssignmentStatus]] = {}
     for assignment_date, status in result.all():
         assignments_by_date.setdefault(assignment_date, []).append(status)
 
-    eligible_credit_dates = {
+    eligible_credit_dates = [
         assignment_date
         for assignment_date, statuses in assignments_by_date.items()
         if statuses and all(status in done_statuses for status in statuses)
-    }
+    ]
     # Keep the existing "no assignments today" behavior: allow one same-day spin.
+    # We only add *today* (never past no-assignment days), so this preserves that
+    # behavior without creating backlogged credits that could be farmed on idle days.
     if today not in assignments_by_date:
-        eligible_credit_dates.add(today)
+        eligible_credit_dates.append(today)
 
     used_dates_result = await db.execute(
-        select(SpinResult.spin_date).where(SpinResult.user_id == user.id)
+        select(SpinResult.spin_date)
+        .where(SpinResult.user_id == user.id)
+        .order_by(SpinResult.spin_date.asc())
     )
     used_credit_dates = set(used_dates_result.scalars().all())
-    available_credit_dates = sorted(eligible_credit_dates - used_credit_dates)
+    available_credit_dates = [
+        credit_date for credit_date in eligible_credit_dates if credit_date not in used_credit_dates
+    ]
 
     if available_credit_dates:
         return True, last_result, None, len(available_credit_dates), available_credit_dates
 
     if today in used_credit_dates:
+        earn_more_hint = (
+            "Complete and verify quests to earn more."
+            if requires_verification
+            else "Complete quests to earn more."
+        )
         return (
             False,
             last_result,
-            "You already used all available spin credits. Complete quests to earn more.",
+            f"You already used all available spin credits. {earn_more_hint}",
             0,
             [],
         )
@@ -181,11 +196,16 @@ async def execute_spin(
     user: User = Depends(get_current_user),
 ):
     """Execute the daily spin. Validates eligibility, generates random XP, awards points."""
-    can_spin, _, reason, _, credit_dates = await _can_spin_today(db, user)
+    can_spin, _last_result, reason, _spin_credits, credit_dates = await _can_spin_today(db, user)
     if not can_spin:
         raise HTTPException(
             status_code=400,
             detail=reason or "Cannot spin today.",
+        )
+    if not credit_dates:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to process spin right now. Please try again.",
         )
 
     # Pick from the wheel segments so the frontend animation matches
