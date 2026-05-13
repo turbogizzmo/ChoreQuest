@@ -36,11 +36,17 @@ function getDateLabel(dateStr) {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+/** Normalize a backend UTC datetime string to a proper UTC Date (appends 'Z' if missing). */
+function parseUtcDate(dtStr) {
+  if (!dtStr) return null;
+  const utcStr = /Z|[+-]\d\d:?\d\d$/.test(dtStr) ? dtStr : dtStr + 'Z';
+  return new Date(utcStr);
+}
+
 /** Convert a UTC datetime string from the backend to a local YYYY-MM-DD string. */
 function utcToLocalDateISO(dtStr) {
-  if (!dtStr) return '';
-  const utcStr = /Z|[+-]\d\d:?\d\d$/.test(dtStr) ? dtStr : dtStr + 'Z';
-  return toLocalISO(new Date(utcStr));
+  const d = parseUtcDate(dtStr);
+  return d ? toLocalISO(d) : '';
 }
 
 export default function ParentDashboard() {
@@ -475,7 +481,7 @@ export default function ParentDashboard() {
                           </span>
                           {claim.completed_at && (
                             <span className="text-muted ml-1">
-                              · submitted {new Date(/Z|[+-]\d\d:?\d\d$/.test(claim.completed_at) ? claim.completed_at : claim.completed_at + 'Z').toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                              · submitted {parseUtcDate(claim.completed_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                             </span>
                           )}
                         </p>
