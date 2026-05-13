@@ -247,7 +247,9 @@ async function createAndCompleteBountyClaim(parentToken, kidToken) {
   if (!completeRes.ok) throw new Error(`Complete failed ${completeRes.status}: ${await completeRes.text()}`);
 
   const claims = await apiGet('/api/bounty/claims', parentToken);
-  return claims.find((c) => c.chore_id === chore.id);
+  const claim = claims.find((c) => c.chore_id === chore.id);
+  if (!claim) throw new Error(`Claim for chore ${chore.id} not found in pending queue. Queue: ${JSON.stringify(claims.map((c) => c.chore_id))}`);
+  return claim;
 }
 
 test.describe('Parent Dashboard — bounty claim approvals', () => {
