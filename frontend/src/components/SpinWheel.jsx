@@ -48,9 +48,9 @@ export default function SpinWheel({ availability, onSpinComplete }) {
   const [error, setError] = useState(null);
   const hasSpunRef = useRef(false);
 
-  const canSpin = availability?.can_spin ?? true;
+  const canSpin = availability?.can_spin ?? false;
   const reason = availability?.reason ?? null;
-  const spinCredits = availability?.spin_credits ?? (canSpin ? 1 : 0);
+  const spinCredits = availability?.spin_credits ?? 0;
   const disabled = !canSpin;
 
   const handleSpin = useCallback(async () => {
@@ -193,9 +193,17 @@ export default function SpinWheel({ availability, onSpinComplete }) {
         <p className="text-gold text-sm text-center max-w-xs">{reason}</p>
       )}
 
-      {spinCredits > 0 && (
+      {/* After a spin: prompt if more credits remain */}
+      {result !== null && canSpin && !spinning && (
+        <p className="text-accent text-sm text-center font-medium">
+          You have {spinCredits} credit{spinCredits === 1 ? '' : 's'} left — spin again!
+        </p>
+      )}
+
+      {/* Before spinning: show credit count when more than 1 available */}
+      {result === null && spinCredits > 1 && (
         <p className="text-muted text-xs text-center">
-          {spinCredits} spin credit{spinCredits === 1 ? '' : 's'} ready
+          {spinCredits} spin credits ready
         </p>
       )}
 

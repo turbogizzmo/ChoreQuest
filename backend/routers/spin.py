@@ -2,6 +2,7 @@ import random
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -164,13 +165,12 @@ async def _can_spin_today(
             0,
             [],
         )
-    return (
-        False,
-        last_result,
-        "No spin credits yet. Complete and verify quests to earn one.",
-        0,
-        [],
+    no_credit_msg = (
+        "No spin credits yet. Complete and verify quests to earn one."
+        if requires_verification
+        else "No spin credits yet. Complete quests to earn one."
     )
+    return (False, last_result, no_credit_msg, 0, [])
 
 
 # ---------- GET /availability ----------
@@ -236,7 +236,11 @@ async def execute_spin(
     # Award pet XP alongside user XP
     await award_pet_xp_db(db, user, points_won)
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Spin already recorded for this credit. Please try again.")
     await db.refresh(spin_result)
 
     # Check achievements (non-blocking on failure)
