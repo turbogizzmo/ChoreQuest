@@ -135,6 +135,11 @@ export default function UpdateOverlay() {
 
         if (bgVersionRef.current === null) {
           bgVersionRef.current = v; // baseline on first check
+          // Fresh page load during an in-progress update: the lock file exists
+          // on disk so the health endpoint returns updating:true.  Show the
+          // overlay immediately — the WS broadcast already happened before this
+          // device connected so it was never received.
+          if (data?.updating) showOverlay(v);
           return;
         }
 
