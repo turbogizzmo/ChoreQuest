@@ -212,7 +212,7 @@ async function createAndCompleteBountyClaim(parentToken, kidToken) {
   const cats = await apiGet('/api/chores/categories', parentToken);
   const categoryId = cats[0]?.id;
 
-  const res = await fetch(`${BASE}/api/chores`, {
+  const choreRes = await fetch(`${BASE}/api/chores`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${parentToken}` },
     body: JSON.stringify({
@@ -223,23 +223,28 @@ async function createAndCompleteBountyClaim(parentToken, kidToken) {
       category_id: categoryId,
     }),
   });
-  const chore = await res.json();
+  if (!choreRes.ok) throw new Error(`Create chore failed ${choreRes.status}: ${await choreRes.text()}`);
+  const chore = await choreRes.json();
 
   // Mark as bounty
-  await fetch(`${BASE}/api/chores/${chore.id}`, {
+  const bountyRes = await fetch(`${BASE}/api/chores/${chore.id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${parentToken}` },
     body: JSON.stringify({ is_bounty: true }),
   });
+  if (!bountyRes.ok) throw new Error(`Set is_bounty failed ${bountyRes.status}: ${await bountyRes.text()}`);
 
   // Kid claims then completes
-  await apiPost(`/api/bounty/${chore.id}/claim`, kidToken);
+  const claimResult = await apiPost(`/api/bounty/${chore.id}/claim`, kidToken);
+  if (claimResult.status >= 300) throw new Error(`Claim failed ${claimResult.status}: ${JSON.stringify(claimResult.body)}`);
+
   const fd = new FormData();
-  await fetch(`${BASE}/api/bounty/${chore.id}/complete`, {
+  const completeRes = await fetch(`${BASE}/api/bounty/${chore.id}/complete`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${kidToken}` },
     body: fd,
   });
+  if (!completeRes.ok) throw new Error(`Complete failed ${completeRes.status}: ${await completeRes.text()}`);
 
   const claims = await apiGet('/api/bounty/claims', parentToken);
   return claims.find((c) => c.chore_id === chore.id);
@@ -295,9 +300,8 @@ test.describe('Parent Dashboard — bounty claim approvals', () => {
     await page.reload();
     await page.waitForLoadState('networkidle');
 
-    // Wait for at least one approve button to appear
     const approveBtn = page.locator('[title="Approve"]').first();
-    if (!(await approveBtn.isVisible({ timeout: 8_000 }).catch(() => false))) return;
+    await expect(approveBtn).toBeVisible({ timeout: 10_000 });
 
     const countBefore = await page.locator('[title="Approve"]').count();
     await approveBtn.click();
@@ -316,7 +320,7 @@ test.describe('Parent Dashboard — bounty claim approvals', () => {
     await page.waitForLoadState('networkidle');
 
     const rejectBtn = page.locator('[title="Reject"]').first();
-    if (!(await rejectBtn.isVisible({ timeout: 8_000 }).catch(() => false))) return;
+    await expect(rejectBtn).toBeVisible({ timeout: 10_000 });
 
     const countBefore = await page.locator('[title="Reject"]').count();
     await rejectBtn.click();
