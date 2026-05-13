@@ -302,8 +302,12 @@ test.describe('Parent Dashboard — bounty claim approvals', () => {
     await page.reload();
     await page.waitForLoadState('networkidle');
 
-    const approveBtn = page.locator('[title="Approve"]').first();
-    await expect(approveBtn).toBeVisible({ timeout: 10_000 });
+    // Scope to the bounty card specifically so we don't accidentally click a
+    // regular chore approval button if any are also in the queue.
+    const bountyCard = page.locator('.game-panel', { has: page.locator('text=Bounty') }).first();
+    await expect(bountyCard).toBeVisible({ timeout: 10_000 });
+    const approveBtn = bountyCard.locator('[title="Approve"]');
+    await expect(approveBtn).toBeVisible();
 
     const countBefore = await page.locator('[title="Approve"]').count();
     await approveBtn.click();
@@ -321,8 +325,10 @@ test.describe('Parent Dashboard — bounty claim approvals', () => {
     await page.reload();
     await page.waitForLoadState('networkidle');
 
-    const rejectBtn = page.locator('[title="Reject"]').first();
-    await expect(rejectBtn).toBeVisible({ timeout: 10_000 });
+    const bountyCard = page.locator('.game-panel', { has: page.locator('text=Bounty') }).first();
+    await expect(bountyCard).toBeVisible({ timeout: 10_000 });
+    const rejectBtn = bountyCard.locator('[title="Reject"]');
+    await expect(rejectBtn).toBeVisible();
 
     const countBefore = await page.locator('[title="Reject"]').count();
     await rejectBtn.click();
