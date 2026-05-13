@@ -9,8 +9,7 @@ chore_assignments.
 from datetime import datetime, date, timezone, timedelta
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
-from sqlalchemy import select, delete
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
@@ -414,14 +413,33 @@ async def verify_bounty_claim(
     parent: User = Depends(require_parent),
 ):
     """Parent approves a completed bounty claim — awards XP to the kid."""
-    claim_result = await db.execute(
-        select(BountyBoardClaim).where(BountyBoardClaim.id == claim_id)
+    # Atomically transition the claim from completed → verified.
+    # Using a conditional UPDATE means only one concurrent request can succeed;
+    # the second will see rowcount=0 and receive a 409 rather than double-awarding XP.
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    result = await db.execute(
+        update(BountyBoardClaim)
+        .where(
+            BountyBoardClaim.id == claim_id,
+            BountyBoardClaim.status == BountyClaimStatus.completed,
+        )
+        .values(
+            status=BountyClaimStatus.verified,
+            verified_at=now,
+            verified_by=parent.id,
+        )
+        .execution_options(synchronize_session="fetch")
     )
-    claim = claim_result.scalar_one_or_none()
-    if not claim:
-        raise HTTPException(status_code=404, detail="Claim not found")
-    if claim.status != BountyClaimStatus.completed:
-        raise HTTPException(status_code=400, detail="Claim is not in completed state")
+    if result.rowcount == 0:
+        # Either not found or already verified/rejected by a concurrent request
+        check = await db.execute(select(BountyBoardClaim).where(BountyBoardClaim.id == claim_id))
+        existing = check.scalar_one_or_none()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Claim not found")
+        raise HTTPException(status_code=409, detail="Claim already processed. Please refresh.")
+
+    claim_result = await db.execute(select(BountyBoardClaim).where(BountyBoardClaim.id == claim_id))
+    claim = claim_result.scalar_one()
 
     # Load chore and kid
     chore_result = await db.execute(select(Chore).where(Chore.id == claim.chore_id))
@@ -456,7 +474,7 @@ async def verify_bounty_claim(
         db.add(PointTransaction(
             user_id=kid.id,
             amount=bonus_points,
-            type=PointType.bonus,
+            type=PointType.event_multiplier,
             description=f"Event bonus ({multiplier}x): {chore.title}",
             reference_id=claim.id,
             created_by=parent.id,
@@ -479,12 +497,7 @@ async def verify_bounty_claim(
     today = date.today()
     await update_streak(db, kid, today)
 
-    # Finalise claim
-    claim.status = BountyClaimStatus.verified
-    claim.verified_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    claim.verified_by = parent.id
-
-    # Notify kid
+    # Notify kid (status/verified_at/verified_by already set by the atomic UPDATE above)
     db.add(Notification(
         user_id=kid.id,
         type=NotificationType.bounty_verified,
@@ -494,11 +507,7 @@ async def verify_bounty_claim(
         reference_id=claim.id,
     ))
 
-    try:
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(status_code=409, detail="Claim already verified. Please refresh.")
+    await db.commit()
     await db.refresh(claim)
 
     # Check achievements (same pattern as chore verification)

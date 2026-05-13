@@ -1,4 +1,12 @@
-"""Unit tests for the bounty claim lifecycle: claim → complete → verify → reject."""
+"""Unit tests for the bounty claim lifecycle: claim → complete → verify → reject.
+
+Covers:
+- claim_bounty: happy path, double-claim prevention
+- complete_bounty: photo validation (bad extension, oversized), optional note,
+  requires_photo enforcement
+- verify_bounty_claim: XP awarded, event-bonus transaction split
+- reject_bounty_claim: status reset, correct notification type, display name present
+"""
 
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
@@ -11,12 +19,31 @@ from backend.models import (
     PointTransaction, Notification, Recurrence, UserRole,
 )
 from backend.routers.bounty import (
-    claim_bounty, verify_bounty_claim, reject_bounty_claim,
+    claim_bounty, complete_bounty, verify_bounty_claim, reject_bounty_claim,
 )
 from tests.unit.conftest import make_category, make_user
 
 
-async def make_bounty_chore(db, creator_id: int, category_id: int, *, points: int = 20) -> Chore:
+class _FakeUpload:
+    """Minimal UploadFile stand-in for unit tests."""
+    def __init__(self, filename: str, content: bytes = b"fake-image-data",
+                 content_type: str = "image/jpeg"):
+        self.filename = filename
+        self.content_type = content_type
+        self._content = content
+
+    async def read(self) -> bytes:
+        return self._content
+
+
+async def make_bounty_chore(
+    db,
+    creator_id: int,
+    category_id: int,
+    *,
+    points: int = 20,
+    requires_photo: bool = False,
+) -> Chore:
     chore = Chore(
         title="Test Bounty",
         points=points,
@@ -26,6 +53,7 @@ async def make_bounty_chore(db, creator_id: int, category_id: int, *, points: in
         created_by=creator_id,
         is_bounty=True,
         is_active=True,
+        requires_photo=requires_photo,
         created_at=datetime(2024, 1, 1),
     )
     db.add(chore)
@@ -72,6 +100,145 @@ async def test_claim_bounty_prevents_double_claim(db):
         with pytest.raises(HTTPException) as exc_info:
             await claim_bounty(chore_id=chore.id, db=db, current_user=kid)
     assert exc_info.value.status_code == 409
+
+
+# ---------------------------------------------------------------------------
+# complete_bounty
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_complete_bounty_no_photo(db):
+    category = await make_category(db)
+    parent = await make_user(db, "bounty_parent_c1", role=UserRole.parent)
+    kid = await make_user(db, "bounty_kid_c1")
+    chore = await make_bounty_chore(db, parent.id, category.id)
+
+    claim = BountyBoardClaim(
+        chore_id=chore.id,
+        user_id=kid.id,
+        status=BountyClaimStatus.claimed,
+        claimed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    db.add(claim)
+    await db.commit()
+
+    with patch("backend.routers.bounty.ws_manager") as mock_ws:
+        mock_ws.broadcast = AsyncMock()
+        result = await complete_bounty(
+            chore_id=chore.id, file=None, kid_note=None, db=db, current_user=kid
+        )
+
+    assert result.status == BountyClaimStatus.completed
+    assert result.completed_at is not None
+    assert result.photo_proof_path is None
+
+
+@pytest.mark.asyncio
+async def test_complete_bounty_stores_kid_note(db):
+    category = await make_category(db)
+    parent = await make_user(db, "bounty_parent_c2", role=UserRole.parent)
+    kid = await make_user(db, "bounty_kid_c2")
+    chore = await make_bounty_chore(db, parent.id, category.id)
+
+    claim = BountyBoardClaim(
+        chore_id=chore.id,
+        user_id=kid.id,
+        status=BountyClaimStatus.claimed,
+        claimed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    db.add(claim)
+    await db.commit()
+
+    with patch("backend.routers.bounty.ws_manager") as mock_ws:
+        mock_ws.broadcast = AsyncMock()
+        await complete_bounty(
+            chore_id=chore.id, file=None, kid_note="I did it!", db=db, current_user=kid
+        )
+
+    updated = (await db.execute(
+        select(BountyBoardClaim).where(BountyBoardClaim.id == claim.id)
+    )).scalar_one()
+    assert updated.kid_note == "I did it!"
+
+
+@pytest.mark.asyncio
+async def test_complete_bounty_requires_photo_missing(db):
+    """Bounty with requires_photo=True must reject completion without a file."""
+    from fastapi import HTTPException
+    category = await make_category(db)
+    parent = await make_user(db, "bounty_parent_c3", role=UserRole.parent)
+    kid = await make_user(db, "bounty_kid_c3")
+    chore = await make_bounty_chore(db, parent.id, category.id, requires_photo=True)
+
+    claim = BountyBoardClaim(
+        chore_id=chore.id,
+        user_id=kid.id,
+        status=BountyClaimStatus.claimed,
+        claimed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    db.add(claim)
+    await db.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await complete_bounty(
+            chore_id=chore.id, file=None, kid_note=None, db=db, current_user=kid
+        )
+    assert exc_info.value.status_code == 400
+    assert "photo" in exc_info.value.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_complete_bounty_rejects_bad_extension(db):
+    """Files with disallowed extensions must be rejected with 400."""
+    from fastapi import HTTPException
+    category = await make_category(db)
+    parent = await make_user(db, "bounty_parent_c4", role=UserRole.parent)
+    kid = await make_user(db, "bounty_kid_c4")
+    chore = await make_bounty_chore(db, parent.id, category.id)
+
+    claim = BountyBoardClaim(
+        chore_id=chore.id,
+        user_id=kid.id,
+        status=BountyClaimStatus.claimed,
+        claimed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    db.add(claim)
+    await db.commit()
+
+    bad_file = _FakeUpload("proof.exe", b"MZ\x90\x00", content_type="application/octet-stream")
+    with pytest.raises(HTTPException) as exc_info:
+        await complete_bounty(
+            chore_id=chore.id, file=bad_file, kid_note=None, db=db, current_user=kid
+        )
+    assert exc_info.value.status_code == 400
+    assert "file type" in exc_info.value.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_complete_bounty_rejects_oversized_file(db):
+    """Files larger than 10 MB must be rejected with 400."""
+    from fastapi import HTTPException
+    category = await make_category(db)
+    parent = await make_user(db, "bounty_parent_c5", role=UserRole.parent)
+    kid = await make_user(db, "bounty_kid_c5")
+    chore = await make_bounty_chore(db, parent.id, category.id)
+
+    claim = BountyBoardClaim(
+        chore_id=chore.id,
+        user_id=kid.id,
+        status=BountyClaimStatus.claimed,
+        claimed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    db.add(claim)
+    await db.commit()
+
+    big_file = _FakeUpload("photo.jpg", b"x" * (10 * 1024 * 1024 + 1))
+    with pytest.raises(HTTPException) as exc_info:
+        await complete_bounty(
+            chore_id=chore.id, file=big_file, kid_note=None, db=db, current_user=kid
+        )
+    assert exc_info.value.status_code == 400
+    assert "10 mb" in exc_info.value.detail.lower()
 
 
 # ---------------------------------------------------------------------------
