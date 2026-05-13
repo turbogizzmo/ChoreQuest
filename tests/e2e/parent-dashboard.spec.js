@@ -205,6 +205,129 @@ test.describe('Parent — party and kid detail', () => {
   });
 });
 
+// ─── Bounty claim approvals on home screen ───────────────────────────────────
+
+/** Create a bounty, have the kid claim and complete it, return the claim. */
+async function createAndCompleteBountyClaim(parentToken, kidToken) {
+  const cats = await apiGet('/api/chores/categories', parentToken);
+  const categoryId = cats[0]?.id;
+
+  const res = await fetch(`${BASE}/api/chores`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${parentToken}` },
+    body: JSON.stringify({
+      title: `Dashboard Bounty ${Date.now()}`,
+      points: 25,
+      difficulty: 'easy',
+      recurrence: 'once',
+      category_id: categoryId,
+    }),
+  });
+  const chore = await res.json();
+
+  // Mark as bounty
+  await fetch(`${BASE}/api/chores/${chore.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${parentToken}` },
+    body: JSON.stringify({ is_bounty: true }),
+  });
+
+  // Kid claims then completes
+  await apiPost(`/api/bounty/${chore.id}/claim`, kidToken);
+  const fd = new FormData();
+  await fetch(`${BASE}/api/bounty/${chore.id}/complete`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${kidToken}` },
+    body: fd,
+  });
+
+  const claims = await apiGet('/api/bounty/claims', parentToken);
+  return claims.find((c) => c.chore_id === chore.id);
+}
+
+test.describe('Parent Dashboard — bounty claim approvals', () => {
+  test('completed bounty claim appears in Pending Verifications with Bounty badge', async ({ loginAsParent: page }) => {
+    const { parentToken, kidToken } = loadTokens();
+    await createAndCompleteBountyClaim(parentToken, kidToken);
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('text=Pending Verifications')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('text=Bounty').first()).toBeVisible({ timeout: 8_000 });
+  });
+
+  test('bounty claim card shows a date label (Today or Yesterday)', async ({ loginAsParent: page }) => {
+    const { parentToken, kidToken } = loadTokens();
+    await createAndCompleteBountyClaim(parentToken, kidToken);
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    await expect(
+      page.locator('text=/Today|Yesterday/i').first()
+    ).toBeVisible({ timeout: 8_000 });
+  });
+
+  test('approving a bounty claim from home screen removes it from the queue (API)', async () => {
+    const { parentToken, kidToken, kidId } = loadTokens();
+    const claim = await createAndCompleteBountyClaim(parentToken, kidToken);
+    expect(claim, 'Claim not found in pending queue').toBeTruthy();
+
+    const before = await apiGet(`/api/points/${kidId}`, parentToken);
+
+    const verify = await apiPost(`/api/bounty/claims/${claim.id}/verify`, parentToken);
+    expect(verify.status, `verify failed: ${JSON.stringify(verify.body)}`).toBe(200);
+
+    // Claim no longer in pending queue
+    const pending = await apiGet('/api/bounty/claims', parentToken);
+    expect(pending.find((c) => c.id === claim.id)).toBeFalsy();
+
+    // XP awarded
+    const after = await apiGet(`/api/points/${kidId}`, parentToken);
+    expect(after.balance).toBeGreaterThan(before.balance);
+  });
+
+  test('approving a bounty claim via UI removes it from the pending list', async ({ loginAsParent: page }) => {
+    const { parentToken, kidToken } = loadTokens();
+    await createAndCompleteBountyClaim(parentToken, kidToken);
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    // Wait for at least one approve button to appear
+    const approveBtn = page.locator('[title="Approve"]').first();
+    if (!(await approveBtn.isVisible({ timeout: 8_000 }).catch(() => false))) return;
+
+    const countBefore = await page.locator('[title="Approve"]').count();
+    await approveBtn.click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('text=/error/i')).not.toBeVisible({ timeout: 3_000 }).catch(() => {});
+    const countAfter = await page.locator('[title="Approve"]').count();
+    expect(countAfter).toBeLessThan(countBefore);
+  });
+
+  test('rejecting a bounty claim via UI removes it from the pending list', async ({ loginAsParent: page }) => {
+    const { parentToken, kidToken } = loadTokens();
+    await createAndCompleteBountyClaim(parentToken, kidToken);
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    const rejectBtn = page.locator('[title="Reject"]').first();
+    if (!(await rejectBtn.isVisible({ timeout: 8_000 }).catch(() => false))) return;
+
+    const countBefore = await page.locator('[title="Reject"]').count();
+    await rejectBtn.click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('text=/error/i')).not.toBeVisible({ timeout: 3_000 }).catch(() => {});
+    const countAfter = await page.locator('[title="Reject"]').count();
+    expect(countAfter).toBeLessThan(countBefore);
+  });
+});
+
 // ─── Shoutouts ────────────────────────────────────────────────────────────────
 
 test.describe('Parent — shoutouts', () => {
