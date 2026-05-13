@@ -50,6 +50,7 @@ export default function SpinWheel({ availability, onSpinComplete }) {
 
   const canSpin = availability?.can_spin ?? true;
   const reason = availability?.reason ?? null;
+  const spinCredits = availability?.spin_credits ?? (canSpin ? 1 : 0);
   const disabled = !canSpin;
 
   const handleSpin = useCallback(async () => {
@@ -190,6 +191,12 @@ export default function SpinWheel({ availability, onSpinComplete }) {
       {/* Reason why spin is disabled */}
       {disabled && !spinning && reason && (
         <p className="text-gold text-sm text-center max-w-xs">{reason}</p>
+      )}
+
+      {spinCredits > 0 && (
+        <p className="text-muted text-xs text-center">
+          {spinCredits} spin credit{spinCredits === 1 ? '' : 's'} ready
+        </p>
       )}
 
       {/* Error */}
