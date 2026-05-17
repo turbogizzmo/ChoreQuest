@@ -57,6 +57,7 @@ async def init_db():
             # Multiple completions per day support
             ("chores", "max_completions_per_day", "INTEGER DEFAULT 1"),
             ("chore_assignments", "completion_count", "INTEGER DEFAULT 0"),
+            ("bounty_board_claims", "completion_count", "INTEGER DEFAULT 0"),
         ]
         for table, col, typedef in _migrations:
             try:

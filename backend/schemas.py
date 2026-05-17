@@ -608,6 +608,7 @@ class BountyClaimResponse(BaseModel):
     status: BountyClaimStatus
     photo_proof_path: str | None
     kid_note: str | None = None
+    completion_count: int = 0
     claimed_at: UtcDt
     completed_at: UtcDt | None
     verified_at: UtcDt | None
@@ -627,6 +628,7 @@ class BountyResponse(BaseModel):
     category: CategoryResponse | None = None
     requires_photo: bool
     is_active: bool
+    max_completions_per_day: int = 1
     # Enriched at query time
     my_claim: BountyClaimResponse | None = None
     claim_count: int = 0

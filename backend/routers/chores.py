@@ -956,7 +956,8 @@ async def complete_chore(
             f.write(contents)
         assignment.photo_proof_path = filename
 
-    new_count = (assignment.completion_count or 0) + 1
+    current_count = assignment.completion_count or 0
+    new_count = min(max_completions, current_count + 1)
     assignment.completion_count = new_count
     assignment.updated_at = now
 
@@ -1193,9 +1194,9 @@ async def parent_verify_assignment(
         )
 
     chore = assignment.chore
+    assignment.completion_count = max(1, assignment.completion_count or 0)
     # Scale base points by number of completions (multi-completion chores earn XP per completion).
-    # parent-verify path assigns completion_count=1 since the parent is logging it directly.
-    base_points = chore.points * max(1, assignment.completion_count or 1)
+    base_points = chore.points * assignment.completion_count
 
     assignment.status = AssignmentStatus.verified
     assignment.completed_at = now

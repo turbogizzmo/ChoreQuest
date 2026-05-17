@@ -557,6 +557,7 @@ class BountyBoardClaim(Base):
     )
     photo_proof_path: Mapped[str | None] = mapped_column(String, nullable=True)
     kid_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    completion_count: Mapped[int] = mapped_column(Integer, default=0)
     claimed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
