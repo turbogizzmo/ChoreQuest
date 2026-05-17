@@ -1194,6 +1194,9 @@ async def parent_verify_assignment(
         )
 
     chore = assignment.chore
+    # Direct parent verification can hit legacy rows, and pending assignments
+    # naturally start at completion_count=0 before any kid submission.
+    # Ensure at least one completion is counted for this verified attempt.
     assignment.completion_count = max(1, assignment.completion_count or 0)
     # Scale base points by number of completions (multi-completion chores earn XP per completion).
     base_points = chore.points * assignment.completion_count

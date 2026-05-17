@@ -153,7 +153,7 @@ async def test_claim_bounty_blocks_reclaim_at_daily_max(db):
             await claim_bounty(chore_id=chore.id, db=db, current_user=kid)
 
     assert exc_info.value.status_code == 409
-    assert "limit" in exc_info.value.detail.lower()
+    assert exc_info.value.detail == "Daily completion limit reached for this bounty"
 
 
 # ---------------------------------------------------------------------------
