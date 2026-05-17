@@ -89,7 +89,7 @@ async def test_assignment_completion_count_default(db):
         select(ChoreAssignment).where(ChoreAssignment.id == assignment.id)
     )
     fetched = result.scalar_one()
-    assert (fetched.completion_count or 0) == 0
+    assert fetched.completion_count == 0
 
 
 @pytest.mark.asyncio

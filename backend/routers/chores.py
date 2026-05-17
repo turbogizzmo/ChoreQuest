@@ -875,6 +875,11 @@ async def complete_chore(
     earliest = today - timedelta(days=grace_days)
 
     # Guard: prevent completing today's assignment beyond max_completions_per_day.
+    # For chores with max_completions_per_day > 1, intermediate completions reset
+    # the assignment status to 'pending' so kids can complete again. Only when
+    # completion_count reaches the max does the status become 'completed'. This
+    # guard therefore correctly blocks double-XP by checking for completed/verified
+    # status, which is only set once all required completions are done.
     # Only checks today so that yesterday's verified assignment doesn't block
     # completing a fresh assignment for today (grace period cross-day case).
     already_done = await db.execute(
