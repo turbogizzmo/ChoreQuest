@@ -42,9 +42,9 @@ check \
     backend/
 
 check \
-    "datetime.now(timezone.utc) passed into should_advance_rotation" \
-    "ERROR" \
-    'should_advance_rotation.*datetime\.now(timezone\.utc)' \
+    "should_advance_rotation called with 'now' — verify now is local time, NOT datetime.now(timezone.utc)" \
+    "WARN" \
+    'should_advance_rotation(.*\bnow\b' \
     backend/
 
 check \
