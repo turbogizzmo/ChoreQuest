@@ -6,7 +6,9 @@ completion rate because they live in bounty_board_claims, not
 chore_assignments.
 """
 
+import os
 from datetime import datetime, date, timezone, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
 from sqlalchemy import select, delete, update
@@ -646,9 +648,16 @@ async def expire_stale_bounty_claims(db: AsyncSession) -> None:
     In-progress claims (claimed/completed) are intentionally left alone.
     Kids are notified so they know the board has refreshed.
     """
-    # Use local midnight (respects TZ env var) so bounties reset at the family's
-    # end-of-day rather than UTC midnight (which is 7 pm CDT for US Central).
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    # Compute local midnight as naive UTC so it compares correctly against the
+    # naive-UTC values stored in BountyBoardClaim.verified_at.
+    # Strategy: get aware local midnight → convert to UTC → strip tzinfo.
+    _tz_name = os.environ.get("TZ", "UTC")
+    try:
+        _local_tz = ZoneInfo(_tz_name)
+    except ZoneInfoNotFoundError:
+        _local_tz = ZoneInfo("UTC")
+    local_midnight = datetime.now(_local_tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = local_midnight.astimezone(timezone.utc).replace(tzinfo=None)
 
     # Fetch affected claims before deleting so we can notify the kids
     stale_result = await db.execute(

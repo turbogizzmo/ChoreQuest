@@ -869,7 +869,7 @@ async def complete_chore(
     user: User = Depends(get_current_user),
 ):
     today = date.today()
-    now = datetime.now()  # local time — should_advance_rotation uses now.date() for day-boundary checks
+    now = datetime.now(timezone.utc)
 
     grace_result = await db.execute(
         select(AppSetting).where(AppSetting.key == "grace_period_days")
@@ -1028,7 +1028,7 @@ async def verify_chore(
     user: User = Depends(require_parent),
 ):
     today = date.today()
-    now = datetime.now()  # local time — should_advance_rotation uses now.date() for day-boundary checks
+    now = datetime.now(timezone.utc)
 
     filters = [
         ChoreAssignment.chore_id == chore_id,
@@ -1184,7 +1184,7 @@ async def parent_verify_assignment(
     exactly as the normal verify flow does.
     """
     today = date.today()
-    now = datetime.now()  # local time — should_advance_rotation uses now.date() for day-boundary checks
+    now = datetime.now(timezone.utc)
 
     result = await db.execute(
         select(ChoreAssignment)
@@ -1371,7 +1371,7 @@ async def uncomplete_chore(
     user: User = Depends(require_parent),
 ):
     today = date.today()
-    now = datetime.now()  # local time — should_advance_rotation uses now.date() for day-boundary checks
+    now = datetime.now(timezone.utc)
 
     filters = [
         ChoreAssignment.chore_id == chore_id,
@@ -1463,7 +1463,7 @@ async def skip_chore(
     user: User = Depends(require_parent),
 ):
     today = date.today()
-    now = datetime.now()  # local time — should_advance_rotation uses now.date() for day-boundary checks
+    now = datetime.now(timezone.utc)
 
     filters = [
         ChoreAssignment.chore_id == chore_id,
