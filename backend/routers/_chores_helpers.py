@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.models import (
+    AssignmentStatus,
     Chore,
     ChoreAssignment,
     ChoreRotation,
@@ -111,6 +112,28 @@ async def build_rotation_summaries(
     today = date.today()
     now = datetime.now(timezone.utc)
 
+    # Batch-load today's actual assignments for all rotation chores so we can
+    # ground the "currently X's turn" display in what was really scheduled for
+    # today rather than blindly trusting current_index.
+    #
+    # This matters when the daily reset fires before local midnight (e.g. UTC
+    # midnight = 7 pm CDT): current_index is already advanced to tomorrow's
+    # kid, but today's local assignment still belongs to the previous kid.
+    all_chore_ids = [r.chore_id for r in rotations]
+    today_assignment_result = await db.execute(
+        select(ChoreAssignment.chore_id, ChoreAssignment.user_id)
+        .where(
+            ChoreAssignment.chore_id.in_(all_chore_ids),
+            ChoreAssignment.user_id.in_(all_kid_ids),
+            ChoreAssignment.date == today,
+            ChoreAssignment.status != AssignmentStatus.skipped,
+        )
+    )
+    # chore_id → kid_id who has today's actual assignment (non-skipped)
+    today_assigned_kid: dict[int, int] = {
+        row.chore_id: row.user_id for row in today_assignment_result.all()
+    }
+
     summaries: dict[int, RotationSummary] = {}
     for r in rotations:
         kid_ids = r.kid_ids or []
@@ -136,6 +159,16 @@ async def build_rotation_summaries(
         else:
             idx = r.current_index % len(kid_ids)
             current_kid_id = kid_ids[idx]
+
+        # Ground-truth override: if there is an actual non-skipped assignment
+        # for today belonging to one of this rotation's kids, that kid is who
+        # the family will see doing the chore today — show them as "current".
+        # This prevents the display from jumping to tomorrow's kid after the
+        # UTC-midnight reset fires before local midnight.
+        actual_today_kid = today_assigned_kid.get(r.chore_id)
+        if actual_today_kid is not None and actual_today_kid in kid_ids:
+            current_kid_id = actual_today_kid
+            idx = kid_ids.index(current_kid_id)
 
         summaries[r.chore_id] = RotationSummary(
             current_kid_id=current_kid_id,
