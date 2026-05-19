@@ -646,7 +646,9 @@ async def expire_stale_bounty_claims(db: AsyncSession) -> None:
     In-progress claims (claimed/completed) are intentionally left alone.
     Kids are notified so they know the board has refreshed.
     """
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    # Use local midnight (respects TZ env var) so bounties reset at the family's
+    # end-of-day rather than UTC midnight (which is 7 pm CDT for US Central).
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Fetch affected claims before deleting so we can notify the kids
     stale_result = await db.execute(
