@@ -24,7 +24,7 @@ check() {
         else
             echo -e "${YEL}[WARN]  $label${NC}"
         fi
-        echo "$results" | sed 's/^/        /'
+        while IFS= read -r line; do echo "        $line"; done <<< "$results"
         echo
     fi
 }
