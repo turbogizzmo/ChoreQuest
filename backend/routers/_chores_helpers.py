@@ -10,7 +10,7 @@ These are internal utilities used across the chores router endpoints:
 from datetime import date, datetime, timezone
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -120,6 +120,15 @@ async def build_rotation_summaries(
     # midnight = 7 pm CDT): current_index is already advanced to tomorrow's
     # kid, but today's local assignment still belongs to the previous kid.
     all_chore_ids = [r.chore_id for r in rotations]
+    # Order so that the most "active" row wins when multiple non-skipped
+    # assignments exist for the same chore/date (e.g. a stale verified row
+    # left over from a previous rotation cycle alongside a new pending one).
+    # pending=0 < completed=1 < verified=2, then newest id first as tiebreak.
+    _status_priority = case(
+        (ChoreAssignment.status == AssignmentStatus.pending, 0),
+        (ChoreAssignment.status == AssignmentStatus.completed, 1),
+        else_=2,
+    )
     today_assignment_result = await db.execute(
         select(ChoreAssignment.chore_id, ChoreAssignment.user_id)
         .where(
@@ -128,11 +137,13 @@ async def build_rotation_summaries(
             ChoreAssignment.date == today,
             ChoreAssignment.status != AssignmentStatus.skipped,
         )
+        .order_by(_status_priority, ChoreAssignment.id.desc())
     )
-    # chore_id → kid_id who has today's actual assignment (non-skipped)
-    today_assigned_kid: dict[int, int] = {
-        row.chore_id: row.user_id for row in today_assignment_result.all()
-    }
+    # chore_id → kid_id who has today's most-active assignment.
+    # setdefault keeps only the first (highest-priority) row per chore.
+    today_assigned_kid: dict[int, int] = {}
+    for row in today_assignment_result.all():
+        today_assigned_kid.setdefault(row.chore_id, row.user_id)
 
     summaries: dict[int, RotationSummary] = {}
     for r in rotations:
