@@ -1,0 +1,393 @@
+// WorldScene: the main overworld. Player walks, fights, and enters portals.
+
+import Phaser from 'phaser';
+import { buildWorldTilemap }     from '../maps/WorldMap.js';
+import { createPlayer, updatePlayer, PLAYER_SPEED } from '../entities/Player.js';
+import { createEnemyAnimations, spawnEnemy, updateEnemy } from '../entities/Enemy.js';
+import { PortalManager }         from '../chore-portals/PortalManager.js';
+import { BattleSystem }          from '../systems/BattleSystem.js';
+import { HUD }                   from '../ui/HUD.js';
+import { writeSave }             from '../systems/SaveSystem.js';
+import { SoundSystem }          from '../systems/SoundSystem.js';
+
+const HUD_DEPTH = 100;
+import { PORTAL_ZONES, ENEMY_ZONES, TILE_SIZE, levelFromXp } from '../data/WorldData.js';
+
+const SAVE_INTERVAL = 15000; // ms
+
+export class WorldScene extends Phaser.Scene {
+  constructor() {
+    super({ key: 'WorldScene' });
+  }
+
+  init(data) {
+    this.userId    = data.userId;
+    this.userName  = data.userName;
+    this.gameData  = { ...data.gameData };
+    this.tileMap   = data.tileMap;
+    this.onExit    = data.onExit    ?? (() => {});
+    this.onComplete = data.onComplete ?? (() => {});
+
+    this._portalCooldown = 0;
+    this._saveTick       = 0;
+    this._paused         = false;
+    this._lastLevel      = levelFromXp(data.gameData?.xp ?? 0);
+  }
+
+  create() {
+    // ── Tilemap ────────────────────────────────────────────────────────
+    const { map, layer } = buildWorldTilemap(this);
+    this.worldLayer = layer;
+
+    // ── Player ─────────────────────────────────────────────────────────
+    this.player = createPlayer(
+      this,
+      this.gameData.playerX,
+      this.gameData.playerY,
+    );
+    this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
+
+    // Collision: player <-> world tiles
+    this.physics.add.collider(this.player, layer);
+
+    // ── Enemies ────────────────────────────────────────────────────────
+    createEnemyAnimations(this);
+    this.enemies = this.physics.add.group();
+    ENEMY_ZONES.forEach((zone) => {
+      for (let i = 0; i < zone.count; i++) {
+        const jx = zone.x * TILE_SIZE + (Math.random() - 0.5) * TILE_SIZE * 2;
+        const jy = zone.y * TILE_SIZE + (Math.random() - 0.5) * TILE_SIZE * 2;
+        const enemy = spawnEnemy(this, zone.type, jx, jy);
+        this.enemies.add(enemy);
+        this.physics.add.collider(enemy, layer);
+      }
+    });
+
+    // Enemy<->player contact
+    this.physics.add.overlap(this.player, this.enemies, (player, enemy) => {
+      this.battle.enemyContactDamage(player, enemy);
+    });
+
+    // ── Portals ────────────────────────────────────────────────────────
+    this.portalMgr = new PortalManager(this);
+    this.portalMgr.addOverlap(this.player);
+    Object.entries(this.gameData.portalRestoreLevels ?? {}).forEach(([id, lvl]) => {
+      this.portalMgr.setRestoreLevel(id, lvl);
+    });
+
+    // ── Sound system ────────────────────────────────────────────────────
+    this.sfx = new SoundSystem(this);
+    this.sfx.startBGM();
+
+    // ── Battle system ──────────────────────────────────────────────────
+    this.battle = new BattleSystem(this);
+    this.events.on('enemyHurt', ({ enemy, damage }) => {
+      // Show damage number over every hit — makes attacks feel responsive
+      this.hud.showFloatingText(enemy.x, enemy.y - 16, `-${damage}`, '#ff4444');
+    });
+
+    this.events.on('enemyDefeated', ({ enemy, xpDrop, coinDrop }) => {
+      this.gameData.xp    += xpDrop;
+      this.gameData.coins += coinDrop;
+      this.hud.showFloatingText(enemy.x, enemy.y, `+${xpDrop} XP`, '#58d854');
+      this.hud.showFloatingText(enemy.x, enemy.y + 14, `+${coinDrop}¢`, '#fcd860');
+      this.sfx.playEnemyDefeat();
+      if (coinDrop > 0) this.time.delayedCall(280, () => this.sfx.playCoinPickup());
+    });
+    this.events.on('playerHurt', ({ damage }) => {
+      this.gameData.hp = Math.max(0, this.gameData.hp - damage);
+      this.sfx.playPlayerHurt();
+      if (this.gameData.hp <= 0) this._handlePlayerDeath();
+    });
+
+    // ── Portal entry ───────────────────────────────────────────────────
+    this.events.on('portalEnter', (zoneData) => {
+      const now = Date.now();
+      if (now - this._portalCooldown < 2000) return;
+      this._portalCooldown = now;
+      this.sfx.playPortalEnter();
+      this.onComplete({ type: 'portalEnter', zone: zoneData, gameData: this.gameData });
+    });
+
+    // ── HUD ────────────────────────────────────────────────────────────
+    this.hud = new HUD(this);
+
+    // ── Keyboard ──────────────────────────────────────────────────────
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.wasd    = this.input.keyboard.addKeys({
+      up:    Phaser.Input.Keyboard.KeyCodes.W,
+      down:  Phaser.Input.Keyboard.KeyCodes.S,
+      left:  Phaser.Input.Keyboard.KeyCodes.A,
+      right: Phaser.Input.Keyboard.KeyCodes.D,
+    });
+    this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.escKey   = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+
+    // ── Pause overlay (ESC) ───────────────────────────────────────────
+    this.escKey.on('down', () => this._togglePause());
+
+    // ── World name banner ─────────────────────────────────────────────
+    const banner = this.add.text(
+      this.scale.width / 2, 20,
+      'Home Realm — Broken Village',
+      { fontSize: '10px', fontFamily: 'monospace', color: '#fcd860',
+        stroke: '#000000', strokeThickness: 3, resolution: 2 }
+    ).setScrollFactor(0).setDepth(50).setOrigin(0.5);
+    this.tweens.add({ targets: banner, alpha: 0, delay: 3000, duration: 1000 });
+
+    // ── Exit button ───────────────────────────────────────────────────
+    const exitBtn = this.add.text(
+      this.scale.width - 8, 8, '[EXIT]',
+      { fontSize: '8px', fontFamily: 'monospace', color: '#ff6644',
+        stroke: '#000', strokeThickness: 2, resolution: 2 }
+    ).setScrollFactor(0).setDepth(HUD_DEPTH + 5).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+    exitBtn.on('pointerdown', () => this._exitGame());
+
+    // ── Tutorial (first visit only) ───────────────────────────────────
+    if (!this.gameData.tutorialSeen) {
+      this.time.delayedCall(400, () => this._showTutorial());
+    }
+  }
+
+  update(time, delta) {
+    if (this._paused) return;
+
+    // Build combined input (keyboard + touch)
+    const touch = this.hud?.touchKeys ?? {};
+    const cursors = {
+      left:  { isDown: this.cursors.left.isDown  || (touch.left?.isDown  ?? false) },
+      right: { isDown: this.cursors.right.isDown || (touch.right?.isDown ?? false) },
+      up:    { isDown: this.cursors.up.isDown    || (touch.up?.isDown    ?? false) },
+      down:  { isDown: this.cursors.down.isDown  || (touch.down?.isDown  ?? false) },
+    };
+
+    updatePlayer(this.player, cursors, this.wasd);
+
+    // Attack on SPACE or touch attack button
+    if (
+      Phaser.Input.Keyboard.JustDown(this.spaceKey) ||
+      (touch.attack?.isDown)
+    ) {
+      this.battle.playerAttack(this.player.weapon, this.enemies, this.player);
+      this._spawnAttackVfx();
+      this.sfx.playAttack();
+    }
+
+    // Level-up detection
+    const curLevel = levelFromXp(this.gameData.xp);
+    if (curLevel > this._lastLevel) {
+      this._lastLevel = curLevel;
+      this.sfx.playLevelUp();
+    }
+
+    // Update enemies
+    this.enemies.getChildren().forEach((e) => updateEnemy(e, this.player, delta));
+
+    // Save player position to gameData continuously
+    this.gameData.playerX = this.player.x;
+    this.gameData.playerY = this.player.y;
+
+    // Periodic save
+    this._saveTick += delta;
+    if (this._saveTick >= SAVE_INTERVAL) {
+      this._saveTick = 0;
+      writeSave({ ...this.gameData, userId: this.userId });
+    }
+
+    // Update HUD
+    this.hud.update(this.gameData);
+  }
+
+  _spawnAttackVfx() {
+    // A wider, brighter sweep that makes it obvious you swung
+    const offsets = { down: [0, 32], up: [0, -32], left: [-32, 0], right: [32, 0] };
+    const [ox, oy] = offsets[this.player.facing] ?? [0, 32];
+    const isHoriz  = (this.player.facing === 'left' || this.player.facing === 'right');
+
+    // Sweep rectangle — elongated in the perpendicular direction
+    const vfx = this.add.rectangle(
+      this.player.x + ox, this.player.y + oy,
+      isHoriz ? 24 : 48,   // width
+      isHoriz ? 48 : 24,   // height
+      0xffffff, 0.85
+    ).setDepth(12);
+
+    this.tweens.add({
+      targets: vfx,
+      alpha: 0,
+      scaleX: 1.8,
+      scaleY: 1.8,
+      duration: 180,
+      ease: 'Power2',
+      onComplete: () => vfx.destroy(),
+    });
+  }
+
+  _handlePlayerDeath() {
+    this.player.isAlive = false;
+    this.player.body.setVelocity(0, 0);
+
+    const w = this.scale.width;
+    const h = this.scale.height;
+    this.add.rectangle(w / 2, h / 2, w, h, 0x000000, 0.6)
+      .setScrollFactor(0).setDepth(200);
+    this.add.text(w / 2, h / 2 - 16, 'You Fainted!', {
+      fontSize: '20px', fontFamily: 'monospace', color: '#ff4444',
+      stroke: '#000', strokeThickness: 4, resolution: 2,
+    }).setScrollFactor(0).setDepth(201).setOrigin(0.5);
+
+    this.time.delayedCall(2500, () => {
+      // Respawn: restore 3 HP
+      this.gameData.hp = Math.min(3, this.gameData.maxHp);
+      this.gameData.playerX = 640;
+      this.gameData.playerY = 640;
+      this.scene.restart({
+        userId: this.userId, userName: this.userName,
+        gameData: this.gameData, tileMap: this.tileMap,
+        onExit: this.onExit, onComplete: this.onComplete,
+      });
+    });
+  }
+
+  _togglePause() {
+    this._paused = !this._paused;
+    if (this._paused) {
+      this.physics.pause();
+      this._showPauseMenu();
+    } else {
+      this.physics.resume();
+      if (this._pauseOverlay) {
+        this._pauseOverlay.destroy();
+        this._pauseOverlay = null;
+      }
+    }
+  }
+
+  _showPauseMenu() {
+    const w = this.scale.width;
+    const h = this.scale.height;
+    const container = this.add.container(0, 0).setScrollFactor(0).setDepth(300);
+
+    const bg = this.add.rectangle(w / 2, h / 2, 200, 160, 0x000000, 0.85);
+    const title = this.add.text(w / 2, h / 2 - 55, '— PAUSED —', {
+      fontSize: '14px', fontFamily: 'monospace', color: '#fcd860',
+      stroke: '#000', strokeThickness: 3, resolution: 2,
+    }).setOrigin(0.5);
+
+    const resumeBtn = this._makePauseBtn(w / 2, h / 2 - 20, 'Resume', () => this._togglePause());
+    const exitBtn   = this._makePauseBtn(w / 2, h / 2 + 20, 'Exit Adventure', () => this._exitGame());
+
+    container.add([bg, title, resumeBtn.bg, resumeBtn.label, exitBtn.bg, exitBtn.label]);
+    this._pauseOverlay = container;
+  }
+
+  _makePauseBtn(x, y, text, cb) {
+    const bg = this.add.rectangle(x, y, 140, 24, 0x2a2a2a, 1)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', cb)
+      .on('pointerover',  () => bg.setFillStyle(0x444444))
+      .on('pointerout',   () => bg.setFillStyle(0x2a2a2a));
+    const label = this.add.text(x, y, text, {
+      fontSize: '10px', fontFamily: 'monospace', color: '#ffffff', resolution: 2,
+    }).setOrigin(0.5);
+    return { bg, label };
+  }
+
+  _showTutorial() {
+    this._paused = true;
+    this.physics.pause();
+
+    const w = this.scale.width;
+    const h = this.scale.height;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    const panelW = Math.min(w - 32, 340);
+    const panelH = 310;
+
+    const container = this.add.container(0, 0).setScrollFactor(0).setDepth(400);
+
+    // ── Background layers (added first = rendered behind) ─────────────
+    const dim   = this.add.rectangle(cx, cy, w, h, 0x000000, 0.75);
+    const panel = this.add.rectangle(cx, cy, panelW, panelH, 0x1a1a2e, 1)
+                    .setStrokeStyle(2, 0xfcd860);
+    container.add([dim, panel]);
+
+    // ── Title + divider ───────────────────────────────────────────────
+    const title = this.add.text(cx, cy - panelH / 2 + 22, '-- HOW TO PLAY --', {
+      fontSize: '11px', fontFamily: 'monospace', color: '#fcd860',
+      stroke: '#000', strokeThickness: 3, resolution: 2,
+    }).setOrigin(0.5);
+    const divLine = this.add.rectangle(cx, cy - panelH / 2 + 38, panelW - 24, 1, 0x3a3a5a);
+    container.add([title, divLine]);
+
+    // ── Control rows ─────────────────────────────────────────────────
+    // [bullet, label, description]
+    const rows = [
+      ['>>', 'MOVE',    'Arrow keys  or  W  A  S  D'],
+      ['>>',  'ATTACK',  'SPACE  (broom swing)'],
+      ['>>',  'PORTALS', 'Walk into glowing orbs\nto open chore quests'],
+      ['>>',  'ENEMIES', 'Attack critters for XP & coins'],
+      ['>>',  'PAUSE',   'ESC  key'],
+    ];
+
+    const rowStartY = cy - panelH / 2 + 60;
+    const rowStep   = 44;
+    const lx = cx - panelW / 2 + 18; // left edge of text
+
+    rows.forEach(([, label, desc], i) => {
+      const ry = rowStartY + i * rowStep;
+
+      const bullet = this.add.text(lx, ry, '>>', {
+        fontSize: '8px', fontFamily: 'monospace', color: '#fcd860',
+        stroke: '#000', strokeThickness: 2, resolution: 2,
+      }).setOrigin(0, 0.5);
+
+      const labelTxt = this.add.text(lx + 20, ry, label, {
+        fontSize: '9px', fontFamily: 'monospace', color: '#ffffff',
+        stroke: '#000', strokeThickness: 2, resolution: 2,
+      }).setOrigin(0, 0.5);
+
+      const descTxt = this.add.text(lx + 20, ry + 14, desc, {
+        fontSize: '7px', fontFamily: 'monospace', color: '#aaaaaa',
+        stroke: '#000', strokeThickness: 2, resolution: 2, lineSpacing: 3,
+      }).setOrigin(0, 0);
+
+      container.add([bullet, labelTxt, descTxt]);
+    });
+
+    // ── "Let's go!" button ────────────────────────────────────────────
+    const btnY  = cy + panelH / 2 - 26;
+    const btnBg = this.add.rectangle(cx, btnY, 150, 28, 0xfcd860)
+      .setInteractive({ useHandCursor: true });
+    const btnTxt = this.add.text(cx, btnY, "Let's go!  (or press any key)", {
+      fontSize: '8px', fontFamily: 'monospace', color: '#1a1a2e',
+      resolution: 2,
+    }).setOrigin(0.5);
+    container.add([btnBg, btnTxt]);
+
+    // ── Dismiss logic ─────────────────────────────────────────────────
+    const dismiss = () => {
+      container.destroy();
+      this._paused = false;
+      this.physics.resume();
+      this.gameData.tutorialSeen = true;
+      writeSave({ ...this.gameData, userId: this.userId });
+      this.input.keyboard.off('keydown', dismiss);
+    };
+
+    btnBg.on('pointerdown', dismiss);
+    btnBg.on('pointerover',  () => btnBg.setFillStyle(0xffe080));
+    btnBg.on('pointerout',   () => btnBg.setFillStyle(0xfcd860));
+    this.input.keyboard.once('keydown', dismiss);
+  }
+
+  _exitGame() {
+    writeSave({ ...this.gameData, userId: this.userId });
+    this.onExit();
+  }
+
+  shutdown() {
+    this.sfx?.destroy();
+  }
+}
