@@ -725,8 +725,8 @@ export class WorldScene extends Phaser.Scene {
       container.destroy();
       this._paused = false;
       this.physics.resume();
-      this._setSurgeTimersPaused(false);
       this.gameData.tutorialSeen = true;
+      this._setSurgeTimersPaused(false);
       writeSave({ ...this.gameData, userId: this.userId });
       this.input.keyboard.off('keydown', dismiss);
     };
@@ -815,7 +815,8 @@ export class WorldScene extends Phaser.Scene {
   }
 
   _setSurgeTimersPaused(paused) {
-    if (this._surgeTimer) this._surgeTimer.paused = paused;
+    const shouldPause = paused || !this.gameData.tutorialSeen;
+    if (this._surgeTimer) this._surgeTimer.paused = shouldPause;
     if (this._surgeEndTimer) this._surgeEndTimer.paused = paused;
   }
 

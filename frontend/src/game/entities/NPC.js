@@ -8,6 +8,7 @@ import { TILE_SIZE } from '../data/WorldData.js';
 
 const PROX_TILES = 3;      // tile radius for dialogue trigger
 const PROX_PX    = PROX_TILES * TILE_SIZE;
+const METRICS_DELAY_MS = 32;
 
 const DIALOGUE_LINES = [
   'Complete chores for XP!',
@@ -102,8 +103,8 @@ export class NPC {
     // Fade in
     bubble.setAlpha(0);
     textEl.setAlpha(0);
-    // Wait a tick for Phaser to populate text metrics before sizing the bubble.
-    scene.time.delayedCall(32, () => {
+    // Wait one render tick for Phaser to populate text metrics before sizing the bubble.
+    scene.time.delayedCall(METRICS_DELAY_MS, () => {
       if (this._bubble !== bubble || !textEl.active) return;
       const pad = 6;
       const bw  = textEl.width  + pad * 2;

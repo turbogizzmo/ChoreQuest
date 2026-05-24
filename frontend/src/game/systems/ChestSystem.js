@@ -34,7 +34,7 @@ export class ChestSystem {
 
     // Pop-in entrance: start tiny + invisible, expand to full size
     sprite.setAlpha(0).setScale(0.2);
-    let pulseTween = null;
+    const chest = { sprite, overlap: null, pulseTween: null, timer: null };
     scene.tweens.add({
       targets: sprite,
       alpha: 1, scaleX: 1.5, scaleY: 1.5,
@@ -45,7 +45,7 @@ export class ChestSystem {
         sprite.refreshBody();
         if (sprite.body) sprite.body.enable = true;
         // Pulse alpha only so the static Arcade body stays aligned with the chest.
-        pulseTween = scene.tweens.add({
+        chest.pulseTween = scene.tweens.add({
           targets: sprite,
           alpha: 0.82,
           yoyo: true,
@@ -57,23 +57,24 @@ export class ChestSystem {
     });
 
     // Player overlap → collect
-    const overlap = scene.physics.add.overlap(scene.player, sprite, () => {
-      this._collectChest(sprite, overlap, pulseTween);
+    chest.overlap = scene.physics.add.overlap(scene.player, sprite, () => {
+      this._collectChest(chest);
     });
 
     // Auto-despawn timer
-    const timer = scene.time.delayedCall(DESPAWN_MS, () => {
-      this._removeChest(sprite, overlap, pulseTween);
+    chest.timer = scene.time.delayedCall(DESPAWN_MS, () => {
+      this._removeChest(chest);
     });
 
-    this._chests.push({ sprite, overlap, pulseTween, timer });
+    this._chests.push(chest);
   }
 
-  _collectChest(sprite, overlap, pulseTween) {
+  _collectChest(chest) {
+    const { sprite } = chest;
     if (!sprite.active) return;
     sprite.setActive(false);
 
-    this._cleanup(sprite, overlap, pulseTween);
+    this._cleanup(chest);
 
     // Pick reward
     const reward = CHEST_REWARDS[Math.floor(Math.random() * CHEST_REWARDS.length)];
@@ -104,11 +105,12 @@ export class ChestSystem {
     this.scene.events.emit('chestCollect', reward);
   }
 
-  _removeChest(sprite, overlap, pulseTween) {
+  _removeChest(chest) {
+    const { sprite } = chest;
     if (!sprite.active) return;
     sprite.setActive(false);
 
-    this._cleanup(sprite, overlap, pulseTween);
+    this._cleanup(chest);
 
     // Shrink + fade out
     this.scene.tweens.add({
@@ -119,16 +121,17 @@ export class ChestSystem {
   }
 
   // Shared teardown: kill timer, remove overlap, kill tween, remove from list
-  _cleanup(sprite, overlap, pulseTween) {
-    this._chests = this._chests.filter((c) => {
-      if (c.sprite === sprite) {
-        c.timer.remove(false);
-        return false;
+  _cleanup(chest) {
+    this._chests = this._chests.filter((c) => c !== chest);
+    try { chest.timer?.remove(false); } catch (_) {}
+    try { chest.pulseTween?.stop(); chest.pulseTween?.destroy?.(); } catch (_) {}
+    try {
+      if (chest.overlap?.destroy) {
+        chest.overlap.destroy();
+      } else {
+        this.scene.physics.world.removeCollider(chest.overlap);
       }
-      return true;
-    });
-    try { pulseTween?.stop(); pulseTween?.destroy?.(); } catch (_) {}
-    try { if (overlap?.destroy) { overlap.destroy(); } else { this.scene.physics.world.removeCollider(overlap); } } catch (_) {}
+    } catch (_) {}
   }
 
   destroy() {
