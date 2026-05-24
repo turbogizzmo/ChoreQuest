@@ -28,7 +28,6 @@ export const PORTAL_ZONES = [
     color: 0xff6644,
     choreCategories: ['Kitchen'],
     description: 'Culinary quests await inside!',
-    restoreLevel: 0,
   },
   {
     id: 'laundry',
@@ -38,7 +37,6 @@ export const PORTAL_ZONES = [
     color: 0x6688ff,
     choreCategories: ['Laundry', 'Bedroom'],
     description: 'Tame the wild laundry beasts!',
-    restoreLevel: 0,
   },
   {
     id: 'yard',
@@ -48,7 +46,6 @@ export const PORTAL_ZONES = [
     color: 0x44cc44,
     choreCategories: ['Garden', 'Pets', 'Outdoor'],
     description: 'The wild outdoors beckons.',
-    restoreLevel: 0,
   },
   {
     id: 'study',
@@ -58,7 +55,6 @@ export const PORTAL_ZONES = [
     color: 0xffcc00,
     choreCategories: ['Homework'],
     description: 'Knowledge is power!',
-    restoreLevel: 0,
   },
   {
     id: 'castle',
@@ -68,7 +64,6 @@ export const PORTAL_ZONES = [
     color: 0xffdd00,
     choreCategories: [],
     description: 'Redeem your hard-earned rewards!',
-    restoreLevel: 0,
     isRewardShop: true,
   },
 ];

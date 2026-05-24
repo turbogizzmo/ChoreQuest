@@ -2,7 +2,7 @@
 
 import Phaser from 'phaser';
 import { buildWorldTilemap }     from '../maps/WorldMap.js';
-import { createPlayer, updatePlayer, PLAYER_SPEED } from '../entities/Player.js';
+import { createPlayer, updatePlayer, playAttackAnim, PLAYER_SPEED } from '../entities/Player.js';
 import { createEnemyAnimations, spawnEnemy, updateEnemy } from '../entities/Enemy.js';
 import { PortalManager }         from '../chore-portals/PortalManager.js';
 import { BattleSystem }          from '../systems/BattleSystem.js';
@@ -124,7 +124,8 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.events.on('comboHit', ({ multiplier }) => {
-      this.hud.showFloatingText(
+      this.hud.showCombo(multiplier);    // persistent HUD counter
+      this.hud.showFloatingText(         // floating pop for immediate impact
         this.player.x, this.player.y - 48,
         `${multiplier}× COMBO!`,
         multiplier >= 3 ? '#ff4444' : '#ff8800',
@@ -190,6 +191,9 @@ export class WorldScene extends Phaser.Scene {
     if (!this.gameData.tutorialSeen) {
       this.time.delayedCall(400, () => this._showTutorial());
     }
+
+    // Notify React shell that the scene is fully initialised — hides loading splash
+    this.onComplete({ type: 'sceneReady' });
   }
 
   update(time, delta) {
@@ -213,7 +217,8 @@ export class WorldScene extends Phaser.Scene {
     ) {
       this.battle.playerAttack(this.player.weapon, this.enemies, this.player);
       this._spawnAttackVfx();
-      this.sfx.playAttack();
+      this.sfx.playAttack(this.player.weapon ?? 'broom');
+      playAttackAnim(this, this.player, 180); // show directional swing frame
     }
 
     // Level-up detection
@@ -221,6 +226,9 @@ export class WorldScene extends Phaser.Scene {
     if (curLevel > this._lastLevel) {
       this._lastLevel = curLevel;
       this.sfx.playLevelUp();
+      this._showLevelUpBanner(curLevel);
+      // Persist immediately so a crash right after levelling doesn't lose progress
+      writeSave({ ...this.gameData, userId: this.userId });
     }
 
     // Day/night cycle (10-minute sinusoidal loop, max alpha 0.55)
@@ -228,6 +236,7 @@ export class WorldScene extends Phaser.Scene {
     const phase      = ((this.time.now - this._cycleStart) % CYCLE_MS) / CYCLE_MS;
     const nightAlpha = 0.55 * 0.5 * (1 - Math.cos(2 * Math.PI * phase));
     this._nightOverlay.setAlpha(nightAlpha);
+    this.hud.updateNightCycle(nightAlpha);
     // Enemies get up to 30% faster at peak night
     const nightBoost = 1 + nightAlpha * 0.55;
 
@@ -262,27 +271,89 @@ export class WorldScene extends Phaser.Scene {
   }
 
   _spawnAttackVfx() {
-    // A wider, brighter sweep that makes it obvious you swung
+    const weapon  = this.player.weapon ?? 'broom';
+    const facing  = this.player.facing ?? 'down';
     const offsets = { down: [0, 32], up: [0, -32], left: [-32, 0], right: [32, 0] };
-    const [ox, oy] = offsets[this.player.facing] ?? [0, 32];
-    const isHoriz  = (this.player.facing === 'left' || this.player.facing === 'right');
+    const [ox, oy] = offsets[facing] ?? [0, 32];
+    const isHoriz  = (facing === 'left' || facing === 'right');
+    const px = this.player.x + ox;
+    const py = this.player.y + oy;
 
-    // Sweep rectangle — elongated in the perpendicular direction
+    if (weapon === 'broom') {
+      // Diagonal slash arc: two crossing rectangles in NES yellow
+      const ang = isHoriz ? 0 : Math.PI / 2;
+      const vfx1 = this.add.rectangle(px, py, 40, 8, 0xfcd860, 0.9)
+        .setDepth(12).setRotation(ang + Math.PI / 4);
+      const vfx2 = this.add.rectangle(px, py, 40, 8, 0xfcd860, 0.9)
+        .setDepth(12).setRotation(ang - Math.PI / 4);
+      [vfx1, vfx2].forEach((v) => {
+        this.tweens.add({
+          targets: v, alpha: 0, scaleX: 1.6, scaleY: 1.6,
+          duration: 180, ease: 'Power2', onComplete: () => v.destroy(),
+        });
+      });
+      return;
+    }
+
+    if (weapon === 'vacuum') {
+      // Rectangular "blast" beam extending from player in facing direction
+      const vfx = this.add.rectangle(
+        px, py,
+        isHoriz ? 48 : 28, isHoriz ? 28 : 48,
+        0x6888fc, 0.80
+      ).setDepth(12);
+      this.tweens.add({
+        targets: vfx, alpha: 0, scaleX: 2, scaleY: 2,
+        duration: 220, ease: 'Power1', onComplete: () => vfx.destroy(),
+      });
+      return;
+    }
+
+    if (weapon === 'soap') {
+      // Splatter: 5 small orange droplets radiating outward
+      for (let i = 0; i < 5; i++) {
+        const baseAngle = Math.atan2(oy, ox);
+        const spread    = (Math.PI / 3);
+        const a         = baseAngle + (i - 2) * (spread / 4);
+        const drop      = this.add.rectangle(
+          this.player.x, this.player.y, 6, 6, 0xfc7820, 0.9,
+        ).setDepth(12);
+        this.tweens.add({
+          targets: drop,
+          x: this.player.x + Math.cos(a) * 36,
+          y: this.player.y + Math.sin(a) * 36,
+          alpha: 0, scaleX: 0.3, scaleY: 0.3,
+          duration: 200, ease: 'Power1', onComplete: () => drop.destroy(),
+        });
+      }
+      return;
+    }
+
+    if (weapon === 'sponge') {
+      // Radial burst — ring of 8 white squares expanding outward
+      for (let i = 0; i < 8; i++) {
+        const a    = (Math.PI * 2 * i) / 8;
+        const puff = this.add.rectangle(
+          this.player.x, this.player.y, 8, 8, 0xfcfcfc, 0.85,
+        ).setDepth(12);
+        this.tweens.add({
+          targets: puff,
+          x: this.player.x + Math.cos(a) * 56,
+          y: this.player.y + Math.sin(a) * 56,
+          alpha: 0, scaleX: 0.5, scaleY: 0.5,
+          duration: 280, ease: 'Power2', onComplete: () => puff.destroy(),
+        });
+      }
+      return;
+    }
+
+    // Fallback: original white sweep
     const vfx = this.add.rectangle(
-      this.player.x + ox, this.player.y + oy,
-      isHoriz ? 24 : 48,   // width
-      isHoriz ? 48 : 24,   // height
-      0xffffff, 0.85
+      px, py, isHoriz ? 24 : 48, isHoriz ? 48 : 24, 0xffffff, 0.85,
     ).setDepth(12);
-
     this.tweens.add({
-      targets: vfx,
-      alpha: 0,
-      scaleX: 1.8,
-      scaleY: 1.8,
-      duration: 180,
-      ease: 'Power2',
-      onComplete: () => vfx.destroy(),
+      targets: vfx, alpha: 0, scaleX: 1.8, scaleY: 1.8,
+      duration: 180, ease: 'Power2', onComplete: () => vfx.destroy(),
     });
   }
 
@@ -316,18 +387,54 @@ export class WorldScene extends Phaser.Scene {
   _handlePlayerDeath() {
     this.player.isAlive = false;
     this.player.body.setVelocity(0, 0);
+    this.physics.pause();
 
     const w = this.scale.width;
     const h = this.scale.height;
-    this.add.rectangle(w / 2, h / 2, w, h, 0x000000, 0.6)
-      .setScrollFactor(0).setDepth(200);
-    this.add.text(w / 2, h / 2 - 16, 'You Fainted!', {
-      fontSize: '20px', fontFamily: 'monospace', color: '#ff4444',
-      stroke: '#000', strokeThickness: 4, resolution: 2,
-    }).setScrollFactor(0).setDepth(201).setOrigin(0.5);
 
-    this.time.delayedCall(2500, () => {
-      // Respawn: restore 3 HP
+    // 1. Player sprite: spin + shrink to nothing
+    this.tweens.add({
+      targets: this.player,
+      angle: 360,
+      scaleX: 0, scaleY: 0,
+      alpha: 0,
+      duration: 600,
+      ease: 'Power2',
+    });
+
+    // 2. Screen darkens gradually after the sprite finishes
+    const overlay = this.add.rectangle(w / 2, h / 2, w, h, 0x000000, 0)
+      .setScrollFactor(0).setDepth(200);
+    this.tweens.add({
+      targets: overlay, alpha: 0.75,
+      delay: 400, duration: 500, ease: 'Power1',
+    });
+
+    // 3. "YOU FAINTED" slides down from above with a bounce
+    const faintTxt = this.add.text(w / 2, h / 2 - h * 0.4, 'YOU FAINTED', {
+      fontSize: '22px', fontFamily: 'monospace', color: '#ff4444',
+      stroke: '#000', strokeThickness: 5, resolution: 2,
+    }).setScrollFactor(0).setDepth(201).setOrigin(0.5).setAlpha(0);
+    this.tweens.add({
+      targets: faintTxt,
+      y: h / 2 - 20,
+      alpha: 1,
+      delay: 700,
+      duration: 400,
+      ease: 'Bounce.easeOut',
+    });
+
+    // 4. Respawn sub-text fades in below
+    const respawnTxt = this.add.text(w / 2, h / 2 + 20, 'Respawning with 3 hearts...', {
+      fontSize: '9px', fontFamily: 'monospace', color: '#888888',
+      stroke: '#000', strokeThickness: 2, resolution: 2,
+    }).setScrollFactor(0).setDepth(201).setOrigin(0.5).setAlpha(0);
+    this.tweens.add({
+      targets: respawnTxt, alpha: 1,
+      delay: 1200, duration: 300,
+    });
+
+    this.time.delayedCall(2800, () => {
       this.gameData.hp = Math.min(3, this.gameData.maxHp);
       this.gameData.playerX = 640;
       this.gameData.playerY = 640;
@@ -335,6 +442,7 @@ export class WorldScene extends Phaser.Scene {
         userId: this.userId, userName: this.userName,
         gameData: this.gameData, tileMap: this.tileMap,
         onExit: this.onExit, onComplete: this.onComplete,
+        isKid: this.isKid,
       });
     });
   }
@@ -388,74 +496,133 @@ export class WorldScene extends Phaser.Scene {
     this._paused = true;
     this.physics.pause();
 
-    const w = this.scale.width;
-    const h = this.scale.height;
+    const w  = this.scale.width;
+    const h  = this.scale.height;
     const cx = w / 2;
     const cy = h / 2;
 
-    const panelW = Math.min(w - 32, 340);
-    const panelH = 310;
+    // Panel dimensions — wider and taller than the original for legibility
+    const panelW = Math.min(w - 20, 440);
+    const isTouch = this.sys.game.device.input.touch;
+    // Compute panel height from content so nothing is clipped on small screens
+    const TITLE_H   = 56;  // title + subtitle + divider
+    const GRID_ROWS = 3;
+    const ROW_H     = 54;
+    const TOUCH_H   = isTouch ? 28 : 0;
+    const BTN_H     = 54;  // divider + button + sub-label
+    const VPAD      = 20;  // top + bottom padding
+    const panelH    = Math.min(h - 16, TITLE_H + GRID_ROWS * ROW_H + TOUCH_H + BTN_H + VPAD * 2);
+    const top       = cy - panelH / 2;
 
     const container = this.add.container(0, 0).setScrollFactor(0).setDepth(400);
 
-    // ── Background layers (added first = rendered behind) ─────────────
-    const dim   = this.add.rectangle(cx, cy, w, h, 0x000000, 0.75);
-    const panel = this.add.rectangle(cx, cy, panelW, panelH, 0x1a1a2e, 1)
-                    .setStrokeStyle(2, 0xfcd860);
-    container.add([dim, panel]);
+    // ── Backdrop + panel ──────────────────────────────────────────────
+    const dim   = this.add.rectangle(cx, cy, w, h, 0x000000, 0.82);
+    const panel = this.add.rectangle(cx, cy, panelW, panelH, 0x0d0d1e, 1)
+      .setStrokeStyle(2, 0xfcd860);
+    // NES-style corner accent dots
+    const cornerOffsets = [
+      [-panelW / 2 + 5,  -panelH / 2 + 5],
+      [ panelW / 2 - 5,  -panelH / 2 + 5],
+      [-panelW / 2 + 5,   panelH / 2 - 5],
+      [ panelW / 2 - 5,   panelH / 2 - 5],
+    ];
+    const corners = cornerOffsets.map(([ox, oy]) =>
+      this.add.rectangle(cx + ox, cy + oy, 4, 4, 0xfcd860)
+    );
+    container.add([dim, panel, ...corners]);
 
-    // ── Title + divider ───────────────────────────────────────────────
-    const title = this.add.text(cx, cy - panelH / 2 + 22, '-- HOW TO PLAY --', {
-      fontSize: '11px', fontFamily: 'monospace', color: '#fcd860',
-      stroke: '#000', strokeThickness: 3, resolution: 2,
-    }).setOrigin(0.5);
-    const divLine = this.add.rectangle(cx, cy - panelH / 2 + 38, panelW - 24, 1, 0x3a3a5a);
-    container.add([title, divLine]);
+    // ── Title block ───────────────────────────────────────────────────
+    const titleY = top + VPAD + 14;
+    const titleTxt = this.add.text(cx, titleY,
+      '⚔  ADVENTURE MODE  ⚔', {
+        fontSize: '13px', fontFamily: 'monospace', color: '#fcd860',
+        stroke: '#000', strokeThickness: 3, resolution: 2,
+      }).setOrigin(0.5);
+    const subTxt = this.add.text(cx, titleY + 18,
+      'Complete chores  ›  earn XP & coins  ›  level up!', {
+        fontSize: '8px', fontFamily: 'monospace', color: '#666688',
+        stroke: '#000', strokeThickness: 2, resolution: 2,
+      }).setOrigin(0.5);
+    const divTop = this.add.rectangle(cx, titleY + 32, panelW - 28, 1, 0x2a2a4a);
+    container.add([titleTxt, subTxt, divTop]);
 
-    // ── Control rows ─────────────────────────────────────────────────
-    // [bullet, label, description]
-    const rows = [
-      ['>>', 'MOVE',    'Arrow keys  or  W  A  S  D'],
-      ['>>',  'ATTACK',  'SPACE  (broom swing)'],
-      ['>>',  'PORTALS', 'Walk into glowing orbs\nto open chore quests'],
-      ['>>',  'ENEMIES', 'Attack critters for XP & coins'],
-      ['>>',  'PAUSE',   'ESC  key'],
+    // ── Controls grid (2 columns × 3 rows) ───────────────────────────
+    // Each entry: [col, icon, action, keyHint, description, accentColor]
+    const controls = [
+      [0, '◈', 'MOVE',    '[ ↑↓←→ ]  or  [ W A S D ]', 'Walk around the Home Realm',       '#6888fc'],
+      [0, '◉', 'PORTALS', 'Walk into a glowing portal',  'Opens your chore quest list',       '#58d854'],
+      [0, '▸', 'PAUSE',   '[ ESC ]',                     'Pause or open the menu',            '#bcbcbc'],
+      [1, '✦', 'ATTACK',  '[ SPACE ]',                   'Swing your weapon at enemies',      '#fca044'],
+      [1, '◎', 'COINS',   'Defeat enemies + do chores',  'Spend at the Reward Castle  ★',    '#fcd860'],
+      [1, '⚔', 'WEAPONS', 'Visit the Reward Castle',     'Buy upgrades with your coins',      '#f87858'],
     ];
 
-    const rowStartY = cy - panelH / 2 + 60;
-    const rowStep   = 44;
-    const lx = cx - panelW / 2 + 18; // left edge of text
+    const gridTop  = top + TITLE_H + VPAD;
+    const colLx    = cx - panelW / 2 + 16;
+    const colRx    = cx + 4;
 
-    rows.forEach(([, label, desc], i) => {
-      const ry = rowStartY + i * rowStep;
+    controls.forEach(([col, icon, action, key, desc, color], idx) => {
+      const row = idx % GRID_ROWS;   // 0–2
+      const lx  = col === 0 ? colLx : colRx;
+      const ry  = gridTop + row * ROW_H;
 
-      const bullet = this.add.text(lx, ry, '>>', {
-        fontSize: '8px', fontFamily: 'monospace', color: '#fcd860',
-        stroke: '#000', strokeThickness: 2, resolution: 2,
+      const iconT = this.add.text(lx, ry + 10, icon, {
+        fontSize: '15px', fontFamily: 'monospace', color,
+        stroke: '#000', strokeThickness: 3, resolution: 2,
       }).setOrigin(0, 0.5);
 
-      const labelTxt = this.add.text(lx + 20, ry, label, {
-        fontSize: '9px', fontFamily: 'monospace', color: '#ffffff',
+      const actT = this.add.text(lx + 22, ry + 1, action, {
+        fontSize: '10px', fontFamily: 'monospace', color: '#e5e5e5',
         stroke: '#000', strokeThickness: 2, resolution: 2,
-      }).setOrigin(0, 0.5);
-
-      const descTxt = this.add.text(lx + 20, ry + 14, desc, {
-        fontSize: '7px', fontFamily: 'monospace', color: '#aaaaaa',
-        stroke: '#000', strokeThickness: 2, resolution: 2, lineSpacing: 3,
       }).setOrigin(0, 0);
 
-      container.add([bullet, labelTxt, descTxt]);
+      const keyT = this.add.text(lx + 22, ry + 16, key, {
+        fontSize: '8px', fontFamily: 'monospace', color,
+        stroke: '#000', strokeThickness: 2, resolution: 2,
+      }).setOrigin(0, 0);
+
+      const descT = this.add.text(lx + 22, ry + 30, desc, {
+        fontSize: '7px', fontFamily: 'monospace', color: '#777799',
+        stroke: '#000', strokeThickness: 1, resolution: 2,
+      }).setOrigin(0, 0);
+
+      container.add([iconT, actT, keyT, descT]);
     });
 
-    // ── "Let's go!" button ────────────────────────────────────────────
-    const btnY  = cy + panelH / 2 - 26;
-    const btnBg = this.add.rectangle(cx, btnY, 150, 28, 0xfcd860)
+    // Column divider line (between the two columns)
+    const colDiv = this.add.rectangle(cx - 2, gridTop + (GRID_ROWS * ROW_H) / 2,
+      1, GRID_ROWS * ROW_H - 8, 0x2a2a4a);
+    container.add([colDiv]);
+
+    // ── Touch controls hint (only on touch devices) ───────────────────
+    let touchBottom = gridTop + GRID_ROWS * ROW_H;
+    if (isTouch) {
+      const touchDivY = touchBottom + 4;
+      const touchDiv  = this.add.rectangle(cx, touchDivY, panelW - 28, 1, 0x2a2a4a);
+      const touchTxt  = this.add.text(cx, touchDivY + 14,
+        '📱  Joystick (bottom-left)   +   ⚔ button (bottom-right)', {
+          fontSize: '7px', fontFamily: 'monospace', color: '#555577',
+          stroke: '#000', strokeThickness: 2, resolution: 2,
+        }).setOrigin(0.5);
+      container.add([touchDiv, touchTxt]);
+      touchBottom += TOUCH_H;
+    }
+
+    // ── Dismiss button ────────────────────────────────────────────────
+    const btnDivY = touchBottom + 8;
+    const btnDiv  = this.add.rectangle(cx, btnDivY, panelW - 28, 1, 0x2a2a4a);
+    const btnY    = btnDivY + 22;
+    const btnBg   = this.add.rectangle(cx, btnY, panelW - 56, 28, 0xfcd860)
       .setInteractive({ useHandCursor: true });
-    const btnTxt = this.add.text(cx, btnY, "Let's go!  (or press any key)", {
-      fontSize: '8px', fontFamily: 'monospace', color: '#1a1a2e',
-      resolution: 2,
+    const btnTxt  = this.add.text(cx, btnY, '►  LET\'S GO!  ◄', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#0d0d1e',
+      stroke: '#000000', strokeThickness: 1, resolution: 2,
     }).setOrigin(0.5);
-    container.add([btnBg, btnTxt]);
+    const btnSub  = this.add.text(cx, btnY + 20, 'or press any key', {
+      fontSize: '7px', fontFamily: 'monospace', color: '#555555', resolution: 2,
+    }).setOrigin(0.5);
+    container.add([btnDiv, btnBg, btnTxt, btnSub]);
 
     // ── Dismiss logic ─────────────────────────────────────────────────
     const dismiss = () => {
@@ -471,6 +638,46 @@ export class WorldScene extends Phaser.Scene {
     btnBg.on('pointerover',  () => btnBg.setFillStyle(0xffe080));
     btnBg.on('pointerout',   () => btnBg.setFillStyle(0xfcd860));
     this.input.keyboard.once('keydown', dismiss);
+
+    // Panel slides in from below for a polished entrance
+    container.setAlpha(0).setY(30);
+    this.tweens.add({
+      targets: container, alpha: 1, y: 0,
+      duration: 280, ease: 'Power2',
+    });
+  }
+
+  _showLevelUpBanner(level) {
+    const w = this.scale.width;
+    const h = this.scale.height;
+
+    // Screen flash
+    const cam   = this.cameras.main;
+    const flash = this.add.rectangle(cam.width / 2, cam.height / 2, cam.width, cam.height, 0xffffff, 0)
+      .setScrollFactor(0).setDepth(200);
+    this.tweens.add({
+      targets: flash, alpha: 0.45,
+      yoyo: true, duration: 100, repeat: 1,
+      onComplete: () => flash.destroy(),
+    });
+
+    // Big golden "LEVEL UP!" text that rises and fades
+    const txt = this.add.text(w / 2, h / 2 + 10, `✦  LEVEL UP!  LV ${level}  ✦`, {
+      fontSize: '16px', fontFamily: 'monospace', color: '#fcd860',
+      stroke: '#000000', strokeThickness: 5, resolution: 2,
+    }).setScrollFactor(0).setDepth(201).setOrigin(0.5).setAlpha(0);
+
+    this.tweens.add({
+      targets: txt, alpha: 1, y: h / 2 - 20,
+      duration: 300, ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: txt, alpha: 0, y: h / 2 - 60,
+          delay: 1200, duration: 500, ease: 'Power2',
+          onComplete: () => txt.destroy(),
+        });
+      },
+    });
   }
 
   _exitGame() {
