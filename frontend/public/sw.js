@@ -118,7 +118,17 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
-      }).catch(() => cached);
+      }).catch(() => {
+        // Network failed. Return the cached version if available, otherwise a
+        // real error Response so respondWith() always receives a valid object.
+        // Returning `undefined` here would trigger a "bad respondWith" error in
+        // the browser and manifest as a mysterious "script failed to load" error
+        // to the user.
+        return cached || new Response('Network error', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain' },
+        });
+      });
       return cached || fetched;
     })
   );
