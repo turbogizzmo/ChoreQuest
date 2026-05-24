@@ -320,9 +320,9 @@ export default function ChoreDetail() {
         body: { rotation_day: parseInt(newDay) },
       });
       await fetchRotation();
-      setActionMessage(`Rotation day updated.`);
+      showToast('Rotation day updated.', 'success');
     } catch (err) {
-      setActionMessage(err.message || 'Could not update rotation day.');
+      showToast(err.message || 'Could not update rotation day.', 'error');
     } finally {
       setActionLoading('');
     }
