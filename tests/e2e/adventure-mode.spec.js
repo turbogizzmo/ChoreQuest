@@ -178,6 +178,8 @@ test.describe('Adventure mode preview', () => {
 
     await expect(page).toHaveURL(/\/adventure/);
     await expect(page.getByText("PREVIEW — XP won't count on leaderboard")).toBeVisible();
+    await expect(page.getByText('Loading Adventure Mode...')).toBeHidden();
+    await expect(page.locator('#adventure-game-container canvas')).toBeVisible();
     await page.waitForLoadState('networkidle');
 
     expect(consoleErrors).toEqual([]);

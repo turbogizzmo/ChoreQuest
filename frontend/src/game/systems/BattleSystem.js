@@ -222,6 +222,7 @@ export class BattleSystem {
   // Called when an enemy overlaps the player
   enemyContactDamage(player, enemy) {
     const now  = Date.now();
+    if (this.scene.isRespawnInvulnerable?.()) return;
     const key  = `player_iframes`;
     const last = this.cooldowns[key] || 0;
     if (now - last < 1000) return; // 1 s invincibility

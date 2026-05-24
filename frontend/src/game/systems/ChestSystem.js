@@ -117,14 +117,14 @@ export class ChestSystem {
       return true;
     });
     try { pulseTween?.stop(); pulseTween?.destroy?.(); } catch (_) {}
-    try { overlap.destroy?.() ?? this.scene.physics.world.removeCollider(overlap); } catch (_) {}
+    try { if (overlap?.destroy) { overlap.destroy(); } else { this.scene.physics.world.removeCollider(overlap); } } catch (_) {}
   }
 
   destroy() {
     this._chests.forEach(({ sprite, overlap, pulseTween, timer }) => {
       try { timer.remove(false); } catch (_) {}
       try { pulseTween?.stop(); } catch (_) {}
-      try { overlap.destroy?.() ?? this.scene.physics.world.removeCollider(overlap); } catch (_) {}
+      try { if (overlap?.destroy) { overlap.destroy(); } else { this.scene.physics.world.removeCollider(overlap); } } catch (_) {}
       try { sprite.destroy(); } catch (_) {}
     });
     this._chests = [];
