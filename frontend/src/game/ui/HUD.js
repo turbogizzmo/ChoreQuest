@@ -2,7 +2,7 @@
 // All elements are fixed to the camera (setScrollFactor(0)).
 
 import Phaser from 'phaser';
-import { xpForLevel, levelFromXp, PORTAL_ZONES, MAP_COLS, TILE_SIZE } from '../data/WorldData.js';
+import { xpForLevel, levelFromXp, PORTAL_ZONES, BOSS_ZONES, MAP_COLS, TILE_SIZE } from '../data/WorldData.js';
 
 const MAX_HEARTS   = 5;
 const HUD_DEPTH    = 100;
@@ -28,13 +28,18 @@ export class HUD {
 
     const xpY  = PADDING + HEART_SIZE + 6;
     const BAR_W = 128;
-    const HUD_BG_W = PADDING + MAX_HEARTS * (HEART_SIZE + HEART_GAP) + 4;
     const HUD_BG_H = xpY + 12 + 6;
 
     // ── Dark background strip for top-left HUD ───────────────────────
+    // Width covers hearts row OR xp bar + level badge, whichever is wider.
+    // BAR_W * 1.25 = 160px bar + 50px for level badge text = 210px content.
+    const HUD_BG_CONTENT = Math.max(
+      MAX_HEARTS * (HEART_SIZE + HEART_GAP),   // hearts: 135px
+      BAR_W * 1.25 + 50,                        // xp bar + level badge: 210px
+    );
     const bgLeft = scene.add.graphics();
     bgLeft.fillStyle(0x000000, 0.55);
-    bgLeft.fillRoundedRect(2, 2, HUD_BG_W + 52, HUD_BG_H, 5);
+    bgLeft.fillRoundedRect(2, 2, PADDING + HUD_BG_CONTENT + 6, HUD_BG_H, 5);
     bgLeft.setScrollFactor(0).setDepth(HUD_DEPTH - 1);
 
     // ── Hearts (top-left) ────────────────────────────────────────────
@@ -75,7 +80,7 @@ export class HUD {
       stroke: '#000000',
       strokeThickness: 4,
       resolution: 2,
-    }).setScrollFactor(0).setDepth(HUD_DEPTH);
+    }).setScrollFactor(0).setDepth(HUD_DEPTH + 3); // above xpFill crop edge
 
     // ── Coin counter (top-right) ──────────────────────────────────────
     const coinX = W - PADDING - 48;
@@ -109,6 +114,20 @@ export class HUD {
     // ── Mini-map (top-right, below coin counter) ──────────────────────
     this._buildMinimap(W);
 
+    // ── Combo counter (below XP bar, hidden until first combo) ──────
+    this._comboLabel = scene.add.text(PADDING, xpY + 20, '', {
+      fontSize: '10px', fontFamily: 'monospace',
+      color: '#ff8800', stroke: '#000000', strokeThickness: 3, resolution: 2,
+    }).setScrollFactor(0).setDepth(HUD_DEPTH + 5).setVisible(false);
+    this._comboFadeTimer = null;
+
+    // ── Day/night clock icon (top-center) ───────────────────────────
+    // Unicode sun ☀ → moon ☾ tint shifts as the overlay darkens.
+    this._dayNightLabel = scene.add.text(W / 2, 6, '☀', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#fcd860',
+      stroke: '#000000', strokeThickness: 3, resolution: 2,
+    }).setScrollFactor(0).setDepth(HUD_DEPTH).setOrigin(0.5, 0);
+
     // ── Touch action buttons (bottom) ────────────────────────────────
     if (scene.sys.game.device.input.touch) {
       this._buildTouchControls();
@@ -141,14 +160,45 @@ export class HUD {
       stroke: '#000', strokeThickness: 2, resolution: 2,
     }).setScrollFactor(0).setDepth(HUD_DEPTH).setOrigin(0.5, 1);
 
-    // Portal markers (static)
+    // Water border trace — gives the map geographic context
+    const mmBorder = scene.add.graphics();
+    mmBorder.lineStyle(1, 0x0028f8, 0.55);
+    mmBorder.strokeRect(MM_X, MM_Y, MM_SIZE, MM_SIZE);
+    mmBorder.setScrollFactor(0).setDepth(HUD_DEPTH + 1);
+
+    // Path tile layer — main cross paths run through tile 19–20 (midRow/midCol of 40×40 map).
+    // Each tile = 2px on the 80px mini-map (80 / 40 = 2).
+    // The path is 2 tiles wide, so draw a 4px-wide cross centred at tile 19.5.
+    const mmPath = scene.add.graphics();
+    mmPath.fillStyle(0xbcbcbc, 0.30); // light grey, semi-transparent
+    const pathTile  = 19;             // first of the two mid-column/row tiles
+    const pathPx    = pathTile * 2;   // pixel position on the 80px map
+    // Vertical path (columns 19–20 → x 38–41)
+    mmPath.fillRect(MM_X + pathPx, MM_Y, 4, MM_SIZE);
+    // Horizontal path (rows 19–20 → y 38–41)
+    mmPath.fillRect(MM_X, MM_Y + pathPx, MM_SIZE, 4);
+    mmPath.setScrollFactor(0).setDepth(HUD_DEPTH + 1);
+
+    // Portal markers (static) — castle marker larger and brighter
     const scale = MM_SIZE / WORLD_PX;
     PORTAL_ZONES.forEach((zone) => {
       const px = MM_X + zone.x * TILE_SIZE * scale;
       const py = MM_Y + zone.y * TILE_SIZE * scale;
       const colorHex = zone.color ?? 0xffffff;
-      scene.add.rectangle(px, py, 4, 4, colorHex, 0.9)
+      const sz = zone.isRewardShop ? 6 : 4;
+      scene.add.rectangle(px, py, sz, sz, colorHex, 0.9)
         .setScrollFactor(0).setDepth(HUD_DEPTH + 1).setOrigin(0.5);
+    });
+
+    // Boss respawn timer labels — shown when boss is defeated (re-evaluated in update)
+    this._bossTimers = BOSS_ZONES.map((bz) => {
+      const px = MM_X + bz.x * TILE_SIZE * scale;
+      const py = MM_Y + bz.y * TILE_SIZE * scale;
+      const label = scene.add.text(px, py - 4, '', {
+        fontSize: '5px', fontFamily: 'monospace', color: '#ff8888',
+        stroke: '#000', strokeThickness: 2, resolution: 2,
+      }).setScrollFactor(0).setDepth(HUD_DEPTH + 3).setOrigin(0.5, 1);
+      return { bossType: bz.type, label };
     });
 
     // Dynamic graphics (player + enemies) — redrawn each frame
@@ -181,6 +231,23 @@ export class HUD {
     if (player) {
       gfx.fillStyle(0xffffff, 1);
       gfx.fillRect(mmX + player.x * scale - 2, mmY + player.y * scale - 2, 4, 4);
+    }
+
+    // Boss respawn countdown labels
+    const bossDefeats = this.scene.gameData?.bossDefeats ?? {};
+    const RESPAWN_MS  = 24 * 60 * 60 * 1000;
+    if (this._bossTimers) {
+      this._bossTimers.forEach(({ bossType, label }) => {
+        const defeatedAt = bossDefeats[bossType] ?? 0;
+        const remaining  = defeatedAt ? RESPAWN_MS - (Date.now() - defeatedAt) : 0;
+        if (remaining > 0) {
+          const hrs = Math.ceil(remaining / (60 * 60 * 1000));
+          label.setText(`${hrs}h`);
+          label.setVisible(true);
+        } else {
+          label.setVisible(false);
+        }
+      });
     }
   }
 
@@ -279,6 +346,45 @@ export class HUD {
     });
     atkBtn.on('pointerup',  () => { this.touchKeys.attack.isDown = false; });
     atkBtn.on('pointerout', () => { this.touchKeys.attack.isDown = false; });
+  }
+
+  showCombo(multiplier) {
+    if (!this._comboLabel) return;
+    this.scene.tweens.killTweensOf(this._comboLabel);
+    if (this._comboFadeTimer) {
+      this._comboFadeTimer.remove(false);
+      this._comboFadeTimer = null;
+    }
+
+    const color = multiplier >= 3 ? '#ff4444' : '#ff8800';
+    const stars = multiplier >= 3 ? '★★★' : '★★';
+    this._comboLabel.setText(`${multiplier}× COMBO! ${stars}`)
+      .setColor(color).setVisible(true).setAlpha(1);
+
+    // Cancel any running fade and restart 1.5 s countdown
+    this._comboFadeTimer = this.scene.time.delayedCall(1500, () => {
+      this.scene.tweens.add({
+        targets: this._comboLabel, alpha: 0, duration: 400,
+        onComplete: () => {
+          this._comboLabel?.setVisible(false);
+          this._comboFadeTimer = null;
+        },
+      });
+    });
+  }
+
+  // Called each frame with the current night overlay alpha (0 = full day, 0.55 = full night)
+  updateNightCycle(nightAlpha) {
+    if (!this._dayNightLabel) return;
+    // Cross-fade: day (☀ yellow) → night (☾ light-blue)
+    if (nightAlpha > 0.35) {
+      this._dayNightLabel.setText('☾');
+      // Lerp color toward light-blue at peak night
+      this._dayNightLabel.setColor('#a4e4fc');
+    } else {
+      this._dayNightLabel.setText('☀');
+      this._dayNightLabel.setColor('#fcd860');
+    }
   }
 
   update(gameData) {
