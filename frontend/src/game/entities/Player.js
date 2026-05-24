@@ -7,8 +7,9 @@ export function createPlayerAnimations(scene) {
   const anims = scene.anims;
   if (anims.exists('player_down')) return;
 
-  // Frame layout in sheet: 12 frames total (dir*3 + walkFrame)
-  // dir: 0=down, 1=left, 2=right, 3=up
+  // Frame layout:
+  //   0–11  walk (dir*3 + walkFrame): dir 0=down, 1=left, 2=right, 3=up
+  //   12–15 attack (down, left, right, up)
   const dirMap = { down: 0, left: 1, right: 2, up: 3 };
   Object.entries(dirMap).forEach(([dir, dirIdx]) => {
     const start = dirIdx * 3;
@@ -23,6 +24,17 @@ export function createPlayerAnimations(scene) {
       frames: anims.generateFrameNumbers('player', { start, end: start }),
       frameRate: 1,
       repeat: -1,
+    });
+  });
+
+  // Attack animations — single-frame held for 180ms then snap back to idle
+  const attackFrameMap = { down: 12, left: 13, right: 14, up: 15 };
+  Object.entries(attackFrameMap).forEach(([dir, frame]) => {
+    anims.create({
+      key: `player_attack_${dir}`,
+      frames: anims.generateFrameNumbers('player', { start: frame, end: frame }),
+      frameRate: 1,
+      repeat: 0,
     });
   });
 }
@@ -41,6 +53,15 @@ export function createPlayer(scene, x, y) {
   player.isAlive = true;
 
   return player;
+}
+
+// Play the directional attack frame for `durationMs`, then return to idle
+export function playAttackAnim(scene, player, durationMs = 180) {
+  const dir = player.facing ?? 'down';
+  player.play(`player_attack_${dir}`, true);
+  scene.time.delayedCall(durationMs, () => {
+    if (player.active) player.play(`player_${dir}_idle`, true);
+  });
 }
 
 export function updatePlayer(player, cursors, wasd, speed = PLAYER_SPEED) {

@@ -2,7 +2,7 @@
 
 import Phaser from 'phaser';
 import { buildWorldTilemap }     from '../maps/WorldMap.js';
-import { createPlayer, updatePlayer, PLAYER_SPEED } from '../entities/Player.js';
+import { createPlayer, updatePlayer, playAttackAnim, PLAYER_SPEED } from '../entities/Player.js';
 import { createEnemyAnimations, spawnEnemy, updateEnemy } from '../entities/Enemy.js';
 import { PortalManager }         from '../chore-portals/PortalManager.js';
 import { BattleSystem }          from '../systems/BattleSystem.js';
@@ -124,7 +124,8 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.events.on('comboHit', ({ multiplier }) => {
-      this.hud.showFloatingText(
+      this.hud.showCombo(multiplier);    // persistent HUD counter
+      this.hud.showFloatingText(         // floating pop for immediate impact
         this.player.x, this.player.y - 48,
         `${multiplier}× COMBO!`,
         multiplier >= 3 ? '#ff4444' : '#ff8800',
@@ -214,6 +215,7 @@ export class WorldScene extends Phaser.Scene {
       this.battle.playerAttack(this.player.weapon, this.enemies, this.player);
       this._spawnAttackVfx();
       this.sfx.playAttack();
+      playAttackAnim(this, this.player, 180); // show directional swing frame
     }
 
     // Level-up detection
@@ -228,6 +230,7 @@ export class WorldScene extends Phaser.Scene {
     const phase      = ((this.time.now - this._cycleStart) % CYCLE_MS) / CYCLE_MS;
     const nightAlpha = 0.55 * 0.5 * (1 - Math.cos(2 * Math.PI * phase));
     this._nightOverlay.setAlpha(nightAlpha);
+    this.hud.updateNightCycle(nightAlpha);
     // Enemies get up to 30% faster at peak night
     const nightBoost = 1 + nightAlpha * 0.55;
 
@@ -262,27 +265,89 @@ export class WorldScene extends Phaser.Scene {
   }
 
   _spawnAttackVfx() {
-    // A wider, brighter sweep that makes it obvious you swung
+    const weapon  = this.player.weapon ?? 'broom';
+    const facing  = this.player.facing ?? 'down';
     const offsets = { down: [0, 32], up: [0, -32], left: [-32, 0], right: [32, 0] };
-    const [ox, oy] = offsets[this.player.facing] ?? [0, 32];
-    const isHoriz  = (this.player.facing === 'left' || this.player.facing === 'right');
+    const [ox, oy] = offsets[facing] ?? [0, 32];
+    const isHoriz  = (facing === 'left' || facing === 'right');
+    const px = this.player.x + ox;
+    const py = this.player.y + oy;
 
-    // Sweep rectangle — elongated in the perpendicular direction
+    if (weapon === 'broom') {
+      // Diagonal slash arc: two crossing rectangles in NES yellow
+      const ang = isHoriz ? 0 : Math.PI / 2;
+      const vfx1 = this.add.rectangle(px, py, 40, 8, 0xfcd860, 0.9)
+        .setDepth(12).setRotation(ang + Math.PI / 4);
+      const vfx2 = this.add.rectangle(px, py, 40, 8, 0xfcd860, 0.9)
+        .setDepth(12).setRotation(ang - Math.PI / 4);
+      [vfx1, vfx2].forEach((v) => {
+        this.tweens.add({
+          targets: v, alpha: 0, scaleX: 1.6, scaleY: 1.6,
+          duration: 180, ease: 'Power2', onComplete: () => v.destroy(),
+        });
+      });
+      return;
+    }
+
+    if (weapon === 'vacuum') {
+      // Rectangular "blast" beam extending from player in facing direction
+      const vfx = this.add.rectangle(
+        px, py,
+        isHoriz ? 48 : 28, isHoriz ? 28 : 48,
+        0x6888fc, 0.80
+      ).setDepth(12);
+      this.tweens.add({
+        targets: vfx, alpha: 0, scaleX: 2, scaleY: 2,
+        duration: 220, ease: 'Power1', onComplete: () => vfx.destroy(),
+      });
+      return;
+    }
+
+    if (weapon === 'soap') {
+      // Splatter: 5 small orange droplets radiating outward
+      for (let i = 0; i < 5; i++) {
+        const baseAngle = Math.atan2(oy, ox);
+        const spread    = (Math.PI / 3);
+        const a         = baseAngle + (i - 2) * (spread / 4);
+        const drop      = this.add.rectangle(
+          this.player.x, this.player.y, 6, 6, 0xfc7820, 0.9,
+        ).setDepth(12);
+        this.tweens.add({
+          targets: drop,
+          x: this.player.x + Math.cos(a) * 36,
+          y: this.player.y + Math.sin(a) * 36,
+          alpha: 0, scaleX: 0.3, scaleY: 0.3,
+          duration: 200, ease: 'Power1', onComplete: () => drop.destroy(),
+        });
+      }
+      return;
+    }
+
+    if (weapon === 'sponge') {
+      // Radial burst — ring of 8 white squares expanding outward
+      for (let i = 0; i < 8; i++) {
+        const a    = (Math.PI * 2 * i) / 8;
+        const puff = this.add.rectangle(
+          this.player.x, this.player.y, 8, 8, 0xfcfcfc, 0.85,
+        ).setDepth(12);
+        this.tweens.add({
+          targets: puff,
+          x: this.player.x + Math.cos(a) * 56,
+          y: this.player.y + Math.sin(a) * 56,
+          alpha: 0, scaleX: 0.5, scaleY: 0.5,
+          duration: 280, ease: 'Power2', onComplete: () => puff.destroy(),
+        });
+      }
+      return;
+    }
+
+    // Fallback: original white sweep
     const vfx = this.add.rectangle(
-      this.player.x + ox, this.player.y + oy,
-      isHoriz ? 24 : 48,   // width
-      isHoriz ? 48 : 24,   // height
-      0xffffff, 0.85
+      px, py, isHoriz ? 24 : 48, isHoriz ? 48 : 24, 0xffffff, 0.85,
     ).setDepth(12);
-
     this.tweens.add({
-      targets: vfx,
-      alpha: 0,
-      scaleX: 1.8,
-      scaleY: 1.8,
-      duration: 180,
-      ease: 'Power2',
-      onComplete: () => vfx.destroy(),
+      targets: vfx, alpha: 0, scaleX: 1.8, scaleY: 1.8,
+      duration: 180, ease: 'Power2', onComplete: () => vfx.destroy(),
     });
   }
 

@@ -38,9 +38,9 @@ export function spawnEnemy(scene, type, x, y, isBoss = false) {
   enemy.setCollideWorldBounds(true);
 
   if (isBoss) {
-    enemy.setScale(2.2); // displayed ~70 px — imposing!
+    enemy.setScale(3); // 48 px display — imposing and crisp (integer scale keeps pixel grid sharp)
 
-    // Boss charge state machine
+    // Boss charge state machine (shared across all boss types)
     enemy._chargeState  = 'idle';
     enemy._chargeTimer  = 3000 + Math.random() * 2000; // ms until first charge
     enemy._windupDur    = 0;
@@ -48,15 +48,26 @@ export function spawnEnemy(scene, type, x, y, isBoss = false) {
     enemy._chargeVx     = 0;
     enemy._chargeVy     = 0;
 
-    // HP bar (two rectangles — background + fill, both world-space)
-    const hpBg   = scene.add.rectangle(x, y - 28, 42, 6, 0x330000, 0.9).setDepth(9.6);
-    const hpFill = scene.add.rectangle(x - 21, y - 28, 42, 6, 0xff2222, 1)
+    // Type-specific behaviour flags
+    if (type === 'lint_titan') {
+      // Lint Titan: root-and-burst — freezes briefly then lunges at double speed
+      enemy._burstSpeed    = stats.speed * 2.4;
+      enemy._rootDur       = 600; // ms frozen during wind-up
+    }
+    if (type === 'paper_wraith') {
+      // Paper Wraith: teleports to a random position near the player when HP drops below 50%
+      enemy._hasTeleported = false;
+    }
+
+    // HP bar — offset raised to match 3× scale (24px half-height + margin)
+    const hpBg   = scene.add.rectangle(x, y - 34, 52, 6, 0x330000, 0.9).setDepth(9.6);
+    const hpFill = scene.add.rectangle(x - 26, y - 34, 52, 6, 0xff2222, 1)
       .setOrigin(0, 0.5).setDepth(9.7);
     enemy._hpBarBg   = hpBg;
     enemy._hpBarFill = hpFill;
 
     // Boss name tag
-    enemy._nameTag = scene.add.text(x, y - 36, stats.name.toUpperCase(), {
+    enemy._nameTag = scene.add.text(x, y - 42, stats.name.toUpperCase(), {
       fontSize: '8px', fontFamily: 'monospace',
       color: '#ff4444', stroke: '#000', strokeThickness: 3, resolution: 2,
     }).setOrigin(0.5, 1).setDepth(9.8);
@@ -82,14 +93,14 @@ export function updateEnemy(enemy, playerSprite, delta) {
 
   // ── Boss-specific logic ──────────────────────────────────────────────────────
   if (enemy.isBoss) {
-    // Track HP bar + name tag
-    if (enemy._hpBarBg)   enemy._hpBarBg.setPosition(enemy.x, enemy.y - 28);
+    // Track HP bar + name tag (offsets match 3× scale: 24px half-height + margin)
+    if (enemy._hpBarBg)   enemy._hpBarBg.setPosition(enemy.x, enemy.y - 34);
     if (enemy._hpBarFill) {
       const ratio = Math.max(0, enemy.hp / enemy.maxHp);
-      enemy._hpBarFill.setPosition(enemy.x - 21, enemy.y - 28);
-      enemy._hpBarFill.width = 42 * ratio;
+      enemy._hpBarFill.setPosition(enemy.x - 26, enemy.y - 34);
+      enemy._hpBarFill.width = 52 * ratio;
     }
-    if (enemy._nameTag) enemy._nameTag.setPosition(enemy.x, enemy.y - 36);
+    if (enemy._nameTag) enemy._nameTag.setPosition(enemy.x, enemy.y - 42);
 
     // Charge state machine
     if (enemy._chargeState === 'charging') {
@@ -105,16 +116,37 @@ export function updateEnemy(enemy, playerSprite, delta) {
 
     if (enemy._chargeState === 'windup') {
       enemy._windupDur -= delta;
+      // Lint Titan roots in place during wind-up (already handled: velocity=0)
       enemy.body.setVelocity(0, 0);
       if (enemy._windupDur <= 0) {
         enemy._chargeState = 'charging';
         enemy._chargeDur   = 450;
         const nd = dist || 1;
-        enemy._chargeVx = (dx / nd) * enemy.baseSpeed * 3;
-        enemy._chargeVy = (dy / nd) * enemy.baseSpeed * 3;
+        // Lint Titan burst uses enhanced speed
+        const chargeSpeedMult = (enemy.enemyType === 'lint_titan') ? 4 : 3;
+        enemy._chargeVx = (dx / nd) * enemy.baseSpeed * chargeSpeedMult;
+        enemy._chargeVy = (dy / nd) * enemy.baseSpeed * chargeSpeedMult;
         enemy.clearTint();
       }
       return;
+    }
+
+    // ── Paper Wraith phase-shift (teleport at 50% HP) ─────────────────────────
+    if (enemy.enemyType === 'paper_wraith' && !enemy._hasTeleported) {
+      if (enemy.hp <= enemy.maxHp * 0.5) {
+        enemy._hasTeleported = true;
+        // Fade out → reposition near player → fade in
+        const scene = enemy.scene;
+        enemy.setAlpha(0);
+        // Pick a position 80–140px away from the player at a random angle
+        const teleportAngle = Math.random() * Math.PI * 2;
+        const teleportDist  = 80 + Math.random() * 60;
+        const tx = playerSprite.x + Math.cos(teleportAngle) * teleportDist;
+        const ty = playerSprite.y + Math.sin(teleportAngle) * teleportDist;
+        enemy.setPosition(tx, ty);
+        scene.tweens.add({ targets: enemy, alpha: 1, duration: 300 });
+        scene.sfx?.playBossWarning?.();
+      }
     }
 
     // Idle — count down to next charge when player is nearby
@@ -122,9 +154,9 @@ export function updateEnemy(enemy, playerSprite, delta) {
       enemy._chargeTimer -= delta;
       if (enemy._chargeTimer <= 0) {
         enemy._chargeState = 'windup';
-        enemy._windupDur   = 350;
+        // Lint Titan has a longer, more dramatic root wind-up
+        enemy._windupDur = (enemy.enemyType === 'lint_titan') ? 700 : 350;
         enemy.setTint(0xffff00); // yellow flash = warning
-        // Play warning sound if scene has sfx
         enemy.scene?.sfx?.playBossWarning?.();
       }
     }

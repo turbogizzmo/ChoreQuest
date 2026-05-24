@@ -20,11 +20,13 @@ export class PortalManager {
       portal.setDepth(8);
       portal.body.setSize(TILE_SIZE * 1.5, TILE_SIZE * 1.5);
 
-      // Glow tint cycling
+      // Start at restore level 0 (dim grey, slow pulse)
+      // setRestoreLevel() updates this when save data is loaded.
+      portal.setTint(0x888888);
       this.scene.tweens.add({
         targets: portal,
-        alpha: 0.7,
-        duration: 800,
+        alpha: 0.3,
+        duration: 1800,
         yoyo: true,
         repeat: -1,
         ease: 'Sine.easeInOut',
@@ -77,12 +79,31 @@ export class PortalManager {
   }
 
   setRestoreLevel(zoneId, level) {
-    // Visually tint portal to show restoration progress
+    // Tint and scale portal to reflect restoration progress (0 = dim, 4 = fully restored)
     const child = this.portals.getChildren().find(
       (p) => p.zoneData.id === zoneId
     );
     if (!child) return;
-    const tints = [0xffffff, 0xaaffaa, 0x44ff44, 0x00cc00];
-    child.setTint(tints[Math.min(level, 3)]);
+
+    // Progressively brighter green tint
+    const tints = [0x888888, 0xaaffaa, 0x44ff44, 0x00cc00, 0x00ff88];
+    child.setTint(tints[Math.min(level, 4)]);
+
+    // Stop any running alpha tween and replace with level-appropriate pulse speed
+    this.scene.tweens.killTweensOf(child);
+    const pulseDuration = level === 0 ? 1800 : level < 3 ? 1200 : 600; // faster = healthier
+    const minAlpha      = level === 0 ? 0.3 : 0.55;
+    this.scene.tweens.add({
+      targets: child,
+      alpha: minAlpha,
+      duration: pulseDuration,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    // Grow portal slightly as the zone restores (scale 1 → 1.4)
+    const scale = 1 + level * 0.1;
+    child.setScale(scale);
   }
 }

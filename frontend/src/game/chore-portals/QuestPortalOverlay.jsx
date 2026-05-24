@@ -29,18 +29,62 @@ function DifficultyBadge({ difficulty }) {
   );
 }
 
+// Starter broom card — shows as a greyed-out reference so players have a baseline
+const BROOM_CARD = { weapon: 'broom', name: 'Broom', desc: 'Your trusty starter weapon' };
+
 // ── Weapon Shop (shown inside the Reward Castle portal) ───────────────────────
 function WeaponShop({ gameData, onBuyWeapon, onEquipWeapon }) {
   const owned    = gameData?.unlockedWeapons ?? ['broom'];
   const equipped = gameData?.weapon ?? 'broom';
   const coins    = gameData?.coins ?? 0;
 
+  // Prepend the broom as a non-purchasable starter card for context
+  const allCards = [{ ...BROOM_CARD, isStarter: true }, ...WEAPON_UPGRADES];
+
   return (
     <div>
       <div style={{ fontSize: 9, color: '#888', marginBottom: 10 }}>
         Your coins: <strong style={{ color: '#fcd860' }}>{coins}</strong>
       </div>
-      {WEAPON_UPGRADES.map((u) => {
+      {allCards.map((u) => {
+        if (u.isStarter) {
+          // Broom starter card — always owned, just show equip/equipped state
+          const isEquipped = equipped === 'broom';
+          const { damage, range } = WEAPON_STATS['broom'] ?? {};
+          return (
+            <div key="broom" style={{
+              background: isEquipped ? '#1a2a1a' : '#1e1e1e',
+              border: `1px solid ${isEquipped ? '#58d854' : '#2a2a2a'}`,
+              borderRadius: 6, padding: '10px 12px', marginBottom: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: '#999', fontWeight: 600 }}>
+                    {u.name}
+                    <span style={{ marginLeft: 6, fontSize: 9, color: '#555' }}>STARTER</span>
+                    {isEquipped && <span style={{ marginLeft: 6, fontSize: 9, color: '#58d854' }}>✓ EQUIPPED</span>}
+                  </div>
+                  <div style={{ fontSize: 9, color: '#555', marginTop: 2 }}>{u.desc}</div>
+                  <div style={{ fontSize: 9, color: '#666', marginTop: 2 }}>
+                    <span style={{ color: '#c04040' }}>DMG {damage}</span>
+                    {' · '}
+                    <span style={{ color: '#4458c8' }}>RNG {range}</span>
+                  </div>
+                </div>
+              </div>
+              {!isEquipped && (
+                <button
+                  onClick={() => onEquipWeapon({ weapon: 'broom' })}
+                  style={{
+                    padding: '5px 12px', background: '#334433', border: '1px solid #58d854',
+                    borderRadius: 4, color: '#58d854', fontFamily: 'monospace',
+                    fontSize: 10, cursor: 'pointer', fontWeight: 700,
+                  }}
+                >Equip</button>
+              )}
+            </div>
+          );
+        }
         const isOwned    = owned.includes(u.weapon);
         const isEquipped = equipped === u.weapon;
         const canAfford  = coins >= u.cost;
@@ -209,6 +253,20 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete, o
           <div>
             <div style={{ fontSize: 14, color: '#fcd860', fontWeight: 700 }}>{zone.label}</div>
             <div style={{ fontSize: 9, color: '#888' }}>{zone.description}</div>
+            {!zone.isRewardShop && (() => {
+              const lvl = gameData?.portalRestoreLevels?.[zone.id] ?? 0;
+              return (
+                <div style={{ marginTop: 3, fontSize: 9, color: '#888', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span style={{ color: '#666' }}>Zone health:</span>
+                  {[0,1,2,3].map(i => (
+                    <span key={i} style={{ color: i < lvl ? '#58d854' : '#333', fontSize: 11 }}>◆</span>
+                  ))}
+                  <span style={{ color: '#555', fontSize: 8, marginLeft: 2 }}>
+                    {lvl === 0 ? '(complete chores to restore!)' : lvl < 4 ? `(${lvl}/4 restored)` : '(fully restored!)'}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
           <button
             onClick={onClose}

@@ -65,12 +65,13 @@ export default function AdventureMode() {
 
   useEffect(() => {
     if (!containerRef.current || !user) return;
+    const mobile = window.innerWidth <= 480;
 
     const game = createGame(containerRef.current.id, {
       userId:     String(user.id),
       userName:   user.username ?? user.display_name ?? 'Hero',
       isKid:      user.role === 'kid',   // gates backend progress-sync POST in WorldScene
-      headerH:    HEADER_H,
+      headerH:    mobile ? 0 : HEADER_H, // no React header on mobile — full canvas height
       onExit:     handleExit,
       onComplete: handleGameEvent,
     });
@@ -152,6 +153,10 @@ export default function AdventureMode() {
 
   const level = gameData ? levelFromXp(gameData.xp) : null;
 
+  // On narrow mobile screens (≤480 px) collapse the header to save vertical space.
+  // The Exit button is instead rendered as a small overlay chip inside the canvas area.
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 480;
+
   // Render via portal so position:fixed is relative to the true viewport,
   // not a Layout ancestor that has overflow-x:clip.
   return createPortal(
@@ -162,7 +167,8 @@ export default function AdventureMode() {
       alignItems: 'center',
       zIndex: 9999,
     }}>
-      {/* Header bar */}
+      {/* Header bar — hidden on narrow mobile, replaced by canvas overlay */}
+      {!isMobile && (
       <div style={{
         width: '100%',
         height: HEADER_H,
@@ -194,6 +200,7 @@ export default function AdventureMode() {
           }}
         >Exit</button>
       </div>
+      )}
 
       {/* Game canvas fills the remaining viewport */}
       <div style={{ position: 'relative', flex: 1, width: '100%', minHeight: 0 }}>
@@ -202,6 +209,19 @@ export default function AdventureMode() {
           ref={containerRef}
           style={{ position: 'absolute', inset: 0 }}
         />
+
+        {/* Mobile-only floating Exit chip — overlays the canvas top-right */}
+        {isMobile && (
+          <button
+            onClick={handleExit}
+            style={{
+              position: 'absolute', top: 6, right: 6, zIndex: 20,
+              background: 'rgba(18,18,18,0.85)', border: '1px solid #3a3a3a',
+              borderRadius: 4, color: '#888', padding: '3px 10px',
+              fontFamily: 'monospace', fontSize: 9, cursor: 'pointer',
+            }}
+          >✕ Exit</button>
+        )}
 
         {!gameReady && (
           <div style={{
