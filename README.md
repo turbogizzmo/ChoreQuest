@@ -230,8 +230,49 @@ Detailed documentation lives in the [GitHub Wiki](https://github.com/turbogizzmo
 - [Parent Tools](https://github.com/turbogizzmo/ChoreQuest/wiki/Parent-Tools) — calendar, verify override, bounty board, audit log
 - [Achievements & Ranks](https://github.com/turbogizzmo/ChoreQuest/wiki/Achievements-and-Ranks) — tiers, XP thresholds
 - [Avatar & Pets](https://github.com/turbogizzmo/ChoreQuest/wiki/Avatar-and-Pets) — editor, pet levels, drops
+- [Adventure Mode](https://github.com/turbogizzmo/ChoreQuest/wiki/Adventure-Mode) — gameplay loop, enemies, rewards, weapons
 - [API Reference](https://github.com/turbogizzmo/ChoreQuest/wiki/API-Reference) — full endpoint list and examples
 - [Troubleshooting](https://github.com/turbogizzmo/ChoreQuest/wiki/Troubleshooting) — common issues and debug tools
+
+### ⚔️ Adventure Mode quick guide
+
+Adventure Mode is a top-down action map where kids defeat enemies, complete portal chores, and spend coins on weapon upgrades.
+
+- **Launch:** Kids can open Adventure Mode from their dashboard. Parents/admins can launch **Try Adventure** in preview mode.
+- **Controls:** Move with keyboard/touch controls, **SPACE** to attack, **ESC** to pause.
+- **Progress sync:** Kid progress is synced to `/api/progress/adventure/progress` and ranked on `/api/progress/adventure/leaderboard`.  
+  Preview mode is clearly marked and does **not** count on the leaderboard.
+
+#### How rewards work
+
+- Defeat enemies and bosses to earn **XP + coins**.
+- Portal chores also grant **XP + coins** and help restore each district.
+- Treasure chests have a **20% drop chance** on enemy defeat and award random XP/coin bundles.
+- Periodic **Chore Surge** events temporarily boost XP gains to **2×**.
+
+#### Enemy roster
+
+Regular enemies:
+
+- Dust Bunny — 8 HP, +2 XP, +1 coin
+- Sock Goblin — 12 HP, +3 XP, +2 coins
+- Crumb Slime — 6 HP, +1 XP, +1 coin
+- Mop Golem — 18 HP, +5 XP, +3 coins
+- Trash Bag Ghost — 9 HP, +4 XP, +2 coins
+
+Bosses (one per district, 24h respawn):
+
+- Grime Lord — 24 HP, +15 XP, +8 coins
+- Lint Titan — 30 HP, +18 XP, +10 coins
+- Weed Golem — 20 HP, +12 XP, +7 coins
+- Paper Wraith — 18 HP, +10 XP, +6 coins
+
+#### Weapons
+
+- **Broom Swipe** (starter): damage 3, range 72, cooldown 500 ms
+- **Vacuum Blast**: damage 4, range 88, cooldown 800 ms (**20 coins**)
+- **Toss Sponge**: damage 2, range 120, cooldown 600 ms (**35 coins**)
+- **Soap Attack**: damage 5, range 56, cooldown 1000 ms (**60 coins**)
 
 ---
 
