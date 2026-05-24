@@ -247,7 +247,7 @@ export class WorldScene extends Phaser.Scene {
       writeSave({ ...this.gameData, userId: this.userId });
       // Fire-and-forget sync to backend leaderboard (ignore failures)
       const lvl = levelFromXp(this.gameData.xp);
-      api('/api/adventure/progress', {
+      api('/api/progress/adventure/progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ xp: this.gameData.xp, coins: this.gameData.coins, level: lvl }),
