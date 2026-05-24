@@ -10,7 +10,7 @@ import { HUD }                   from '../ui/HUD.js';
 import { writeSave }             from '../systems/SaveSystem.js';
 import { SoundSystem }           from '../systems/SoundSystem.js';
 import { PORTAL_ZONES, ENEMY_ZONES, BOSS_ZONES, BOSS_STATS, TILE_SIZE, MAP_COLS, levelFromXp } from '../data/WorldData.js';
-import { api } from '../../../api/client.js';
+import { api } from '../../api/client.js';
 
 const HUD_DEPTH = 100;
 

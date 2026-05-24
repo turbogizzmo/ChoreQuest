@@ -6,10 +6,6 @@
  * - Parent / admin gets 403 on that POST (kids-only endpoint)
  * - GET /api/progress/adventure/leaderboard returns kids sorted by XP
  * - No 4xx errors on leaderboard fetch from the kid dashboard
- *
- * Note: The /adventure route is kid-only and lazy-loaded; browser-level
- * tests that require the React component to fully mount are not reliable
- * in CI headless Chrome and are omitted here.
  */
 
 import { test, expect } from './fixtures.js';
@@ -161,5 +157,30 @@ test.describe('Adventure leaderboard', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     expect(errors).toHaveLength(0);
+  });
+});
+
+test.describe('Adventure mode preview', () => {
+  test('parent can launch adventure preview from the dashboard without console errors', async ({ loginAsParent: page }) => {
+    const consoleErrors = [];
+    const pageErrors = [];
+
+    page.on('console', (message) => {
+      if (message.type() === 'error') {
+        consoleErrors.push(message.text());
+      }
+    });
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message);
+    });
+
+    await page.getByRole('button', { name: 'Try Adventure' }).click();
+
+    await expect(page).toHaveURL(/\/adventure/);
+    await expect(page.getByText("PREVIEW — XP won't count on leaderboard")).toBeVisible();
+    await page.waitForLoadState('networkidle');
+
+    expect(consoleErrors).toEqual([]);
+    expect(pageErrors).toEqual([]);
   });
 });

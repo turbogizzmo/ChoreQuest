@@ -553,7 +553,7 @@ export default function ParentDashboard() {
           Award Bonus XP
         </button>
         <button
-          className="game-btn game-btn-yellow flex items-center gap-2 justify-center flex-1"
+          className="game-btn game-btn-gold flex items-center gap-2 justify-center flex-1"
           onClick={() => navigate('/adventure')}
           title="Preview Adventure Mode as it appears to kids"
         >
