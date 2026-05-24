@@ -1,6 +1,7 @@
 // Enemy entity factory — creates animated enemies that wander and chase the player.
 
 import { ENEMY_STATS, BOSS_STATS } from '../data/WorldData.js';
+import Phaser from 'phaser';
 
 export function createEnemyAnimations(scene) {
   const allTypes = [...Object.keys(ENEMY_STATS), ...Object.keys(BOSS_STATS)];
