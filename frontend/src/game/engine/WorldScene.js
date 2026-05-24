@@ -24,6 +24,7 @@ export class WorldScene extends Phaser.Scene {
   init(data) {
     this.userId    = data.userId;
     this.userName  = data.userName;
+    this.isKid     = data.isKid ?? false;  // gates backend progress-sync; parents get local-only saves
     this.gameData  = { ...data.gameData };
     this.tileMap   = data.tileMap;
     this.onExit    = data.onExit    ?? (() => {});
@@ -245,13 +246,15 @@ export class WorldScene extends Phaser.Scene {
     if (this._saveTick >= SAVE_INTERVAL) {
       this._saveTick = 0;
       writeSave({ ...this.gameData, userId: this.userId });
-      // Fire-and-forget sync to backend leaderboard (ignore failures)
-      const lvl = levelFromXp(this.gameData.xp);
-      api('/api/progress/adventure/progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ xp: this.gameData.xp, coins: this.gameData.coins, level: lvl }),
-      }).catch(() => {});
+      // Sync to backend leaderboard — kids only (parents/admins in preview get 403, so skip)
+      if (this.isKid) {
+        const lvl = levelFromXp(this.gameData.xp);
+        api('/api/progress/adventure/progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ xp: this.gameData.xp, coins: this.gameData.coins, level: lvl }),
+        }).catch(() => {});
+      }
     }
 
     // Update HUD

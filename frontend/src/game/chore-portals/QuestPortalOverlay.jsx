@@ -144,8 +144,9 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete, o
     try {
       await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
 
-      // Streak bonus: if the user has a current streak > 2, award 1.5× XP
-      const streak      = user?.current_streak ?? 0;
+      // Streak bonus: kids only — parents in preview mode have streaks from their own
+      // chore activity which has no gameplay meaning here, so skip the bonus for them.
+      const streak      = user?.role === 'kid' ? (user?.current_streak ?? 0) : 0;
       const baseXp      = assignment.chore?.points ?? 50;
       const xpGained    = streak > 2 ? Math.round(baseXp * 1.5) : baseXp;
       const coinsGained = Math.floor(xpGained / 10);
@@ -252,7 +253,7 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete, o
           <>
             <div style={{ fontSize: 9, color: '#888', marginBottom: 8 }}>
               Active quests in this district:
-              {(user?.current_streak ?? 0) > 2 && (
+              {user?.role === 'kid' && (user?.current_streak ?? 0) > 2 && (
                 <span style={{ marginLeft: 8, color: '#ff8800' }}>
                   🔥 {user.current_streak}-day streak → 1.5× XP bonus!
                 </span>
@@ -270,15 +271,24 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete, o
                 color: '#666', fontSize: 10, textAlign: 'center', padding: 16,
                 border: '1px dashed #333', borderRadius: 6,
               }}>
-                No active quests here right now.<br />
-                <span style={{ fontSize: 9, color: '#555' }}>Check back after the daily reset!</span>
+                {user?.role !== 'kid' ? (
+                  <>
+                    Quests are assigned to kids, not parents.<br />
+                    <span style={{ fontSize: 9, color: '#555' }}>Log in as a kid to see active quests here.</span>
+                  </>
+                ) : (
+                  <>
+                    No active quests here right now.<br />
+                    <span style={{ fontSize: 9, color: '#555' }}>Check back after the daily reset!</span>
+                  </>
+                )}
               </div>
             )}
 
             {chores.map((a) => {
               const chore   = a.chore ?? {};
               const baseXp  = chore.points ?? 50;
-              const streak  = user?.current_streak ?? 0;
+              const streak  = user?.role === 'kid' ? (user?.current_streak ?? 0) : 0;
               const xp      = streak > 2 ? Math.round(baseXp * 1.5) : baseXp;
               const coins   = Math.floor(xp / 10);
               const diff    = chore.difficulty ?? 'easy';
