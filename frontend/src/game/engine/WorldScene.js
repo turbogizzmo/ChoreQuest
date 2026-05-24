@@ -17,6 +17,8 @@ const HUD_DEPTH = 100;
 
 const SAVE_INTERVAL = 15000; // ms
 const RESPAWN_INVULNERABILITY_MS = 3000;
+const RESPAWN_BLINK_ALPHA = 0.65;
+const RESPAWN_BLINK_INTERVAL_MS = 120;
 
 export class WorldScene extends Phaser.Scene {
   constructor() {
@@ -37,6 +39,8 @@ export class WorldScene extends Phaser.Scene {
     this._paused         = false;
     this._lastLevel      = levelFromXp(data.gameData?.xp ?? 0);
     this._respawnInvulnerableUntil = data.respawnInvulnerableUntil ?? 0;
+    this._nextRespawnBlinkAt = 0;
+    this._respawnBlinkOn = false;
   }
 
   create() {
@@ -209,10 +213,17 @@ export class WorldScene extends Phaser.Scene {
 
     updatePlayer(this.player, cursors, this.wasd);
 
-    if (Date.now() < this._respawnInvulnerableUntil) {
-      this.player.setAlpha(this.player.alpha >= 1 ? 0.65 : 1);
+    if (this.isRespawnInvulnerable()) {
+      const now = Date.now();
+      if (now >= this._nextRespawnBlinkAt) {
+        this._respawnBlinkOn = !this._respawnBlinkOn;
+        this.player.setAlpha(this._respawnBlinkOn ? RESPAWN_BLINK_ALPHA : 1);
+        this._nextRespawnBlinkAt = now + RESPAWN_BLINK_INTERVAL_MS;
+      }
     } else if (this.player.alpha !== 1) {
       this.player.setAlpha(1);
+      this._respawnBlinkOn = false;
+      this._nextRespawnBlinkAt = 0;
     }
 
     // Attack on SPACE or touch attack button
@@ -501,5 +512,9 @@ export class WorldScene extends Phaser.Scene {
 
   shutdown() {
     this.sfx?.destroy();
+  }
+
+  isRespawnInvulnerable() {
+    return Date.now() < this._respawnInvulnerableUntil;
   }
 }
