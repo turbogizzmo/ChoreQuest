@@ -264,7 +264,7 @@ export class WorldScene extends Phaser.Scene {
       down:  { isDown: this.cursors.down.isDown  || (touch.down?.isDown  ?? false) },
     };
 
-    updatePlayer(this.player, cursors, this.wasd);
+    updatePlayer(this.player, cursors, this.wasd, PLAYER_SPEED, delta);
 
     if (this.isRespawnInvulnerable()) {
       const now = Date.now();

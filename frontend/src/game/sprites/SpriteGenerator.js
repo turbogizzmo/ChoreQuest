@@ -426,6 +426,53 @@ const PLAYER_PALETTE = {
   '.': null,
 };
 
+function normalizeHexColor(raw, fallback = null) {
+  if (typeof raw !== 'string') return fallback;
+  const value = raw.trim();
+  const short = value.match(/^#([0-9a-f]{3})$/i);
+  if (short) {
+    const [r, g, b] = short[1].split('');
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  return /^#([0-9a-f]{6})$/i.test(value) ? value.toLowerCase() : fallback;
+}
+
+function shadeColor(color, percent, fallback = color) {
+  const hex = normalizeHexColor(color, null);
+  if (!hex) return fallback;
+  const n = parseInt(hex.slice(1), 16);
+  const clamp = (x) => Math.max(0, Math.min(255, x));
+  const factor = (100 + percent) / 100;
+  const r = clamp(Math.round(((n >> 16) & 0xff) * factor));
+  const g = clamp(Math.round(((n >> 8) & 0xff) * factor));
+  const b = clamp(Math.round((n & 0xff) * factor));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+function buildPlayerPaletteFromAvatar(avatarConfig = {}) {
+  const skin = normalizeHexColor(avatarConfig?.head_color, PLAYER_PALETTE.S);
+  const tunic = normalizeHexColor(avatarConfig?.body_color, PLAYER_PALETTE.H);
+  const accent = normalizeHexColor(
+    avatarConfig?.accessory_color || avatarConfig?.hat_color,
+    PLAYER_PALETTE.b,
+  );
+  const boots = normalizeHexColor(avatarConfig?.hair_color, PLAYER_PALETTE.L);
+
+  return {
+    S: skin,
+    s: shadeColor(skin, -14),
+    H: tunic,
+    h: shadeColor(tunic, -22),
+    b: accent,
+    B: shadeColor(tunic, -8),
+    L: boots,
+    l: shadeColor(boots, -22),
+    A: PLAYER_PALETTE.A,
+    a: PLAYER_PALETTE.a,
+    '.': null,
+  };
+}
+
 // Attack frames — one per cardinal direction (arm extended with broom)
 // These are appended after the 12 walk frames: indices 12..15
 const PLAYER_ATTACK_FRAMES = {
@@ -503,7 +550,7 @@ const PLAYER_ATTACK_FRAMES = {
   ],
 };
 
-export function generatePlayerSheet(scene) {
+export function generatePlayerSheet(scene, options = {}) {
   const WALK_FRAMES   = 12; // 4 dirs × 3 walk frames
   const ATTACK_FRAMES = 4;  // 1 per direction (down/left/right/up) = indices 12..15
   const TOTAL_FRAMES  = WALK_FRAMES + ATTACK_FRAMES;
@@ -516,11 +563,12 @@ export function generatePlayerSheet(scene) {
   const ctx = c.getContext('2d');
 
   // Dir-specific palettes
+  const avatarPalette = buildPlayerPaletteFromAvatar(options.avatarConfig);
   const palettes = [
-    PLAYER_PALETTE,                           // down
-    { ...PLAYER_PALETTE },                    // left
-    { ...PLAYER_PALETTE },                    // right
-    { ...PLAYER_PALETTE },                    // up (back-of-head)
+    avatarPalette,                       // down
+    { ...avatarPalette },                // left
+    { ...avatarPalette },                // right
+    { ...avatarPalette },                // up (back-of-head)
   ];
 
   // Walk frames (0–11)
@@ -551,7 +599,7 @@ export function generatePlayerSheet(scene) {
     const ox = (WALK_FRAMES + i) * FS * SCALE;
     ctx.save();
     ctx.translate(ox, 0);
-    drawGrid(ctx, grid, PLAYER_PALETTE, SCALE);
+    drawGrid(ctx, grid, avatarPalette, SCALE);
     ctx.restore();
   });
 
@@ -1283,8 +1331,8 @@ export function generateUISprites(scene) {
   addCanvasSpriteSheet(scene, 'npc_shopkeeper', nc, nW * SCALE, nH * SCALE);
 }
 
-export function generateAllSprites(scene) {
-  generatePlayerSheet(scene);
+export function generateAllSprites(scene, options = {}) {
+  generatePlayerSheet(scene, options);
   generateEnemySheets(scene);
   generateBossSheets(scene);
   generateBuildingSprites(scene);

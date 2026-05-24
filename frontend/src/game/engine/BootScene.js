@@ -13,6 +13,7 @@ export class BootScene extends Phaser.Scene {
   init(data) {
     this.userId    = data.userId ?? 'guest';
     this.userName  = data.userName ?? 'Hero';
+    this.avatarConfig = data.avatarConfig ?? null;
     this.isKid     = data.isKid ?? false;
     this.onExit    = data.onExit ?? (() => {});
     this.onComplete = data.onComplete ?? (() => {});
@@ -41,7 +42,7 @@ export class BootScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Generate all sprites (canvas-based, synchronous)
-    const tileMap = generateAllSprites(this);
+    const tileMap = generateAllSprites(this, { avatarConfig: this.avatarConfig });
 
     loadSave(this.userId).then((save) => {
       // Guard: game may have been destroyed by the time this resolves (React StrictMode double-invoke)
