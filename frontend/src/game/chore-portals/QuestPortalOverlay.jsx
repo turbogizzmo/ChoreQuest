@@ -7,6 +7,8 @@
 
 import { useState, useEffect } from 'react';
 import { api } from '../../api/client.js';
+import { useAuth } from '../../hooks/useAuth.jsx';
+import { toLocalISO } from '../../utils/dates.js';
 
 const DIFFICULTY_COLORS = {
   easy:   '#58d854',
@@ -29,6 +31,7 @@ function DifficultyBadge({ difficulty }) {
 }
 
 export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete }) {
+  const { user }              = useAuth();
   const [chores, setChores]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [doing, setDoing]     = useState(null);
@@ -38,13 +41,17 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
     if (!zone) return;
     setLoading(true);
 
-    // GET /api/calendar defaults to the current week; we pull today's pending slice.
-    const today = new Date().toISOString().split('T')[0];
+    // GET /api/calendar defaults to the current week; pull today's slice.
+    // toLocalISO() uses the local calendar date (not UTC) — critical after ~7pm
+    // in western timezones where new Date().toISOString() returns tomorrow's date.
+    const today = toLocalISO();
     api('/api/calendar')
       .then((data) => {
         const todayAssignments = data.days?.[today] ?? [];
         const list = todayAssignments.filter((a) => {
           if (a.status !== 'pending') return false;
+          // Filter to the current user only — /api/calendar returns all family members.
+          if (user && a.user_id !== user.id) return false;
           if (!zone.choreCategories?.length) return true;
           // category is a nested object: { id, name, icon, colour, is_default }
           const catName = (a.chore?.category?.name ?? '').toLowerCase();
@@ -54,7 +61,7 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
       })
       .catch(() => setChores([]))
       .finally(() => setLoading(false));
-  }, [zone]);
+  }, [zone, user]);
 
   async function handleComplete(assignment) {
     setDoing(assignment.id);

@@ -182,7 +182,7 @@ export default function App() {
             <Route path="/kids/:kidId" element={<Page pageKey="kid-quests"><KidQuests /></Page>} />
             <Route path="/bounty" element={<Page pageKey="bounty"><BountyBoard /></Page>} />
             <Route path="/settings" element={<Page pageKey="settings"><Settings /></Page>} />
-            <Route path="/adventure" element={<Page pageKey="adventure"><AdventureMode /></Page>} />
+            {user.role === 'kid' && <Route path="/adventure" element={<Page pageKey="adventure"><AdventureMode /></Page>} />}
             {user.role === 'admin' && <Route path="/admin" element={<Page pageKey="admin"><AdminDashboard /></Page>} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

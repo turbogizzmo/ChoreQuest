@@ -17,6 +17,8 @@ export const MAP_ROWS = 40;
 export const TILE_SIZE = 32;
 
 // Portal zone categories — map to ChoreQuest chore categories
+// choreCategories must match the seeded category names in backend/seed.py:
+// Kitchen, Bedroom, Bathroom, Garden, Pets, Homework, Laundry, General, Outdoor
 export const PORTAL_ZONES = [
   {
     id: 'kitchen',
@@ -24,7 +26,7 @@ export const PORTAL_ZONES = [
     x: 10, y: 8,
     buildingKey: 'building_kitchen',
     color: 0xff6644,
-    choreCategories: ['Kitchen', 'Dishes', 'Cooking'],
+    choreCategories: ['Kitchen'],
     description: 'Culinary quests await inside!',
     restoreLevel: 0,
   },
@@ -34,7 +36,7 @@ export const PORTAL_ZONES = [
     x: 28, y: 8,
     buildingKey: 'building_laundry',
     color: 0x6688ff,
-    choreCategories: ['Laundry', 'Clothes', 'Bedroom'],
+    choreCategories: ['Laundry', 'Bedroom'],
     description: 'Tame the wild laundry beasts!',
     restoreLevel: 0,
   },
@@ -44,7 +46,7 @@ export const PORTAL_ZONES = [
     x: 10, y: 28,
     buildingKey: null,
     color: 0x44cc44,
-    choreCategories: ['Yard', 'Outside', 'Garden', 'Pets'],
+    choreCategories: ['Garden', 'Pets', 'Outdoor'],
     description: 'The wild outdoors beckons.',
     restoreLevel: 0,
   },
@@ -54,7 +56,7 @@ export const PORTAL_ZONES = [
     x: 28, y: 28,
     buildingKey: null,
     color: 0xffcc00,
-    choreCategories: ['Homework', 'Study', 'School'],
+    choreCategories: ['Homework'],
     description: 'Knowledge is power!',
     restoreLevel: 0,
   },

@@ -9,6 +9,10 @@ import { useAuth } from '../hooks/useAuth.jsx';
 import { QuestPortalOverlay } from '../game/chore-portals/QuestPortalOverlay.jsx';
 import { writeSave } from '../game/systems/SaveSystem.js';
 import { levelFromXp } from '../game/data/WorldData.js';
+// Eager import so destroyGame is available synchronously in the effect cleanup,
+// eliminating the dynamic-import race that could leave a game instance un-destroyed
+// when React StrictMode unmounts+remounts before the lazy import resolves.
+import { createGame, destroyGame } from '../game/engine/GameInstance.js';
 
 const HEADER_H = 34; // px — keep in sync with GameInstance height calc
 
@@ -33,40 +37,47 @@ export default function AdventureMode() {
 
   const handleExit = useCallback(() => { navigate('/'); }, [navigate]);
 
-  // Lock body scroll while the full-screen overlay is active (mirrors Modal.jsx).
+  // Full iOS-safe scroll lock — mirrors Modal.jsx to prevent page scrolling behind canvas.
   useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    const alreadyLocked = document.body.style.position === 'fixed';
+    const scrollY = alreadyLocked
+      ? -parseInt(document.body.style.top || '0', 10)
+      : window.scrollY;
+    if (!alreadyLocked) {
+      document.body.style.position = 'fixed';
+      document.body.style.top      = `-${scrollY}px`;
+      document.body.style.left     = '0';
+      document.body.style.right    = '0';
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top      = '';
+      document.body.style.left     = '';
+      document.body.style.right    = '';
+      document.body.style.overflow = '';
+      window.scrollTo(0, scrollY);
+    };
   }, []);
 
   useEffect(() => {
     if (!containerRef.current || !user) return;
 
-    // `cancelled` guards the race where React unmounts before the dynamic import
-    // resolves — without it the Phaser game created in the .then() callback would
-    // have no cleanup path and leak indefinitely.
-    let cancelled = false;
-
-    import('../game/engine/GameInstance.js').then(({ createGame }) => {
-      if (cancelled) return;
-      const game = createGame(containerRef.current.id, {
-        userId:     String(user.id),
-        userName:   user.username ?? user.display_name ?? 'Hero',
-        headerH:    HEADER_H,
-        onExit:     handleExit,
-        onComplete: handleGameEvent,
-      });
-      gameRef.current = game;
-      setGameReady(true);
+    const game = createGame(containerRef.current.id, {
+      userId:     String(user.id),
+      userName:   user.username ?? user.display_name ?? 'Hero',
+      headerH:    HEADER_H,
+      onExit:     handleExit,
+      onComplete: handleGameEvent,
     });
+    gameRef.current = game;
+    setGameReady(true);
 
+    // destroyGame is imported at the top level so this cleanup runs synchronously —
+    // no dynamic-import race when React StrictMode unmounts before a lazy import resolves.
     return () => {
-      cancelled = true;
-      import('../game/engine/GameInstance.js').then(({ destroyGame }) => {
-        destroyGame(gameRef.current);
-        gameRef.current = null;
-      });
+      destroyGame(gameRef.current);
+      gameRef.current = null;
     };
   }, [user, handleExit, handleGameEvent]);
 

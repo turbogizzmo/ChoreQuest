@@ -8,10 +8,10 @@ import { PortalManager }         from '../chore-portals/PortalManager.js';
 import { BattleSystem }          from '../systems/BattleSystem.js';
 import { HUD }                   from '../ui/HUD.js';
 import { writeSave }             from '../systems/SaveSystem.js';
-import { SoundSystem }          from '../systems/SoundSystem.js';
+import { SoundSystem }           from '../systems/SoundSystem.js';
+import { PORTAL_ZONES, ENEMY_ZONES, TILE_SIZE, levelFromXp } from '../data/WorldData.js';
 
 const HUD_DEPTH = 100;
-import { PORTAL_ZONES, ENEMY_ZONES, TILE_SIZE, levelFromXp } from '../data/WorldData.js';
 
 const SAVE_INTERVAL = 15000; // ms
 
