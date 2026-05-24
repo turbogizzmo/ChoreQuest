@@ -93,6 +93,37 @@ export default function AdventureMode() {
     }
   }
 
+  function handleBuyWeapon({ weapon, cost }) {
+    setGameData((prev) => {
+      if (!prev || prev.coins < cost) return prev;
+      const unlocked = [...new Set([...(prev.unlockedWeapons ?? ['broom']), weapon])];
+      const next = { ...prev, coins: prev.coins - cost, weapon, unlockedWeapons: unlocked };
+      writeSave({ ...next, userId: String(user.id) });
+      const scene = gameRef.current?.scene?.getScene('WorldScene');
+      if (scene) {
+        scene.gameData.coins = next.coins;
+        scene.gameData.weapon = weapon;
+        scene.gameData.unlockedWeapons = unlocked;
+        if (scene.player) scene.player.weapon = weapon;
+      }
+      return next;
+    });
+  }
+
+  function handleEquipWeapon({ weapon }) {
+    setGameData((prev) => {
+      if (!prev || !(prev.unlockedWeapons ?? ['broom']).includes(weapon)) return prev;
+      const next = { ...prev, weapon };
+      writeSave({ ...next, userId: String(user.id) });
+      const scene = gameRef.current?.scene?.getScene('WorldScene');
+      if (scene) {
+        scene.gameData.weapon = weapon;
+        if (scene.player) scene.player.weapon = weapon;
+      }
+      return next;
+    });
+  }
+
   function handleChoreComplete({ assignment, xpGained, coinsGained }) {
     setGameData((prev) => {
       if (!prev) return prev;
@@ -183,6 +214,8 @@ export default function AdventureMode() {
             gameData={gameData}
             onClose={closePortal}
             onChoreComplete={handleChoreComplete}
+            onBuyWeapon={handleBuyWeapon}
+            onEquipWeapon={handleEquipWeapon}
           />
         )}
       </div>

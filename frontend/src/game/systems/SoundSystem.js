@@ -239,6 +239,24 @@ export class SoundSystem {
     });
   }
 
+  playCombo(multiplier = 2) {
+    const t    = this._ctx.currentTime;
+    const base = multiplier >= 3 ? 880 : 659;
+    this._tone(base,          t,        0.07, 0.18, 'square', this._w25);
+    this._tone(base * 1.25,   t + 0.07, 0.07, 0.18, 'square', this._w25);
+    if (multiplier >= 3) {
+      this._tone(base * 1.5,  t + 0.14, 0.09, 0.22, 'square', this._w25);
+    }
+  }
+
+  playBossWarning() {
+    const t = this._ctx.currentTime;
+    // Low menacing two-note growl
+    this._tone(110, t,        0.15, 0.22, 'sawtooth');
+    this._tone(165, t + 0.15, 0.12, 0.18, 'sawtooth');
+    this._noise(this._noiseBufs.sfx, t, 0.08, 50, 600);
+  }
+
   playChoreComplete() {
     const t = this._ctx.currentTime;
     // NES "got item" fanfare

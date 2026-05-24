@@ -63,8 +63,18 @@ class UserResponse(BaseModel):
     avatar_config: dict | None
     is_active: bool
     created_at: UtcDt
+    # Adventure Mode stats (synced from Phaser client every 15 s)
+    adventure_xp:    int = 0
+    adventure_coins: int = 0
+    adventure_level: int = 1
 
     model_config = {"from_attributes": True}
+
+
+class AdventureProgressUpdate(BaseModel):
+    xp:    int
+    coins: int
+    level: int
 
 
 class AuthResponse(BaseModel):

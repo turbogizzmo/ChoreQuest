@@ -9,7 +9,8 @@ import { BattleSystem }          from '../systems/BattleSystem.js';
 import { HUD }                   from '../ui/HUD.js';
 import { writeSave }             from '../systems/SaveSystem.js';
 import { SoundSystem }           from '../systems/SoundSystem.js';
-import { PORTAL_ZONES, ENEMY_ZONES, TILE_SIZE, levelFromXp } from '../data/WorldData.js';
+import { PORTAL_ZONES, ENEMY_ZONES, BOSS_ZONES, BOSS_STATS, TILE_SIZE, MAP_COLS, levelFromXp } from '../data/WorldData.js';
+import { api } from '../../../api/client.js';
 
 const HUD_DEPTH = 100;
 
@@ -63,6 +64,19 @@ export class WorldScene extends Phaser.Scene {
       }
     });
 
+    // ── Boss enemies (one per portal zone, skip if defeated < 24 h ago) ──
+    const bossDefeats = this.gameData.bossDefeats ?? {};
+    const RESPAWN_MS  = 24 * 60 * 60 * 1000;
+    BOSS_ZONES.forEach((bz) => {
+      const lastDefeated = bossDefeats[bz.type] ?? 0;
+      if (Date.now() - lastDefeated < RESPAWN_MS) return; // still on cooldown
+      const bx = bz.x * TILE_SIZE;
+      const by = bz.y * TILE_SIZE;
+      const boss = spawnEnemy(this, bz.type, bx, by, true);
+      this.enemies.add(boss);
+      this.physics.add.collider(boss, layer);
+    });
+
     // Enemy<->player contact
     this.physics.add.overlap(this.player, this.enemies, (player, enemy) => {
       this.battle.enemyContactDamage(player, enemy);
@@ -92,10 +106,29 @@ export class WorldScene extends Phaser.Scene {
     this.events.on('enemyDefeated', ({ enemy, xpDrop, coinDrop }) => {
       this.gameData.xp    += xpDrop;
       this.gameData.coins += coinDrop;
+
+      // Record boss defeat for 24-hour respawn timer
+      if (enemy.isBoss) {
+        if (!this.gameData.bossDefeats) this.gameData.bossDefeats = {};
+        this.gameData.bossDefeats[enemy.enemyType] = Date.now();
+      }
+
       this.hud.showFloatingText(enemy.x, enemy.y, `+${xpDrop} XP`, '#58d854');
       this.hud.showFloatingText(enemy.x, enemy.y + 14, `+${coinDrop}¢`, '#fcd860');
       this.sfx.playEnemyDefeat();
       if (coinDrop > 0) this.time.delayedCall(280, () => this.sfx.playCoinPickup());
+
+      // Loot drop: animated coin sprites that fly toward the player
+      if (coinDrop > 0) this._spawnCoinDrop(enemy.x, enemy.y, coinDrop);
+    });
+
+    this.events.on('comboHit', ({ multiplier }) => {
+      this.hud.showFloatingText(
+        this.player.x, this.player.y - 48,
+        `${multiplier}× COMBO!`,
+        multiplier >= 3 ? '#ff4444' : '#ff8800',
+      );
+      this.sfx.playCombo(multiplier);
     });
     this.events.on('playerHurt', ({ damage }) => {
       this.gameData.hp = Math.max(0, this.gameData.hp - damage);
@@ -111,6 +144,15 @@ export class WorldScene extends Phaser.Scene {
       this.sfx.playPortalEnter();
       this.onComplete({ type: 'portalEnter', zone: zoneData, gameData: this.gameData });
     });
+
+    // ── Day/night cycle overlay ────────────────────────────────────────
+    // Cycles from clear (day) to dark blue (night) over 10 real minutes.
+    // Depth 8: above tiles but below sprites (player is depth 10).
+    const worldPx = MAP_COLS * TILE_SIZE;
+    this._nightOverlay = this.add.rectangle(
+      worldPx / 2, worldPx / 2, worldPx, worldPx, 0x000033, 0,
+    ).setDepth(8);
+    this._cycleStart = this.time.now;
 
     // ── Keyboard ──────────────────────────────────────────────────────
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -180,18 +222,36 @@ export class WorldScene extends Phaser.Scene {
       this.sfx.playLevelUp();
     }
 
-    // Update enemies
-    this.enemies.getChildren().forEach((e) => updateEnemy(e, this.player, delta));
+    // Day/night cycle (10-minute sinusoidal loop, max alpha 0.55)
+    const CYCLE_MS   = 10 * 60 * 1000;
+    const phase      = ((this.time.now - this._cycleStart) % CYCLE_MS) / CYCLE_MS;
+    const nightAlpha = 0.55 * 0.5 * (1 - Math.cos(2 * Math.PI * phase));
+    this._nightOverlay.setAlpha(nightAlpha);
+    // Enemies get up to 30% faster at peak night
+    const nightBoost = 1 + nightAlpha * 0.55;
+
+    // Update enemies (pass night speed boost via enemy.speed)
+    this.enemies.getChildren().forEach((e) => {
+      if (e.active) e.speed = (e.baseSpeed ?? e.speed) * nightBoost;
+      updateEnemy(e, this.player, delta);
+    });
 
     // Save player position to gameData continuously
     this.gameData.playerX = this.player.x;
     this.gameData.playerY = this.player.y;
 
-    // Periodic save
+    // Periodic save + adventure progress sync to server
     this._saveTick += delta;
     if (this._saveTick >= SAVE_INTERVAL) {
       this._saveTick = 0;
       writeSave({ ...this.gameData, userId: this.userId });
+      // Fire-and-forget sync to backend leaderboard (ignore failures)
+      const lvl = levelFromXp(this.gameData.xp);
+      api('/api/progress/adventure/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ xp: this.gameData.xp, coins: this.gameData.coins, level: lvl }),
+      }).catch(() => {});
     }
 
     // Update HUD
@@ -221,6 +281,33 @@ export class WorldScene extends Phaser.Scene {
       ease: 'Power2',
       onComplete: () => vfx.destroy(),
     });
+  }
+
+  _spawnCoinDrop(x, y, count) {
+    // Spawn up to 4 coin sprites that float toward the player and disappear
+    const visual = Math.min(count, 4);
+    for (let i = 0; i < visual; i++) {
+      this.time.delayedCall(i * 55, () => {
+        if (!this.player?.active) return;
+        const coin = this.add.sprite(x, y, 'coin').setScale(2).setDepth(11);
+        if (this.anims.exists('coin_spin')) coin.play('coin_spin');
+        // Arc outward briefly, then sweep to player
+        const angle = (Math.PI * 2 * i) / visual;
+        const midX  = x + Math.cos(angle) * 18;
+        const midY  = y + Math.sin(angle) * 18;
+        this.tweens.add({
+          targets: coin, x: midX, y: midY, duration: 120, ease: 'Power1',
+          onComplete: () => {
+            this.tweens.add({
+              targets: coin,
+              x: this.player.x, y: this.player.y,
+              alpha: 0, duration: 260, ease: 'Power2',
+              onComplete: () => coin.destroy(),
+            });
+          },
+        });
+      });
+    }
   }
 
   _handlePlayerDeath() {
@@ -283,7 +370,7 @@ export class WorldScene extends Phaser.Scene {
 
   _makePauseBtn(x, y, text, cb) {
     const bg = this.add.rectangle(x, y, 140, 24, 0x2a2a2a, 1)
-      .setScrollFactor(0)
+      .setScrollFactor(0)                   // must precede setInteractive so hit area aligns
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', cb)
       .on('pointerover',  () => bg.setFillStyle(0x444444))

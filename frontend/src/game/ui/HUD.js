@@ -1,8 +1,8 @@
-// In-game HUD: hearts, XP bar, level, coin count, minimap indicator.
+// In-game HUD: hearts, XP bar, level, coin count, mini-map, touch controls.
 // All elements are fixed to the camera (setScrollFactor(0)).
 
 import Phaser from 'phaser';
-import { xpForLevel, levelFromXp } from '../data/WorldData.js';
+import { xpForLevel, levelFromXp, PORTAL_ZONES, MAP_COLS, TILE_SIZE } from '../data/WorldData.js';
 
 const MAX_HEARTS   = 5;
 const HUD_DEPTH    = 100;
@@ -10,6 +10,8 @@ const PADDING      = 8;
 const HEART_SCALE  = 3;            // 8px source × 3 = 24px display
 const HEART_SIZE   = 8 * HEART_SCALE;
 const HEART_GAP    = 3;
+
+const WORLD_PX = MAP_COLS * TILE_SIZE; // 1280 px
 
 export class HUD {
   constructor(scene) {
@@ -104,59 +106,179 @@ export class HUD {
       resolution: 2,
     }).setScrollFactor(0).setDepth(HUD_DEPTH).setOrigin(0, 0.5);
 
+    // ── Mini-map (top-right, below coin counter) ──────────────────────
+    this._buildMinimap(W);
+
     // ── Touch action buttons (bottom) ────────────────────────────────
     if (scene.sys.game.device.input.touch) {
       this._buildTouchControls();
     }
   }
 
-  _buildTouchControls() {
-    const scene = this.scene;
-    const cam   = scene.cameras.main;
-    const W     = cam.width;
-    const H     = cam.height;
-    const BTN   = 40;
-    const GAP   = 6;
+  _buildMinimap(W) {
+    const scene   = this.scene;
+    const MM_SIZE = 80;
+    const MM_X    = W - MM_SIZE - PADDING;
+    const MM_Y    = 36; // below coin counter
 
-    // D-pad cluster (bottom-left)
-    const padX = BTN + GAP;
-    const padY = H - BTN - GAP;
+    // Background
+    const mmBg = scene.add.graphics();
+    mmBg.fillStyle(0x000000, 0.65);
+    mmBg.fillRoundedRect(MM_X - 2, MM_Y - 2, MM_SIZE + 4, MM_SIZE + 4, 3);
+    mmBg.lineStyle(1, 0x335533, 1);
+    mmBg.strokeRoundedRect(MM_X - 2, MM_Y - 2, MM_SIZE + 4, MM_SIZE + 4, 3);
+    mmBg.setScrollFactor(0).setDepth(HUD_DEPTH - 1);
 
-    const dpadDefs = [
-      { label: '←', dx: -(BTN + GAP), dy: 0,          dir: 'left' },
-      { label: '→', dx:  (BTN + GAP), dy: 0,           dir: 'right' },
-      { label: '↑', dx: 0,            dy: -(BTN + GAP), dir: 'up' },
-      { label: '↓', dx: 0,            dy:  (BTN + GAP), dir: 'down' },
-    ];
+    // Dark green fill
+    const mmFill = scene.add.graphics();
+    mmFill.fillStyle(0x0a1a0a, 1);
+    mmFill.fillRect(MM_X, MM_Y, MM_SIZE, MM_SIZE);
+    mmFill.setScrollFactor(0).setDepth(HUD_DEPTH);
 
-    this.touchKeys = {};
+    // "MAP" label
+    scene.add.text(MM_X + MM_SIZE / 2, MM_Y - 3, 'MAP', {
+      fontSize: '7px', fontFamily: 'monospace', color: '#556655',
+      stroke: '#000', strokeThickness: 2, resolution: 2,
+    }).setScrollFactor(0).setDepth(HUD_DEPTH).setOrigin(0.5, 1);
 
-    dpadDefs.forEach(({ label, dx, dy, dir }) => {
-      const btn = scene.add.rectangle(padX + dx, padY + dy, BTN, BTN, 0xffffff, 0.15)
-        .setScrollFactor(0).setDepth(HUD_DEPTH).setInteractive();
-      scene.add.text(padX + dx, padY + dy, label, {
-        fontSize: '16px', color: '#ffffff', resolution: 2,
-      }).setScrollFactor(0).setDepth(HUD_DEPTH + 1).setOrigin(0.5);
-
-      this.touchKeys[dir] = { isDown: false };
-      btn.on('pointerdown', () => { this.touchKeys[dir].isDown = true;  });
-      btn.on('pointerup',   () => { this.touchKeys[dir].isDown = false; });
-      btn.on('pointerout',  () => { this.touchKeys[dir].isDown = false; });
+    // Portal markers (static)
+    const scale = MM_SIZE / WORLD_PX;
+    PORTAL_ZONES.forEach((zone) => {
+      const px = MM_X + zone.x * TILE_SIZE * scale;
+      const py = MM_Y + zone.y * TILE_SIZE * scale;
+      const colorHex = zone.color ?? 0xffffff;
+      scene.add.rectangle(px, py, 4, 4, colorHex, 0.9)
+        .setScrollFactor(0).setDepth(HUD_DEPTH + 1).setOrigin(0.5);
     });
 
-    // Attack button (bottom-right)
-    const atkX = W - BTN - GAP;
-    const atkY = H - BTN - GAP;
-    const atkBtn = scene.add.rectangle(atkX, atkY, BTN, BTN, 0xff4400, 0.5)
+    // Dynamic graphics (player + enemies) — redrawn each frame
+    this._mmGfx = scene.add.graphics()
+      .setScrollFactor(0).setDepth(HUD_DEPTH + 2);
+
+    this._mmPos = { x: MM_X, y: MM_Y, size: MM_SIZE, scale };
+  }
+
+  _updateMinimap() {
+    if (!this._mmGfx || !this._mmPos) return;
+    const { x: mmX, y: mmY, scale } = this._mmPos;
+    const gfx = this._mmGfx;
+    gfx.clear();
+
+    // Enemy dots (red)
+    const enemies = this.scene.enemies;
+    if (enemies) {
+      gfx.fillStyle(0xff3333, 0.85);
+      enemies.getChildren().forEach((e) => {
+        if (!e.active) return;
+        const ex = mmX + e.x * scale;
+        const ey = mmY + e.y * scale;
+        gfx.fillRect(ex - 1, ey - 1, e.isBoss ? 4 : 2, e.isBoss ? 4 : 2);
+      });
+    }
+
+    // Player dot (white, slightly larger)
+    const player = this.scene.player;
+    if (player) {
+      gfx.fillStyle(0xffffff, 1);
+      gfx.fillRect(mmX + player.x * scale - 2, mmY + player.y * scale - 2, 4, 4);
+    }
+  }
+
+  _buildTouchControls() {
+    const scene = this.scene;
+    const W     = scene.cameras.main.width;
+    const H     = scene.cameras.main.height;
+
+    this.touchKeys = {
+      left:   { isDown: false },
+      right:  { isDown: false },
+      up:     { isDown: false },
+      down:   { isDown: false },
+      attack: { isDown: false },
+    };
+
+    // ── Virtual joystick (bottom-left) ───────────────────────────────
+    const JOY_R  = 40;
+    const JOY_X  = JOY_R + 16;
+    const JOY_Y  = H - JOY_R - 20;
+
+    // Base ring
+    scene.add.circle(JOY_X, JOY_Y, JOY_R, 0xffffff, 0.10)
+      .setScrollFactor(0).setDepth(HUD_DEPTH);
+    const joyRing = scene.add.graphics().setScrollFactor(0).setDepth(HUD_DEPTH + 1);
+    joyRing.lineStyle(1, 0xffffff, 0.30);
+    joyRing.strokeCircle(JOY_X, JOY_Y, JOY_R);
+
+    // Thumb
+    const joyThumb = scene.add.circle(JOY_X, JOY_Y, 18, 0xffffff, 0.40)
+      .setScrollFactor(0).setDepth(HUD_DEPTH + 2);
+
+    let activeId = null;
+
+    const updateJoy = (ptr) => {
+      const dx   = ptr.x - JOY_X;
+      const dy   = ptr.y - JOY_Y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const max  = JOY_R * 0.72;
+      const angle = Math.atan2(dy, dx);
+      const clamped = Math.min(dist, max);
+      joyThumb.setPosition(
+        JOY_X + Math.cos(angle) * clamped,
+        JOY_Y + Math.sin(angle) * clamped,
+      );
+      const dead = JOY_R * 0.28;
+      this.touchKeys.left.isDown  = dx < -dead;
+      this.touchKeys.right.isDown = dx >  dead;
+      this.touchKeys.up.isDown    = dy < -dead;
+      this.touchKeys.down.isDown  = dy >  dead;
+    };
+
+    const releaseJoy = () => {
+      activeId = null;
+      joyThumb.setPosition(JOY_X, JOY_Y);
+      this.touchKeys.left.isDown  = false;
+      this.touchKeys.right.isDown = false;
+      this.touchKeys.up.isDown    = false;
+      this.touchKeys.down.isDown  = false;
+    };
+
+    scene.input.on('pointerdown', (ptr) => {
+      if (activeId !== null) return;
+      if (ptr.x < W / 2 && ptr.y > H * 0.55) {
+        activeId = ptr.id;
+        updateJoy(ptr);
+      }
+    });
+    scene.input.on('pointermove', (ptr) => {
+      if (ptr.id === activeId) updateJoy(ptr);
+    });
+    scene.input.on('pointerup',  (ptr) => { if (ptr.id === activeId) releaseJoy(); });
+    scene.input.on('pointerout', (ptr) => { if (ptr.id === activeId) releaseJoy(); });
+
+    // ── Attack button (bottom-right) — 56 px circle + ripple ─────────
+    const ATK_R = 28;
+    const ATK_X = W - ATK_R - 20;
+    const ATK_Y = H - ATK_R - 20;
+
+    const atkBtn = scene.add.circle(ATK_X, ATK_Y, ATK_R, 0xff4400, 0.55)
       .setScrollFactor(0).setDepth(HUD_DEPTH).setInteractive();
-    scene.add.text(atkX, atkY, '⚔', {
-      fontSize: '18px', color: '#ffffff', resolution: 2,
+    scene.add.text(ATK_X, ATK_Y, '⚔', {
+      fontSize: '22px', color: '#ffffff', resolution: 2,
     }).setScrollFactor(0).setDepth(HUD_DEPTH + 1).setOrigin(0.5);
 
-    this.touchKeys.attack = { isDown: false };
-    atkBtn.on('pointerdown', () => { this.touchKeys.attack.isDown = true;  });
-    atkBtn.on('pointerup',   () => { this.touchKeys.attack.isDown = false; });
-    atkBtn.on('pointerout',  () => { this.touchKeys.attack.isDown = false; });
+    atkBtn.on('pointerdown', () => {
+      this.touchKeys.attack.isDown = true;
+      // Ripple effect
+      const ripple = scene.add.circle(ATK_X, ATK_Y, ATK_R, 0xff8800, 0.40)
+        .setScrollFactor(0).setDepth(HUD_DEPTH - 1);
+      scene.tweens.add({
+        targets: ripple, scaleX: 2.6, scaleY: 2.6, alpha: 0,
+        duration: 380, ease: 'Power2',
+        onComplete: () => ripple.destroy(),
+      });
+    });
+    atkBtn.on('pointerup',  () => { this.touchKeys.attack.isDown = false; });
+    atkBtn.on('pointerout', () => { this.touchKeys.attack.isDown = false; });
   }
 
   update(gameData) {
@@ -171,7 +293,6 @@ export class HUD {
     // XP fill
     const needed   = xpForLevel(level);
     let   prevXp   = 0;
-    let   accum    = 0;
     for (let l = 1; l < level; l++) {
       prevXp += xpForLevel(l);
     }
@@ -182,6 +303,9 @@ export class HUD {
 
     // Coins
     this.coinLabel.setText(String(coins));
+
+    // Mini-map
+    this._updateMinimap();
   }
 
   showFloatingText(x, y, text, color = '#fcd860') {

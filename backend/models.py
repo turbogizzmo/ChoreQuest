@@ -146,6 +146,10 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Adventure Mode stats — synced from the Phaser client every 15 s
+    adventure_xp:    Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    adventure_coins: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    adventure_level: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
 
     refresh_tokens = relationship("RefreshToken", back_populates="user")
     achievements = relationship("UserAchievement", back_populates="user")

@@ -552,6 +552,192 @@ export function generateEnemySheets(scene) {
   });
 }
 
+// ─── BOSS SPRITES (16×16 source, displayed at 2.2× = ~70px) ─────────────────────
+
+const BOSS_DEFS = {
+  grime_lord: {
+    frames: [
+      [
+        '....yyyyyyy.....',
+        '...yyyYyyyyy....',
+        '....GGGGGGG.....',
+        '...GGGGGGGGGGG..',
+        '..GGGggGGGGGGG..',
+        '..GGGGGGggGGGGG.',
+        '..GGGGGGGGGGGGG.',
+        '..GGeeGGGeeGGGG.',
+        '..GGeeGGGeeGGGG.',
+        '..GGGGmmGGGGGGG.',
+        '..GGGGGGGGGGGG..',
+        '...GGGGGGGGGG...',
+        '....GGGGGGGG....',
+        '......GGGG......',
+        '................',
+        '................',
+      ],
+      [
+        '....yyyyyyy.....',
+        '...yYyyyyy......',
+        '....GGGGGGG.....',
+        '..GGGGGGGGGGG...',
+        '..GGGGGGGGGGgg..',
+        '..GGggGGGGGGGG..',
+        '..GGGGGGGGGGGGG.',
+        '..GGeeGGGeeGGGG.',
+        '..GGeeGGGeeGGGG.',
+        '..GGGGmmGGGGGGG.',
+        '..GGGGGGGGGGGG..',
+        '...GGGGGGGGGG...',
+        '....GGGGGGGG....',
+        '......GGGG......',
+        '................',
+        '................',
+      ],
+    ],
+    p: { G: NES.green, g: NES.teal, y: NES.lyellow, Y: NES.white, e: NES.white, m: NES.lred, '.': null },
+  },
+  lint_titan: {
+    frames: [
+      [
+        '................',
+        '...LLLLLLLLL....',
+        '..LLLlLlLLLLL...',
+        '.LLLLLLLLLLLLl..',
+        'LLLLLLLLLLLLLLl.',
+        'LlLLLbbLLbbLLLL.',
+        'LLLLLbbLLbbLLLL.',
+        'LLLLLLLLLLLLLlL.',
+        'LLLLLLRRLLLLLll.',
+        '.LLLLLRRLLLLlL..',
+        '..LLLLLLLLLLL...',
+        '...LLLLLLLLL....',
+        '.....LLLLL......',
+        '................',
+        '................',
+        '................',
+      ],
+      [
+        '................',
+        '...LLLLLLLLL....',
+        '..LlLLLLLLLLL...',
+        '.LLLLLlLLLLLLL..',
+        'LLLLLLLLLLLLLlL.',
+        'LLLLLbbLLbbLLlL.',
+        'LLLLLbbLLbbLLLL.',
+        'LlLLLLLLLLLLLLL.',
+        'LLLLLLRRLLLLLll.',
+        '.LLLLRRLLLLLlL..',
+        '..LLLLLLLLlLL...',
+        '...LLLLLLLLL....',
+        '.....LLLLL......',
+        '................',
+        '................',
+        '................',
+      ],
+    ],
+    p: { L: NES.lpurple, l: NES.lgray, b: NES.black, R: NES.lred, '.': null },
+  },
+  weed_golem: {
+    frames: [
+      [
+        '...vvVv.........',
+        '..vvvVvVv.......',
+        '..vBBBBBBv......',
+        '.vBBBBBBBBBv....',
+        'vBBBBBBBBBBBBv..',
+        '.BBBBEEBEEBBBv..',
+        '.BBBBEEBEEBBBv..',
+        '.BBBBBBBBBBBBv..',
+        '.BBBBrrBBBBBB...',
+        '.BBBBBBBBBBB....',
+        '..BBBBBBBBB.....',
+        '...vBBBBBBv.....',
+        '....vBBBBv......',
+        '.....vBBv.......',
+        '......vv........',
+        '................',
+      ],
+      [
+        '..vvVvv.........',
+        '..vvVvvVv.......',
+        '.vBBBBBBBv......',
+        'vBBBBBBBBBBv....',
+        '.BBBBBBBBBBBBv..',
+        '.BBBBEEBEEBBBv..',
+        '.BBBBEEBEEBBBv..',
+        '.BBBBBBBBBBBBv..',
+        '.BBBBrrBBBBBB...',
+        '..BBBBBBBBBB....',
+        '...BBBBBBBBB....',
+        '....vBBBBBv.....',
+        '.....vBBBv......',
+        '......vBv.......',
+        '......vv........',
+        '................',
+      ],
+    ],
+    p: { B: NES.green, v: NES.lgreen, V: NES.lyellow, E: NES.lyellow, r: NES.lred, '.': null },
+  },
+  paper_wraith: {
+    frames: [
+      [
+        '................',
+        '....PPPPPPPP....',
+        '...PPPPPPPPPP...',
+        '..PPPPpPPPPPPP..',
+        '..PPPPPPPPpPPP..',
+        '..PPPRRPPRRpPP..',
+        '..PPPRRPPRRpPP..',
+        '..PPPPPPPPpPPP..',
+        '..PPPPPPPPppPP..',
+        '..PPPmmmmmmPPP..',
+        '..PPPPPPPPPPPP..',
+        '...PPPpppPPPP...',
+        '...PP.......PP..',
+        '....P.........P.',
+        '................',
+        '................',
+      ],
+      [
+        '................',
+        '....PPPPPPPP....',
+        '...PPPPPPppPP...',
+        '..PPPpPPPPPPPP..',
+        '..PPPPPPPPPpPP..',
+        '..PPPRRPPRRpPP..',
+        '..PPPRRPPRRpPP..',
+        '..PPPPPPPPpPPP..',
+        '..PPPpPPPPPPPP..',
+        '..PPPmmmmmmPPP..',
+        '..PPPPPPPPPPPP..',
+        '...pPPPpPPPP....',
+        '...PP.......PP..',
+        '....P.........P.',
+        '................',
+        '................',
+      ],
+    ],
+    p: { P: NES.white, p: NES.lgray, R: NES.red, m: NES.mgray, '.': null },
+  },
+};
+
+export function generateBossSheets(scene) {
+  Object.entries(BOSS_DEFS).forEach(([key, def]) => {
+    const FRAMES = def.frames.length;
+    const FS = 16;
+    const SCALE = 2;
+    const c = createCanvas(FRAMES * FS * SCALE, FS * SCALE);
+    const ctx = c.getContext('2d');
+    def.frames.forEach((grid, i) => {
+      ctx.save();
+      ctx.translate(i * FS * SCALE, 0);
+      drawGrid(ctx, grid, def.p, SCALE);
+      ctx.restore();
+    });
+    addCanvasSpriteSheet(scene, `enemy_${key}`, c, FS * SCALE, FS * SCALE);
+  });
+}
+
 // ─── BUILDING SPRITES (32×32) ─────────────────────────────────────────────────
 
 const BUILDING_DEFS = {
@@ -779,6 +965,7 @@ export function generateUISprites(scene) {
 export function generateAllSprites(scene) {
   generatePlayerSheet(scene);
   generateEnemySheets(scene);
+  generateBossSheets(scene);
   generateBuildingSprites(scene);
   generateUISprites(scene);
   return generateTileset(scene);
