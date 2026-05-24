@@ -426,7 +426,7 @@ const PLAYER_PALETTE = {
   '.': null,
 };
 
-function normalizeHexColor(raw, fallback) {
+function normalizeHexColor(raw, fallback = null) {
   if (typeof raw !== 'string') return fallback;
   const value = raw.trim();
   const short = value.match(/^#([0-9a-f]{3})$/i);
@@ -437,8 +437,9 @@ function normalizeHexColor(raw, fallback) {
   return /^#([0-9a-f]{6})$/i.test(value) ? value.toLowerCase() : fallback;
 }
 
-function shadeColor(color, percent) {
-  const hex = normalizeHexColor(color, '#ffffff');
+function shadeColor(color, percent, fallback = color) {
+  const hex = normalizeHexColor(color, null);
+  if (!hex) return fallback;
   const n = parseInt(hex.slice(1), 16);
   const clamp = (x) => Math.max(0, Math.min(255, x));
   const factor = (100 + percent) / 100;

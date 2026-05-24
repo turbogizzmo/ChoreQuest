@@ -12,6 +12,8 @@ import { test, expect } from './fixtures.js';
 import { readFileSync } from 'fs';
 
 const BASE = 'http://localhost:8199';
+const COLOR_TOLERANCE = 18;
+const MIN_ALPHA = 220;
 
 function loadTokens() {
   return JSON.parse(readFileSync('/tmp/chorequest_e2e_tokens.json', 'utf-8'));
@@ -231,8 +233,12 @@ test.describe('Adventure avatar sync', () => {
       await expect(page.locator('#adventure-game-container canvas').first()).toBeVisible();
       await page.screenshot({ path: '/tmp/adventure-avatar-updated.png', fullPage: true });
 
-      await page.waitForTimeout(300);
-      const hasCustomBodyColor = await page.evaluate(({ r, g, b }) => {
+      await page.waitForFunction(() => {
+        const game = window.__CHOREQUEST_ACTIVE_GAME;
+        const scene = game?.scene?.getScene?.('WorldScene');
+        return Boolean(scene?.textures?.get?.('player')?.getSourceImage?.());
+      });
+      const hasCustomBodyColor = await page.evaluate(({ r, g, b, tolerance, minAlpha }) => {
         const game = window.__CHOREQUEST_ACTIVE_GAME;
         const scene = game?.scene?.getScene?.('WorldScene');
         const source = scene?.textures?.get?.('player')?.getSourceImage?.();
@@ -249,12 +255,12 @@ test.describe('Adventure avatar sync', () => {
           const dr = Math.abs(data[i] - r);
           const dg = Math.abs(data[i + 1] - g);
           const db = Math.abs(data[i + 2] - b);
-          if (dr <= 18 && dg <= 18 && db <= 18 && data[i + 3] >= 220) {
+          if (dr <= tolerance && dg <= tolerance && db <= tolerance && data[i + 3] >= minAlpha) {
             return true;
           }
         }
         return false;
-      }, { r: 0, g: 255, b: 102 });
+      }, { r: 0, g: 255, b: 102, tolerance: COLOR_TOLERANCE, minAlpha: MIN_ALPHA });
 
       expect(hasCustomBodyColor).toBe(true);
     } finally {
