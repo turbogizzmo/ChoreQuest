@@ -31,7 +31,10 @@ export default function AdventureMode() {
       setActivePortal(event.zone);
       setGameData({ ...event.gameData });
       const scene = gameRef.current?.scene?.getScene('WorldScene');
-      if (scene) scene._paused = true;
+      if (scene) {
+        scene._paused = true;
+        scene.physics.pause(); // stop enemy movement + contact-damage overlaps
+      }
     }
   }, []);
 
@@ -84,7 +87,10 @@ export default function AdventureMode() {
   function closePortal() {
     setActivePortal(null);
     const scene = gameRef.current?.scene?.getScene('WorldScene');
-    if (scene) scene._paused = false;
+    if (scene) {
+      scene._paused = false;
+      scene.physics.resume(); // re-enable enemy movement + overlap detection
+    }
   }
 
   function handleChoreComplete({ assignment, xpGained, coinsGained }) {

@@ -79,6 +79,9 @@ export class WorldScene extends Phaser.Scene {
     this.sfx = new SoundSystem(this);
     this.sfx.startBGM();
 
+    // ── HUD — must be created before event listeners that call this.hud ─
+    this.hud = new HUD(this);
+
     // ── Battle system ──────────────────────────────────────────────────
     this.battle = new BattleSystem(this);
     this.events.on('enemyHurt', ({ enemy, damage }) => {
@@ -108,9 +111,6 @@ export class WorldScene extends Phaser.Scene {
       this.sfx.playPortalEnter();
       this.onComplete({ type: 'portalEnter', zone: zoneData, gameData: this.gameData });
     });
-
-    // ── HUD ────────────────────────────────────────────────────────────
-    this.hud = new HUD(this);
 
     // ── Keyboard ──────────────────────────────────────────────────────
     this.cursors = this.input.keyboard.createCursorKeys();

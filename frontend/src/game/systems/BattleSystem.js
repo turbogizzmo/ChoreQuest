@@ -61,8 +61,13 @@ export class BattleSystem {
   }
 
   defeatEnemy(enemy) {
-    const xpDrop    = enemy.xpDrop    ?? 2;
-    const coinDrop  = enemy.coinDrop  ?? 1;
+    // Mark inactive immediately so hurtEnemy's `if (!enemy.active) return` guard
+    // blocks any second hit during the 300 ms death tween, preventing double XP/coins.
+    enemy.setActive(false);
+    enemy.body?.setEnable(false); // also disable physics body so overlaps stop firing
+
+    const xpDrop   = enemy.xpDrop   ?? 2;
+    const coinDrop = enemy.coinDrop ?? 1;
     this.scene.events.emit('enemyDefeated', { enemy, xpDrop, coinDrop });
 
     this.scene.tweens.add({
