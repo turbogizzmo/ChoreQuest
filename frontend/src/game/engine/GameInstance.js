@@ -39,7 +39,7 @@ export function createGame(containerId, options = {}) {
   };
 
   const game = new Phaser.Game(config);
-  if (typeof window !== 'undefined') window.__CHOREQUEST_ACTIVE_GAME = game;
+  if (typeof window !== 'undefined' && import.meta.env.DEV) window.__CHOREQUEST_ACTIVE_GAME = game;
 
   game.events.once('ready', () => {
     game.scene.start('BootScene', { userId, userName, avatarConfig, isKid, onExit, onComplete });
@@ -52,7 +52,7 @@ export function destroyGame(game) {
   if (game && !game.isDestroyed) {
     game.destroy(true);
   }
-  if (typeof window !== 'undefined' && window.__CHOREQUEST_ACTIVE_GAME === game) {
+  if (typeof window !== 'undefined' && import.meta.env.DEV && window.__CHOREQUEST_ACTIVE_GAME === game) {
     window.__CHOREQUEST_ACTIVE_GAME = null;
   }
 }

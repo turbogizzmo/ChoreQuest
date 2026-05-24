@@ -233,11 +233,25 @@ test.describe('Adventure avatar sync', () => {
       await expect(page.locator('#adventure-game-container canvas').first()).toBeVisible();
       await page.screenshot({ path: '/tmp/adventure-avatar-updated.png', fullPage: true });
 
-      await page.waitForFunction(() => {
+      await page.waitForFunction(({ minAlpha }) => {
         const game = window.__CHOREQUEST_ACTIVE_GAME;
         const scene = game?.scene?.getScene?.('WorldScene');
-        return Boolean(scene?.textures?.get?.('player')?.getSourceImage?.());
-      });
+        const source = scene?.textures?.get?.('player')?.getSourceImage?.();
+        if (!source) return false;
+
+        const sample = document.createElement('canvas');
+        sample.width = source.width;
+        sample.height = source.height;
+        const ctx = sample.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return false;
+        ctx.drawImage(source, 0, 0);
+        const { data } = ctx.getImageData(0, 0, sample.width, sample.height);
+
+        for (let i = 3; i < data.length; i += 4) {
+          if (data[i] >= minAlpha) return true;
+        }
+        return false;
+      }, { minAlpha: MIN_ALPHA });
       const hasCustomBodyColor = await page.evaluate(({ r, g, b, tolerance, minAlpha }) => {
         const game = window.__CHOREQUEST_ACTIVE_GAME;
         const scene = game?.scene?.getScene?.('WorldScene');
