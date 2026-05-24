@@ -69,6 +69,7 @@ export default function AdventureMode() {
     const game = createGame(containerRef.current.id, {
       userId:     String(user.id),
       userName:   user.username ?? user.display_name ?? 'Hero',
+      isKid:      user.role === 'kid',   // gates backend progress-sync POST in WorldScene
       headerH:    HEADER_H,
       onExit:     handleExit,
       onComplete: handleGameEvent,
@@ -98,7 +99,7 @@ export default function AdventureMode() {
       if (!prev || prev.coins < cost) return prev;
       const unlocked = [...new Set([...(prev.unlockedWeapons ?? ['broom']), weapon])];
       const next = { ...prev, coins: prev.coins - cost, weapon, unlockedWeapons: unlocked };
-      writeSave({ ...next, userId: String(user.id) });
+      writeSave({ ...next, userId: String(user?.id ?? 'preview') });
       const scene = gameRef.current?.scene?.getScene('WorldScene');
       if (scene) {
         scene.gameData.coins = next.coins;
@@ -114,7 +115,7 @@ export default function AdventureMode() {
     setGameData((prev) => {
       if (!prev || !(prev.unlockedWeapons ?? ['broom']).includes(weapon)) return prev;
       const next = { ...prev, weapon };
-      writeSave({ ...next, userId: String(user.id) });
+      writeSave({ ...next, userId: String(user?.id ?? 'preview') });
       const scene = gameRef.current?.scene?.getScene('WorldScene');
       if (scene) {
         scene.gameData.weapon = weapon;
@@ -128,7 +129,7 @@ export default function AdventureMode() {
     setGameData((prev) => {
       if (!prev) return prev;
       const next = { ...prev, xp: prev.xp + xpGained, coins: prev.coins + coinsGained };
-      writeSave({ ...next, userId: String(user.id) });
+      writeSave({ ...next, userId: String(user?.id ?? 'preview') });
       const scene = gameRef.current?.scene?.getScene('WorldScene');
       if (scene) {
         scene.gameData.xp    = next.xp;
@@ -175,6 +176,11 @@ export default function AdventureMode() {
         <span style={{ color: '#fcd860', fontWeight: 700 }}>⚔ Adventure Mode</span>
         {level !== null && (
           <span style={{ color: '#bcbcbc' }}>LV {level} · {gameData.coins} coins</span>
+        )}
+        {user?.role !== 'kid' && (
+          <span style={{ color: '#f97316', fontSize: 9, background: '#1a0a00', border: '1px solid #7c2d12', borderRadius: 3, padding: '1px 5px' }}>
+            PREVIEW — XP won't count on leaderboard
+          </span>
         )}
         <span style={{ marginLeft: 'auto', fontSize: 9, color: '#555' }}>
           SPACE = attack · ESC = pause
