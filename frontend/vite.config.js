@@ -34,4 +34,21 @@ export default defineConfig({
       '/ws': { target: `ws://localhost:${backendPort}`, ws: true },
     },
   },
+  build: {
+    // Target modern browsers — skips legacy JS transforms and shaves ~20% off
+    // esbuild minification time (no need to downlevel optional chaining, etc.)
+    target: 'es2020',
+    rollupOptions: {
+      output: {
+        // Isolate Phaser in its own chunk. Without this, Rollup walks Phaser's
+        // entire 6 MB dependency graph while tree-shaking the rest of the app,
+        // which is the main cause of slow Docker builds since Adventure Mode
+        // was added. Phaser also gets cached by the browser independently so
+        // returning users don't re-download it on every app update.
+        manualChunks: {
+          phaser: ['phaser'],
+        },
+      },
+    },
+  },
 })
