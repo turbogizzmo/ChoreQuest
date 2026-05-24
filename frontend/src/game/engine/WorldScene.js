@@ -9,12 +9,16 @@ import { BattleSystem }          from '../systems/BattleSystem.js';
 import { HUD }                   from '../ui/HUD.js';
 import { writeSave }             from '../systems/SaveSystem.js';
 import { SoundSystem }           from '../systems/SoundSystem.js';
+import { pickRespawnPoint }      from '../systems/RespawnSystem.js';
 import { PORTAL_ZONES, ENEMY_ZONES, BOSS_ZONES, BOSS_STATS, TILE_SIZE, MAP_COLS, levelFromXp } from '../data/WorldData.js';
 import { api } from '../../api/client.js';
 
 const HUD_DEPTH = 100;
 
 const SAVE_INTERVAL = 15000; // ms
+const RESPAWN_INVULNERABILITY_MS = 3000;
+const RESPAWN_BLINK_ALPHA = 0.65;
+const RESPAWN_BLINK_INTERVAL_MS = 120;
 
 export class WorldScene extends Phaser.Scene {
   constructor() {
@@ -34,6 +38,9 @@ export class WorldScene extends Phaser.Scene {
     this._saveTick       = 0;
     this._paused         = false;
     this._lastLevel      = levelFromXp(data.gameData?.xp ?? 0);
+    this._respawnInvulnerableUntil = data.respawnInvulnerableUntil ?? 0;
+    this._nextRespawnBlinkAt = 0;
+    this._respawnBlinkOn = false;
   }
 
   create() {
@@ -206,6 +213,19 @@ export class WorldScene extends Phaser.Scene {
 
     updatePlayer(this.player, cursors, this.wasd);
 
+    if (this.isRespawnInvulnerable()) {
+      const now = Date.now();
+      if (now >= this._nextRespawnBlinkAt) {
+        this._respawnBlinkOn = !this._respawnBlinkOn;
+        this.player.setAlpha(this._respawnBlinkOn ? RESPAWN_BLINK_ALPHA : 1);
+        this._nextRespawnBlinkAt = now + RESPAWN_BLINK_INTERVAL_MS;
+      }
+    } else if (this.player.alpha !== 1) {
+      this.player.setAlpha(1);
+      this._respawnBlinkOn = false;
+      this._nextRespawnBlinkAt = 0;
+    }
+
     // Attack on SPACE or touch attack button
     if (
       Phaser.Input.Keyboard.JustDown(this.spaceKey) ||
@@ -329,11 +349,23 @@ export class WorldScene extends Phaser.Scene {
     this.time.delayedCall(2500, () => {
       // Respawn: restore 3 HP
       this.gameData.hp = Math.min(3, this.gameData.maxHp);
-      this.gameData.playerX = 640;
-      this.gameData.playerY = 640;
+      const fallback = { x: 640, y: 640 };
+      const safeRespawn = pickRespawnPoint({
+        enemies: this.enemies?.getChildren() ?? [],
+        fallback,
+        candidates: [
+          { x: 224, y: 224 },
+          { x: 1056, y: 224 },
+          { x: 224, y: 1056 },
+          { x: 1056, y: 1056 },
+        ],
+      });
+      this.gameData.playerX = safeRespawn.x;
+      this.gameData.playerY = safeRespawn.y;
       this.scene.restart({
         userId: this.userId, userName: this.userName,
         gameData: this.gameData, tileMap: this.tileMap,
+        respawnInvulnerableUntil: Date.now() + RESPAWN_INVULNERABILITY_MS,
         onExit: this.onExit, onComplete: this.onComplete,
       });
     });
@@ -480,5 +512,9 @@ export class WorldScene extends Phaser.Scene {
 
   shutdown() {
     this.sfx?.destroy();
+  }
+
+  isRespawnInvulnerable() {
+    return Date.now() < this._respawnInvulnerableUntil;
   }
 }
