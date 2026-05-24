@@ -6,7 +6,7 @@ import { BootScene }  from './BootScene.js';
 import { WorldScene } from './WorldScene.js';
 
 export function createGame(containerId, options = {}) {
-  const { userId, userName, isKid = false, headerH = 34, onExit, onComplete } = options;
+  const { userId, userName, avatarConfig = null, isKid = false, headerH = 34, onExit, onComplete } = options;
 
   const container = document.getElementById(containerId);
   const availW = container ? container.clientWidth  : window.innerWidth;
@@ -39,9 +39,10 @@ export function createGame(containerId, options = {}) {
   };
 
   const game = new Phaser.Game(config);
+  if (typeof window !== 'undefined') window.__CHOREQUEST_ACTIVE_GAME = game;
 
   game.events.once('ready', () => {
-    game.scene.start('BootScene', { userId, userName, isKid, onExit, onComplete });
+    game.scene.start('BootScene', { userId, userName, avatarConfig, isKid, onExit, onComplete });
   });
 
   return game;
@@ -50,5 +51,8 @@ export function createGame(containerId, options = {}) {
 export function destroyGame(game) {
   if (game && !game.isDestroyed) {
     game.destroy(true);
+  }
+  if (typeof window !== 'undefined' && window.__CHOREQUEST_ACTIVE_GAME === game) {
+    window.__CHOREQUEST_ACTIVE_GAME = null;
   }
 }

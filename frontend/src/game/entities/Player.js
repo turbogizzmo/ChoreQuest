@@ -16,7 +16,7 @@ export function createPlayerAnimations(scene) {
     anims.create({
       key: `player_${dir}`,
       frames: anims.generateFrameNumbers('player', { start, end: start + 2 }),
-      frameRate: 6,
+      frameRate: 9,
       repeat: -1,
     });
     anims.create({
@@ -51,6 +51,7 @@ export function createPlayer(scene, x, y) {
   player.facing  = 'down';
   player.weapon  = 'broom';
   player.isAlive = true;
+  player._motionPhase = Math.random() * Math.PI * 2;
 
   return player;
 }
@@ -70,7 +71,7 @@ export function playAttackAnim(scene, player, durationMs = 180) {
   });
 }
 
-export function updatePlayer(player, cursors, wasd, speed = PLAYER_SPEED) {
+export function updatePlayer(player, cursors, wasd, speed = PLAYER_SPEED, delta = 16) {
   if (!player.isAlive) return;
 
   const body = player.body;
@@ -94,6 +95,20 @@ export function updatePlayer(player, cursors, wasd, speed = PLAYER_SPEED) {
   }
 
   body.setVelocity(vx, vy);
+  const moving = vx !== 0 || vy !== 0;
+
+  const dSec = Math.max(8, Math.min(delta || 16, 50)) / 1000;
+  player._motionPhase = (player._motionPhase ?? 0) + dSec * (moving ? 12 : 4);
+  const wave = Math.sin(player._motionPhase);
+
+  if (moving) {
+    const stretch = Math.abs(wave) * 0.05;
+    player.setScale(1 + stretch, 1 - (stretch * 0.65));
+    player.setAngle(wave * 4);
+  } else {
+    player.setScale(1 + (wave * 0.015), 1 - (wave * 0.012));
+    player.setAngle(wave * 1.5);
+  }
 
   const attackLocked = (player._attackLockUntil ?? 0) > player.scene.time.now;
   if (attackLocked) return;

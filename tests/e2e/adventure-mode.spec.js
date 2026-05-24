@@ -28,6 +28,17 @@ async function apiPost(path, body, token) {
   });
 }
 
+async function apiPut(path, body, token) {
+  return fetch(`${BASE}${path}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 async function apiGet(path, token) {
   return fetch(`${BASE}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -179,10 +190,75 @@ test.describe('Adventure mode preview', () => {
     await expect(page).toHaveURL(/\/adventure/);
     await expect(page.getByText("PREVIEW — XP won't count on leaderboard")).toBeVisible();
     await expect(page.getByText('Loading Adventure Mode...')).toBeHidden();
-    await expect(page.locator('#adventure-game-container canvas')).toBeVisible();
+    await expect(page.locator('#adventure-game-container canvas').first()).toBeVisible();
     await page.waitForLoadState('networkidle');
 
     expect(consoleErrors).toEqual([]);
     expect(pageErrors).toEqual([]);
+  });
+});
+
+test.describe('Adventure avatar sync', () => {
+  test('adventure player sprite uses the kid avatar colors', async ({ page }) => {
+    const { kidToken } = loadTokens();
+    const meRes = await apiGet('/api/auth/me', kidToken);
+    expect(meRes.status).toBe(200);
+    const me = await meRes.json();
+    const originalConfig = me.avatar_config || {};
+
+    const uniqueBodyColor = '#00ff66';
+    const nextConfig = {
+      ...originalConfig,
+      body_color: uniqueBodyColor,
+      accessory_color: '#00ccff',
+      head_color: '#ff66cc',
+      hair_color: '#6633ff',
+    };
+
+    try {
+      const updateRes = await apiPut('/api/avatar', { config: nextConfig }, kidToken);
+      expect(updateRes.status).toBe(200);
+
+      await page.addInitScript((token) => {
+        localStorage.setItem('chorequest_access_token', token);
+      }, kidToken);
+      await page.goto('/');
+      await page.waitForSelector('nav');
+
+      await page.goto('/adventure');
+      await expect(page).toHaveURL(/\/adventure/);
+      await expect(page.getByText('Loading Adventure Mode...')).toBeHidden();
+      await expect(page.locator('#adventure-game-container canvas').first()).toBeVisible();
+      await page.screenshot({ path: '/tmp/adventure-avatar-updated.png', fullPage: true });
+
+      await page.waitForTimeout(300);
+      const hasCustomBodyColor = await page.evaluate(({ r, g, b }) => {
+        const game = window.__CHOREQUEST_ACTIVE_GAME;
+        const scene = game?.scene?.getScene?.('WorldScene');
+        const source = scene?.textures?.get?.('player')?.getSourceImage?.();
+        if (!source) return false;
+
+        const sample = document.createElement('canvas');
+        sample.width = source.width;
+        sample.height = source.height;
+        const ctx = sample.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return false;
+        ctx.drawImage(source, 0, 0);
+        const { data } = ctx.getImageData(0, 0, sample.width, sample.height);
+        for (let i = 0; i < data.length; i += 4) {
+          const dr = Math.abs(data[i] - r);
+          const dg = Math.abs(data[i + 1] - g);
+          const db = Math.abs(data[i + 2] - b);
+          if (dr <= 18 && dg <= 18 && db <= 18 && data[i + 3] >= 220) {
+            return true;
+          }
+        }
+        return false;
+      }, { r: 0, g: 255, b: 102 });
+
+      expect(hasCustomBodyColor).toBe(true);
+    } finally {
+      await apiPut('/api/avatar', { config: originalConfig }, kidToken);
+    }
   });
 });
