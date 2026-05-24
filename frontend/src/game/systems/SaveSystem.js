@@ -24,8 +24,8 @@ export const defaultSave = (userId) => ({
   level: 1,
   xp: 0,
   coins: 0,
-  hp: 10,
-  maxHp: 10,
+  hp: 5,
+  maxHp: 5,   // matches MAX_HEARTS (5) in HUD.js — each heart = 1 HP
   weapon: 'broom',
   unlockedWeapons: ['broom'],
   playerX: 640,

@@ -4,6 +4,6 @@ __pycache__/
 node_modules/
 dist/
 .env
-data/
+/data/
 *.db
 .DS_Store

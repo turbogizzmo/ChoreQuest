@@ -33,12 +33,24 @@ export default function AdventureMode() {
 
   const handleExit = useCallback(() => { navigate('/'); }, [navigate]);
 
+  // Lock body scroll while the full-screen overlay is active (mirrors Modal.jsx).
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current || !user) return;
-    let game = null;
+
+    // `cancelled` guards the race where React unmounts before the dynamic import
+    // resolves — without it the Phaser game created in the .then() callback would
+    // have no cleanup path and leak indefinitely.
+    let cancelled = false;
 
     import('../game/engine/GameInstance.js').then(({ createGame }) => {
-      game = createGame(containerRef.current.id, {
+      if (cancelled) return;
+      const game = createGame(containerRef.current.id, {
         userId:     String(user.id),
         userName:   user.username ?? user.display_name ?? 'Hero',
         headerH:    HEADER_H,
@@ -50,8 +62,10 @@ export default function AdventureMode() {
     });
 
     return () => {
+      cancelled = true;
       import('../game/engine/GameInstance.js').then(({ destroyGame }) => {
-        destroyGame(game);
+        destroyGame(gameRef.current);
+        gameRef.current = null;
       });
     };
   }, [user, handleExit, handleGameEvent]);

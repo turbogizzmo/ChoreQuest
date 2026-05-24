@@ -1,5 +1,9 @@
 // Quest portal popup — shown over the Phaser canvas when the player enters a portal.
-// Fetches real chores from the API and lets the player accept/complete them.
+// Fetches today's pending assignments from /api/calendar and lets the player mark them done.
+// Completing a chore here calls POST /api/chores/{chore_id}/complete (same as the main app),
+// which marks the assignment completed and awaits parent verification for real points.
+// XP and coins shown in-game are a cosmetic "adventure currency" that mirrors chore.points —
+// they are intentionally separate from the app's verified PointTransaction system.
 
 import { useState, useEffect } from 'react';
 import { api } from '../../api/client.js';
@@ -33,12 +37,18 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
   useEffect(() => {
     if (!zone) return;
     setLoading(true);
-    api('/api/chores/assignments?status=pending')
+
+    // GET /api/calendar defaults to the current week; we pull today's pending slice.
+    const today = new Date().toISOString().split('T')[0];
+    api('/api/calendar')
       .then((data) => {
-        const list = (data ?? []).filter((a) => {
+        const todayAssignments = data.days?.[today] ?? [];
+        const list = todayAssignments.filter((a) => {
+          if (a.status !== 'pending') return false;
           if (!zone.choreCategories?.length) return true;
-          const cat = (a.category ?? a.chore?.category ?? '').toLowerCase();
-          return zone.choreCategories.some((c) => cat.includes(c.toLowerCase()));
+          // category is a nested object: { id, name, icon, colour, is_default }
+          const catName = (a.chore?.category?.name ?? '').toLowerCase();
+          return zone.choreCategories.some((c) => catName.includes(c.toLowerCase()));
         });
         setChores(list.slice(0, 6));
       })
@@ -49,8 +59,12 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
   async function handleComplete(assignment) {
     setDoing(assignment.id);
     try {
-      await api(`/api/chores/assignments/${assignment.id}/complete`, { method: 'POST' });
-      const xpGained    = assignment.xp_reward ?? assignment.chore?.xp_value ?? 50;
+      // Correct endpoint: POST /api/chores/{chore_id}/complete
+      // This auto-finds today's pending assignment for the logged-in kid.
+      await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
+
+      // chore.points is the backend reward value; use it as adventure XP.
+      const xpGained    = assignment.chore?.points ?? 50;
       const coinsGained = Math.floor(xpGained / 10);
       setFlash({ xp: xpGained, coins: coinsGained });
       onChoreComplete({ assignment, xpGained, coinsGained });
@@ -64,6 +78,9 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
   }
 
   if (!zone) return null;
+
+  // zone.color is a hex number (e.g. 0xff6644); convert to CSS colour string.
+  const zoneColorCss = `#${(zone.color ?? 0xffffff).toString(16).padStart(6, '0')}`;
 
   return (
     <div style={{
@@ -103,7 +120,7 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <div style={{
             width: 12, height: 12, borderRadius: 2,
-            background: `#${zone.color?.toString(16).padStart(6,'0') ?? 'ffffff'}`,
+            background: zoneColorCss,
           }} />
           <div>
             <div style={{ fontSize: 14, color: '#fcd860', fontWeight: 700 }}>
@@ -165,10 +182,12 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
             )}
 
             {chores.map((a) => {
-              const chore = a.chore ?? a;
-              const xp    = a.xp_reward ?? chore.xp_value ?? 50;
-              const coins = Math.floor(xp / 10);
-              const diff  = chore.difficulty ?? 'easy';
+              // AssignmentResponse fields: id, chore_id, status, chore (ChoreResponse)
+              // ChoreResponse fields: title, points, difficulty, description, category.name
+              const chore   = a.chore ?? {};
+              const xp      = chore.points ?? 50;
+              const coins   = Math.floor(xp / 10);
+              const diff    = chore.difficulty ?? 'easy';
               const isDoing = doing === a.id;
 
               return (
@@ -188,7 +207,7 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 12, color: '#e5e5e5', fontWeight: 600 }}>
-                        {chore.name ?? chore.title ?? 'Chore Quest'}
+                        {chore.title ?? 'Chore Quest'}
                       </div>
                       {chore.description && (
                         <div style={{ fontSize: 9, color: '#666', marginTop: 2 }}>
@@ -202,9 +221,6 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
                   <div style={{ display: 'flex', gap: 12, fontSize: 9, color: '#888' }}>
                     <span style={{ color: '#58d854' }}>+{xp} XP</span>
                     <span style={{ color: '#fcd860' }}>+{coins} coins</span>
-                    {chore.allowance_value > 0 && (
-                      <span style={{ color: '#14b8a6' }}>${chore.allowance_value.toFixed(2)}</span>
-                    )}
                   </div>
 
                   <button
