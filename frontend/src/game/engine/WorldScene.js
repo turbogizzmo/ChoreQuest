@@ -268,11 +268,11 @@ export class WorldScene extends Phaser.Scene {
     const h = this.scale.height;
     const container = this.add.container(0, 0).setScrollFactor(0).setDepth(300);
 
-    const bg = this.add.rectangle(w / 2, h / 2, 200, 160, 0x000000, 0.85);
+    const bg = this.add.rectangle(w / 2, h / 2, 200, 160, 0x000000, 0.85).setScrollFactor(0);
     const title = this.add.text(w / 2, h / 2 - 55, '— PAUSED —', {
       fontSize: '14px', fontFamily: 'monospace', color: '#fcd860',
       stroke: '#000', strokeThickness: 3, resolution: 2,
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setScrollFactor(0);
 
     const resumeBtn = this._makePauseBtn(w / 2, h / 2 - 20, 'Resume', () => this._togglePause());
     const exitBtn   = this._makePauseBtn(w / 2, h / 2 + 20, 'Exit Adventure', () => this._exitGame());
@@ -283,13 +283,14 @@ export class WorldScene extends Phaser.Scene {
 
   _makePauseBtn(x, y, text, cb) {
     const bg = this.add.rectangle(x, y, 140, 24, 0x2a2a2a, 1)
+      .setScrollFactor(0)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', cb)
       .on('pointerover',  () => bg.setFillStyle(0x444444))
       .on('pointerout',   () => bg.setFillStyle(0x2a2a2a));
     const label = this.add.text(x, y, text, {
       fontSize: '10px', fontFamily: 'monospace', color: '#ffffff', resolution: 2,
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setScrollFactor(0);
     return { bg, label };
   }
 
