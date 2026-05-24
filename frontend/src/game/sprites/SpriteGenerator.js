@@ -791,7 +791,8 @@ const BOSS_DEFS = {
         '................',
       ],
     ],
-    p: { L: NES.lpurple, l: NES.lgray, b: NES.black, R: NES.lred, '.': null },
+    // Eyes changed black→lred: glowing red eyes pop against the dark night overlay
+    p: { L: NES.lpurple, l: NES.lgray, b: NES.lred, R: NES.red, '.': null },
   },
   weed_golem: {
     frames: [
@@ -1092,18 +1093,26 @@ export function generateUISprites(scene) {
   });
   addCanvasSpriteSheet(scene, 'coin', cc, 8 * SCALE, 8 * SCALE);
 
-  // Heart sprite (8×8, 2 states: full/empty)
+  // Heart sprite (8×8 source, 2 states: full/empty)
+  // Shape: two top lobes + tapered body → proper pointed tip at bottom.
+  //   row 2: two 2px lobes (left & right)
+  //   row 3–4: full 8px width (mid body)
+  //   row 5: 6px (inset 1)
+  //   row 6: 4px (inset 2)
+  //   row 7: 2px (pointed tip)
   const hc = createCanvas(2 * 8 * SCALE, 8 * SCALE);
   const hctx = hc.getContext('2d');
   [[NES.red, NES.lred], [NES.dgray, NES.mgray]].forEach(([fg, hi], f) => {
     hctx.save();
     hctx.translate(f * 8 * SCALE, 0);
     hctx.fillStyle = fg;
-    hctx.fillRect(1 * SCALE, 2 * SCALE, 2 * SCALE, 2 * SCALE);
-    hctx.fillRect(5 * SCALE, 2 * SCALE, 2 * SCALE, 2 * SCALE);
-    hctx.fillRect(0 * SCALE, 3 * SCALE, 8 * SCALE, 3 * SCALE);
-    hctx.fillRect(1 * SCALE, 6 * SCALE, 6 * SCALE, 1 * SCALE);
-    hctx.fillRect(2 * SCALE, 7 * SCALE, 4 * SCALE, 1 * SCALE);
+    hctx.fillRect(1 * SCALE, 2 * SCALE, 2 * SCALE, 2 * SCALE); // left lobe
+    hctx.fillRect(5 * SCALE, 2 * SCALE, 2 * SCALE, 2 * SCALE); // right lobe
+    hctx.fillRect(0 * SCALE, 3 * SCALE, 8 * SCALE, 2 * SCALE); // full mid (rows 3-4)
+    hctx.fillRect(1 * SCALE, 5 * SCALE, 6 * SCALE, 1 * SCALE); // row 5 taper
+    hctx.fillRect(2 * SCALE, 6 * SCALE, 4 * SCALE, 1 * SCALE); // row 6 taper
+    hctx.fillRect(3 * SCALE, 7 * SCALE, 2 * SCALE, 1 * SCALE); // row 7 pointed tip
+    // Highlight pixel on each lobe (top-left corner)
     hctx.fillStyle = hi;
     hctx.fillRect(1 * SCALE, 2 * SCALE, 1 * SCALE, 1 * SCALE);
     hctx.fillRect(5 * SCALE, 2 * SCALE, 1 * SCALE, 1 * SCALE);
@@ -1111,7 +1120,7 @@ export function generateUISprites(scene) {
   });
   addCanvasSpriteSheet(scene, 'heart', hc, 8 * SCALE, 8 * SCALE);
 
-  // XP bar background (128×8)
+  // XP bar background (128×8) — NES-style with bracket notches at each end
   const xpW = 128, xpH = 8;
   const xpc = createCanvas(xpW, xpH);
   const xpctx = xpc.getContext('2d');
@@ -1119,14 +1128,23 @@ export function generateUISprites(scene) {
   xpctx.fillRect(0, 0, xpW, xpH);
   xpctx.fillStyle = NES.dgray;
   xpctx.fillRect(1, 1, xpW - 2, xpH - 2);
+  // Bracket notches: 2×3 yellow marks at each end
+  xpctx.fillStyle = NES.lyellow;
+  xpctx.fillRect(0, 0, 2, 3);      // top-left bracket
+  xpctx.fillRect(0, xpH - 3, 2, 3); // bottom-left bracket
+  xpctx.fillRect(xpW - 2, 0, 2, 3); // top-right bracket
+  xpctx.fillRect(xpW - 2, xpH - 3, 2, 3); // bottom-right bracket
   addCanvasTexture(scene, 'xpbar_bg', xpc);
 
+  // XP bar fill — green with 1px lyellow highlight stripe at top
   const xpfc = createCanvas(xpW, xpH);
   const xpfctx = xpfc.getContext('2d');
   xpfctx.fillStyle = NES.lgreen;
   xpfctx.fillRect(0, 0, xpW, xpH);
   xpfctx.fillStyle = NES.green;
-  xpfctx.fillRect(0, xpH - 2, xpW, 2);
+  xpfctx.fillRect(0, xpH - 2, xpW, 2);         // darker bottom stripe
+  xpfctx.fillStyle = NES.lyellow;
+  xpfctx.fillRect(0, 0, xpW, 1);               // bright top highlight
   addCanvasTexture(scene, 'xpbar_fill', xpfc);
 }
 

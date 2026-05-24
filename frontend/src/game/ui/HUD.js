@@ -32,9 +32,15 @@ export class HUD {
     const HUD_BG_H = xpY + 12 + 6;
 
     // ── Dark background strip for top-left HUD ───────────────────────
+    // Width covers hearts row OR xp bar + level badge, whichever is wider.
+    // BAR_W * 1.25 = 160px bar + 50px for level badge text = 210px content.
+    const HUD_BG_CONTENT = Math.max(
+      MAX_HEARTS * (HEART_SIZE + HEART_GAP),   // hearts: 135px
+      BAR_W * 1.25 + 50,                        // xp bar + level badge: 210px
+    );
     const bgLeft = scene.add.graphics();
     bgLeft.fillStyle(0x000000, 0.55);
-    bgLeft.fillRoundedRect(2, 2, HUD_BG_W + 52, HUD_BG_H, 5);
+    bgLeft.fillRoundedRect(2, 2, PADDING + HUD_BG_CONTENT + 6, HUD_BG_H, 5);
     bgLeft.setScrollFactor(0).setDepth(HUD_DEPTH - 1);
 
     // ── Hearts (top-left) ────────────────────────────────────────────
@@ -75,7 +81,7 @@ export class HUD {
       stroke: '#000000',
       strokeThickness: 4,
       resolution: 2,
-    }).setScrollFactor(0).setDepth(HUD_DEPTH);
+    }).setScrollFactor(0).setDepth(HUD_DEPTH + 3); // above xpFill crop edge
 
     // ── Coin counter (top-right) ──────────────────────────────────────
     const coinX = W - PADDING - 48;
@@ -160,6 +166,19 @@ export class HUD {
     mmBorder.lineStyle(1, 0x0028f8, 0.55);
     mmBorder.strokeRect(MM_X, MM_Y, MM_SIZE, MM_SIZE);
     mmBorder.setScrollFactor(0).setDepth(HUD_DEPTH + 1);
+
+    // Path tile layer — main cross paths run through tile 19–20 (midRow/midCol of 40×40 map).
+    // Each tile = 2px on the 80px mini-map (80 / 40 = 2).
+    // The path is 2 tiles wide, so draw a 4px-wide cross centred at tile 19.5.
+    const mmPath = scene.add.graphics();
+    mmPath.fillStyle(0xbcbcbc, 0.30); // light grey, semi-transparent
+    const pathTile  = 19;             // first of the two mid-column/row tiles
+    const pathPx    = pathTile * 2;   // pixel position on the 80px map
+    // Vertical path (columns 19–20 → x 38–41)
+    mmPath.fillRect(MM_X + pathPx, MM_Y, 4, MM_SIZE);
+    // Horizontal path (rows 19–20 → y 38–41)
+    mmPath.fillRect(MM_X, MM_Y + pathPx, MM_SIZE, 4);
+    mmPath.setScrollFactor(0).setDepth(HUD_DEPTH + 1);
 
     // Portal markers (static) — castle marker larger and brighter
     const scale = MM_SIZE / WORLD_PX;

@@ -32,6 +32,24 @@ function DifficultyBadge({ difficulty }) {
 // Starter broom card — shows as a greyed-out reference so players have a baseline
 const BROOM_CARD = { weapon: 'broom', name: 'Broom', desc: 'Your trusty starter weapon' };
 
+// Stat bar — renders a mini progress bar for damage or range comparisons
+function StatBar({ label, value, max, color }) {
+  const pct = Math.min(value / max, 1);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+      <span style={{ fontSize: 8, color: '#666', minWidth: 24 }}>{label}</span>
+      <div style={{ width: 48, height: 4, background: '#1a1a1a', borderRadius: 2, position: 'relative' }}>
+        <div style={{
+          width: `${pct * 100}%`, height: '100%',
+          background: color, borderRadius: 2,
+          minWidth: pct > 0 ? 2 : 0,
+        }} />
+      </div>
+      <span style={{ fontSize: 8, color }}>{value}</span>
+    </div>
+  );
+}
+
 // ── Weapon Shop (shown inside the Reward Castle portal) ───────────────────────
 function WeaponShop({ gameData, onBuyWeapon, onEquipWeapon }) {
   const owned    = gameData?.unlockedWeapons ?? ['broom'];
@@ -65,11 +83,8 @@ function WeaponShop({ gameData, onBuyWeapon, onEquipWeapon }) {
                     {isEquipped && <span style={{ marginLeft: 6, fontSize: 9, color: '#58d854' }}>✓ EQUIPPED</span>}
                   </div>
                   <div style={{ fontSize: 9, color: '#555', marginTop: 2 }}>{u.desc}</div>
-                  <div style={{ fontSize: 9, color: '#666', marginTop: 2 }}>
-                    <span style={{ color: '#c04040' }}>DMG {damage}</span>
-                    {' · '}
-                    <span style={{ color: '#4458c8' }}>RNG {range}</span>
-                  </div>
+                  <StatBar label="DMG" value={damage} max={5}   color="#f87858" />
+                  <StatBar label="RNG" value={range}  max={120} color="#6888fc" />
                 </div>
               </div>
               {!isEquipped && (
@@ -105,11 +120,8 @@ function WeaponShop({ gameData, onBuyWeapon, onEquipWeapon }) {
                   )}
                 </div>
                 <div style={{ fontSize: 9, color: '#666', marginTop: 2 }}>{u.desc}</div>
-                <div style={{ fontSize: 9, color: '#888', marginTop: 2 }}>
-                  <span style={{ color: '#f87858' }}>DMG {stats.damage}</span>
-                  {' · '}
-                  <span style={{ color: '#6888fc' }}>RNG {stats.range}</span>
-                </div>
+                <StatBar label="DMG" value={stats.damage} max={5}   color="#f87858" />
+                <StatBar label="RNG" value={stats.range}  max={120} color="#6888fc" />
               </div>
               {!isOwned && (
                 <span style={{ fontSize: 11, color: '#fcd860', fontWeight: 700 }}>

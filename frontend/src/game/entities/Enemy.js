@@ -122,10 +122,13 @@ export function updateEnemy(enemy, playerSprite, delta) {
         enemy._chargeState = 'charging';
         enemy._chargeDur   = 450;
         const nd = dist || 1;
+        // Lint Titan uses its pre-set _burstSpeed; other bosses multiply base speed
         const chargeSpeed = enemy._burstSpeed ?? (enemy.baseSpeed * 3);
         enemy._chargeVx = (dx / nd) * chargeSpeed;
         enemy._chargeVy = (dy / nd) * chargeSpeed;
-        enemy.clearTint();
+        // Orange tint during the actual dash — stays until charge ends so player
+        // can still see the danger window
+        enemy.setTint(0xff8800);
       }
       return;
     }
