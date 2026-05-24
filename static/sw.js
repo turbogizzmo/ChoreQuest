@@ -10,8 +10,13 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  // Don't call skipWaiting() automatically — wait for the app to signal
-  // via postMessage so we can show an "Update available" prompt first.
+  // Auto-skip waiting so the new SW activates immediately.
+  // This prevents iOS Safari PWA home-screen bookmarks from getting stuck on
+  // stale content when the app is redeployed: without skipWaiting() the new SW
+  // sits in "waiting" forever if the iOS PWA never fires the update prompt
+  // reliably. The controllerchange handler in main.jsx auto-reloads the page
+  // once this SW takes control, so all clients get fresh assets.
+  self.skipWaiting();
 });
 
 self.addEventListener('message', (event) => {
@@ -113,7 +118,17 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
-      }).catch(() => cached);
+      }).catch(() => {
+        // Network failed. Return the cached version if available, otherwise a
+        // real error Response so respondWith() always receives a valid object.
+        // Returning `undefined` here would trigger a "bad respondWith" error in
+        // the browser and manifest as "Importing a module script failed" on
+        // iOS Safari when a dynamic import chunk cannot be fetched.
+        return cached || new Response('Network error', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain' },
+        });
+      });
       return cached || fetched;
     })
   );
