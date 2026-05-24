@@ -18,6 +18,7 @@ export class HUD {
     this.scene   = scene;
     this.hearts  = [];
     this.xpMask  = null;
+    this._surgeBanner = null;
     this._buildHUD();
   }
 
@@ -430,23 +431,46 @@ export class HUD {
       stroke: '#000', strokeThickness: 4, resolution: 2,
     }).setScrollFactor(0).setDepth(161).setOrigin(0.5);
 
+    const banner = { bg, txt, introTween: null, holdTimer: null, outroTween: null };
+    this._surgeBanner = banner;
+
     const targetY = 50; // just below the hearts/XP HUD strip
 
-    scene.tweens.add({
+    banner.introTween = scene.tweens.add({
       targets: [bg, txt], y: targetY,
       duration: 340, ease: 'Back.easeOut',
       onComplete: () => {
         // Slide out 1 s before the surge ends
         const holdMs = Math.max(200, durationMs - 1000);
-        scene.time.delayedCall(holdMs, () => {
-          scene.tweens.add({
+        banner.holdTimer = scene.time.delayedCall(holdMs, () => {
+          banner.holdTimer = null;
+          banner.outroTween = scene.tweens.add({
             targets: [bg, txt], y: -50, alpha: 0,
             duration: 400, ease: 'Power2',
-            onComplete: () => { bg.destroy(); txt.destroy(); },
+            onComplete: () => {
+              if (this._surgeBanner === banner) this._surgeBanner = null;
+              bg.destroy();
+              txt.destroy();
+            },
           });
         });
       },
     });
+  }
+
+  setPaused(paused) {
+    if (!this._surgeBanner) return;
+    const { introTween, holdTimer, outroTween } = this._surgeBanner;
+    if (holdTimer) holdTimer.paused = paused;
+    try {
+      if (paused) {
+        introTween?.pause?.();
+        outroTween?.pause?.();
+      } else {
+        introTween?.resume?.();
+        outroTween?.resume?.();
+      }
+    } catch (_) {}
   }
 
   showFloatingText(x, y, text, color = '#fcd860') {

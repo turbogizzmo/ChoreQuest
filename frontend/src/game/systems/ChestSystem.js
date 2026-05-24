@@ -134,6 +134,16 @@ export class ChestSystem {
     } catch (_) {}
   }
 
+  setPaused(paused) {
+    this._chests.forEach(({ timer, pulseTween }) => {
+      if (timer) timer.paused = paused;
+      try {
+        if (paused) pulseTween?.pause?.();
+        else pulseTween?.resume?.();
+      } catch (_) {}
+    });
+  }
+
   destroy() {
     this._chests.forEach(({ sprite, overlap, pulseTween, timer }) => {
       try { timer.remove(false); } catch (_) {}

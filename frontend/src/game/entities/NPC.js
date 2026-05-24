@@ -8,7 +8,7 @@ import { TILE_SIZE } from '../data/WorldData.js';
 
 const PROX_TILES = 3;      // tile radius for dialogue trigger
 const PROX_PX    = PROX_TILES * TILE_SIZE;
-const METRICS_DELAY_MS = 32;
+const TEXT_METRICS_READY_DELAY_MS = 32;
 
 const DIALOGUE_LINES = [
   'Complete chores for XP!',
@@ -61,6 +61,7 @@ export class NPC {
     this._bubbleText    = null;
     this._bubbleVisible = false;
     this._lineIdx       = Math.floor(Math.random() * DIALOGUE_LINES.length);
+    this._metricsTimer  = null;
     this._hidingTimer   = null;
   }
 
@@ -104,7 +105,8 @@ export class NPC {
     bubble.setAlpha(0);
     textEl.setAlpha(0);
     // Wait one render tick for Phaser to populate text metrics before sizing the bubble.
-    scene.time.delayedCall(METRICS_DELAY_MS, () => {
+    this._metricsTimer = scene.time.delayedCall(TEXT_METRICS_READY_DELAY_MS, () => {
+      this._metricsTimer = null;
       if (this._bubble !== bubble || !textEl.active) return;
       const pad = 6;
       const bw  = textEl.width  + pad * 2;
@@ -139,6 +141,10 @@ export class NPC {
       this._hidingTimer.remove(false);
       this._hidingTimer = null;
     }
+    if (this._metricsTimer) {
+      this._metricsTimer.remove(false);
+      this._metricsTimer = null;
+    }
 
     const targets = [this._bubble, this._bubbleText].filter(Boolean);
     this.scene.tweens.add({
@@ -151,7 +157,13 @@ export class NPC {
     });
   }
 
+  setPaused(paused) {
+    if (this._metricsTimer) this._metricsTimer.paused = paused;
+    if (this._hidingTimer) this._hidingTimer.paused = paused;
+  }
+
   destroy() {
+    this._metricsTimer?.remove(false);
     this._hidingTimer?.remove(false);
     try { this._bubble?.destroy(); }     catch (_) {}
     try { this._bubbleText?.destroy(); } catch (_) {}

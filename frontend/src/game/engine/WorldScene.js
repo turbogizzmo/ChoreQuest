@@ -468,7 +468,7 @@ export class WorldScene extends Phaser.Scene {
     this.player.isAlive = false;
     this.player.body.setVelocity(0, 0);
     this.physics.pause();
-    this._setSurgeTimersPaused(true);
+    this._setGameplayTimersPaused(true);
 
     const w = this.scale.width;
     const h = this.scale.height;
@@ -544,11 +544,11 @@ export class WorldScene extends Phaser.Scene {
     this._paused = !this._paused;
     if (this._paused) {
       this.physics.pause();
-      this._setSurgeTimersPaused(true);
+      this._setGameplayTimersPaused(true);
       this._showPauseMenu();
     } else {
       this.physics.resume();
-      this._setSurgeTimersPaused(false);
+      this._setGameplayTimersPaused(false);
       if (this._pauseOverlay) {
         this._pauseOverlay.destroy();
         this._pauseOverlay = null;
@@ -590,7 +590,7 @@ export class WorldScene extends Phaser.Scene {
   _showTutorial() {
     this._paused = true;
     this.physics.pause();
-    this._setSurgeTimersPaused(true);
+    this._setGameplayTimersPaused(true);
 
     const w  = this.scale.width;
     const h  = this.scale.height;
@@ -726,7 +726,7 @@ export class WorldScene extends Phaser.Scene {
       this._paused = false;
       this.physics.resume();
       this.gameData.tutorialSeen = true;
-      this._setSurgeTimersPaused(false);
+      this._setGameplayTimersPaused(false);
       writeSave({ ...this.gameData, userId: this.userId });
       this.input.keyboard.off('keydown', dismiss);
     };
@@ -814,10 +814,13 @@ export class WorldScene extends Phaser.Scene {
     this._surgeEndTimer.paused = this._paused;
   }
 
-  _setSurgeTimersPaused(paused) {
+  _setGameplayTimersPaused(paused) {
     const shouldPause = paused || !this.gameData.tutorialSeen;
     if (this._surgeTimer) this._surgeTimer.paused = shouldPause;
     if (this._surgeEndTimer) this._surgeEndTimer.paused = paused;
+    this.chestSystem?.setPaused(paused);
+    this.npc?.setPaused(paused);
+    this.hud?.setPaused(paused);
   }
 
   // ── Phase 5-C: Boss proximity music ──────────────────────────────────────────
