@@ -42,9 +42,13 @@ export class PortalManager {
         resolution: 2,
       }).setOrigin(0.5).setDepth(15);
 
+      // Width is measured one frame later — text.width is 0 before the first render tick.
       const labelBg = this.scene.add.rectangle(
-        px, py - 30, label.width + 14, 18, 0x000000, 0.7,
+        px, py - 30, 80, 18, 0x000000, 0.7,
       ).setOrigin(0.5).setDepth(14);
+      this.scene.time.delayedCall(32, () => {
+        labelBg.setSize(label.width + 14, 18);
+      });
 
       const hint = this.scene.add.text(px, py - 14, 'walk in to enter', {
         fontSize: '8px',

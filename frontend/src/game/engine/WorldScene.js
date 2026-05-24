@@ -191,6 +191,9 @@ export class WorldScene extends Phaser.Scene {
     if (!this.gameData.tutorialSeen) {
       this.time.delayedCall(400, () => this._showTutorial());
     }
+
+    // Notify React shell that the scene is fully initialised — hides loading splash
+    this.onComplete({ type: 'sceneReady' });
   }
 
   update(time, delta) {
@@ -214,7 +217,7 @@ export class WorldScene extends Phaser.Scene {
     ) {
       this.battle.playerAttack(this.player.weapon, this.enemies, this.player);
       this._spawnAttackVfx();
-      this.sfx.playAttack();
+      this.sfx.playAttack(this.player.weapon ?? 'broom');
       playAttackAnim(this, this.player, 180); // show directional swing frame
     }
 
@@ -223,6 +226,9 @@ export class WorldScene extends Phaser.Scene {
     if (curLevel > this._lastLevel) {
       this._lastLevel = curLevel;
       this.sfx.playLevelUp();
+      this._showLevelUpBanner(curLevel);
+      // Persist immediately so a crash right after levelling doesn't lose progress
+      writeSave({ ...this.gameData, userId: this.userId });
     }
 
     // Day/night cycle (10-minute sinusoidal loop, max alpha 0.55)
@@ -638,6 +644,39 @@ export class WorldScene extends Phaser.Scene {
     this.tweens.add({
       targets: container, alpha: 1, y: 0,
       duration: 280, ease: 'Power2',
+    });
+  }
+
+  _showLevelUpBanner(level) {
+    const w = this.scale.width;
+    const h = this.scale.height;
+
+    // Screen flash
+    const cam   = this.cameras.main;
+    const flash = this.add.rectangle(cam.width / 2, cam.height / 2, cam.width, cam.height, 0xffffff, 0)
+      .setScrollFactor(0).setDepth(200);
+    this.tweens.add({
+      targets: flash, alpha: 0.45,
+      yoyo: true, duration: 100, repeat: 1,
+      onComplete: () => flash.destroy(),
+    });
+
+    // Big golden "LEVEL UP!" text that rises and fades
+    const txt = this.add.text(w / 2, h / 2 + 10, `✦  LEVEL UP!  LV ${level}  ✦`, {
+      fontSize: '16px', fontFamily: 'monospace', color: '#fcd860',
+      stroke: '#000000', strokeThickness: 5, resolution: 2,
+    }).setScrollFactor(0).setDepth(201).setOrigin(0.5).setAlpha(0);
+
+    this.tweens.add({
+      targets: txt, alpha: 1, y: h / 2 - 20,
+      duration: 300, ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: txt, alpha: 0, y: h / 2 - 60,
+          delay: 1200, duration: 500, ease: 'Power2',
+          onComplete: () => txt.destroy(),
+        });
+      },
     });
   }
 

@@ -66,8 +66,11 @@ function drawPixel(ctx, x, y, color, scale = 1) {
 }
 
 function drawGrid(ctx, grid, palette, scale = 1) {
+  // Clip each row to the width of the first row so inconsistent row lengths
+  // in grid definitions don't draw beyond the canvas boundary.
+  const expectedW = grid[0]?.length ?? 0;
   grid.forEach((row, y) =>
-    [...row].forEach((code, x) => {
+    [...row].slice(0, expectedW).forEach((code, x) => {
       const color = palette[code];
       if (color) drawPixel(ctx, x, y, color, scale);
     })
@@ -499,13 +502,6 @@ const PLAYER_ATTACK_FRAMES = {
     '................',
   ],
 };
-
-// Directions: down=0, left=1, right=2, up=3 (each 3 frames)
-function makePlayerFrame(frameIdx, dirOffset, palette) {
-  const frames = PLAYER_FRAMES.down; // reuse for all dirs
-  const src = frames[frameIdx % 3];
-  return { grid: src, p: palette };
-}
 
 export function generatePlayerSheet(scene) {
   const WALK_FRAMES   = 12; // 4 dirs × 3 walk frames

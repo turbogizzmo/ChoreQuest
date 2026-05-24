@@ -373,17 +373,17 @@ export class HUD {
     });
   }
 
-  // Called each frame with the current night overlay alpha (0 = full day, 0.55 = full night)
+  // Called each frame with the current night overlay alpha (0 = full day, 0.55 = full night).
+  // Three zones: day → dusk → night, avoiding an abrupt binary snap.
   updateNightCycle(nightAlpha) {
     if (!this._dayNightLabel) return;
-    // Cross-fade: day (☀ yellow) → night (☾ light-blue)
-    if (nightAlpha > 0.35) {
-      this._dayNightLabel.setText('☾');
-      // Lerp color toward light-blue at peak night
-      this._dayNightLabel.setColor('#a4e4fc');
+    const ratio = nightAlpha / 0.55; // normalise to 0–1
+    if (ratio > 0.6) {
+      this._dayNightLabel.setText('☾').setColor('#a4e4fc'); // night — pale blue
+    } else if (ratio > 0.25) {
+      this._dayNightLabel.setText('☀').setColor('#f08828'); // dusk — orange
     } else {
-      this._dayNightLabel.setText('☀');
-      this._dayNightLabel.setColor('#fcd860');
+      this._dayNightLabel.setText('☀').setColor('#fcd860'); // day — yellow
     }
   }
 

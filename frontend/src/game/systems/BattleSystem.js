@@ -117,8 +117,11 @@ export class BattleSystem {
     enemy._hpBarFill?.destroy();
     enemy._nameTag?.destroy();
 
-    // Apply combo multiplier to XP; coins get a smaller boost
-    const mult     = this._comboMultiplier;
+    // Recompute combo multiplier from the live hit window rather than the cached
+    // value — this prevents a stale 2× bonus lingering after the window expires.
+    const cutoff   = Date.now() - COMBO_WINDOW_MS;
+    const liveHits = this._recentHits.filter(t => t > cutoff);
+    const mult     = liveHits.length >= 5 ? 3 : liveHits.length >= 3 ? 2 : 1;
     const xpDrop   = Math.round((enemy.xpDrop   ?? 2) * mult);
     const coinDrop = Math.round((enemy.coinDrop ?? 1) * (mult > 1 ? 1.5 : 1));
     this.scene.events.emit('enemyDefeated', { enemy, xpDrop, coinDrop });
@@ -188,7 +191,23 @@ export class BattleSystem {
       return;
     }
 
-    // Default (sock_goblin and any future enemy): scale + fade
+    if (type === 'sock_goblin') {
+      // Sock goblin: spin like a thrown sock, then stretch-snap and vanish
+      scene.tweens.add({
+        targets: enemy, angle: 360, scaleX: 1.6, scaleY: 0.4,
+        duration: 160, ease: 'Power2',
+        onComplete: () => {
+          scene.tweens.add({
+            targets: enemy, alpha: 0, scaleX: 0.4, scaleY: 2.0,
+            duration: 180, ease: 'Power1',
+            onComplete: () => enemy.destroy(),
+          });
+        },
+      });
+      return;
+    }
+
+    // Default (any future enemy type): scale + fade
     scene.tweens.add({
       targets: enemy, alpha: 0, scaleX: 2, scaleY: 2,
       duration: 300, onComplete: () => enemy.destroy(),

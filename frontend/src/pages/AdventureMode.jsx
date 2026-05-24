@@ -27,6 +27,11 @@ export default function AdventureMode() {
   const [gameReady, setGameReady]       = useState(false);
 
   const handleGameEvent = useCallback((event) => {
+    if (event.type === 'sceneReady') {
+      // WorldScene.create() has finished — canvas is live, hide the loading splash
+      setGameReady(true);
+      return;
+    }
     if (event.type === 'portalEnter') {
       setActivePortal(event.zone);
       setGameData({ ...event.gameData });
@@ -76,7 +81,8 @@ export default function AdventureMode() {
       onComplete: handleGameEvent,
     });
     gameRef.current = game;
-    setGameReady(true);
+    // setGameReady is triggered by the 'sceneReady' event from WorldScene.create()
+    // so the loading splash stays visible until the canvas is actually live.
 
     // destroyGame is imported at the top level so this cleanup runs synchronously —
     // no dynamic-import race when React StrictMode unmounts before a lazy import resolves.
@@ -99,14 +105,14 @@ export default function AdventureMode() {
     setGameData((prev) => {
       if (!prev || prev.coins < cost) return prev;
       const unlocked = [...new Set([...(prev.unlockedWeapons ?? ['broom']), weapon])];
-      const next = { ...prev, coins: prev.coins - cost, weapon, unlockedWeapons: unlocked };
+      // Buy only unlocks the weapon — the player must press Equip to switch.
+      // Auto-equipping on purchase bypasses the Equip button shown in the shop UI.
+      const next = { ...prev, coins: prev.coins - cost, unlockedWeapons: unlocked };
       writeSave({ ...next, userId: String(user?.id ?? 'preview') });
       const scene = gameRef.current?.scene?.getScene('WorldScene');
       if (scene) {
         scene.gameData.coins = next.coins;
-        scene.gameData.weapon = weapon;
         scene.gameData.unlockedWeapons = unlocked;
-        if (scene.player) scene.player.weapon = weapon;
       }
       return next;
     });
