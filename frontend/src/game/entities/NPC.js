@@ -102,6 +102,7 @@ export class NPC {
     // Fade in
     bubble.setAlpha(0);
     textEl.setAlpha(0);
+    // Wait a tick for Phaser to populate text metrics before sizing the bubble.
     scene.time.delayedCall(32, () => {
       if (this._bubble !== bubble || !textEl.active) return;
       const pad = 6;

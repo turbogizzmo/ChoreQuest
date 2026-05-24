@@ -29,6 +29,7 @@ export class ChestSystem {
     const sprite = scene.physics.add.staticSprite(x, y - 8, 'chest', 0)
       .setScale(1.5).setDepth(9);
     sprite.refreshBody();
+    // Keep the body disabled until the pop-in animation reaches its final size.
     if (sprite.body) sprite.body.enable = false;
 
     // Pop-in entrance: start tiny + invisible, expand to full size
@@ -43,6 +44,7 @@ export class ChestSystem {
         sprite.setScale(1.5);
         sprite.refreshBody();
         if (sprite.body) sprite.body.enable = true;
+        // Pulse alpha only so the static Arcade body stays aligned with the chest.
         pulseTween = scene.tweens.add({
           targets: sprite,
           alpha: 0.82,

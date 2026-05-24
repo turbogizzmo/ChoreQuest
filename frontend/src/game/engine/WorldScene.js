@@ -785,7 +785,7 @@ export class WorldScene extends Phaser.Scene {
       this._surgeTimer = null;
       this._activateSurge();
     });
-    this._surgeTimer.paused = this._paused;
+    this._surgeTimer.paused = this._paused || !this.gameData.tutorialSeen;
   }
 
   _activateSurge() {
