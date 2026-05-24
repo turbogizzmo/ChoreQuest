@@ -70,18 +70,26 @@ export const PORTAL_ZONES = [
 
 // Enemy spawn zones
 export const ENEMY_ZONES = [
-  { type: 'dust_bunny',  x: 6,  y: 15, count: 2 },
-  { type: 'dust_bunny',  x: 33, y: 15, count: 2 },
-  { type: 'sock_goblin', x: 6,  y: 22, count: 2 },
-  { type: 'sock_goblin', x: 33, y: 22, count: 2 },
-  { type: 'crumb_slime', x: 18, y: 6,  count: 2 },
-  { type: 'crumb_slime', x: 18, y: 32, count: 2 },
+  { type: 'dust_bunny',      x: 6,  y: 15, count: 2 },
+  { type: 'dust_bunny',      x: 33, y: 15, count: 2 },
+  { type: 'sock_goblin',     x: 6,  y: 22, count: 2 },
+  { type: 'sock_goblin',     x: 33, y: 22, count: 2 },
+  { type: 'crumb_slime',     x: 18, y: 6,  count: 2 },
+  { type: 'crumb_slime',     x: 18, y: 32, count: 2 },
+  // Phase 5-A: two new enemy types
+  { type: 'mop_golem',       x: 14, y: 14, count: 2 },
+  { type: 'mop_golem',       x: 25, y: 25, count: 2 },
+  { type: 'trash_bag_ghost', x: 25, y: 14, count: 2 },
+  { type: 'trash_bag_ghost', x: 14, y: 25, count: 2 },
 ];
 
 export const ENEMY_STATS = {
-  dust_bunny:  { hp: 8,  xp: 2, coins: 1, name: 'Dust Bunny',  speed: 60 },
-  sock_goblin: { hp: 12, xp: 3, coins: 2, name: 'Sock Goblin', speed: 50 },
-  crumb_slime: { hp: 6,  xp: 1, coins: 1, name: 'Crumb Slime', speed: 40 },
+  dust_bunny:      { hp: 8,  xp: 2, coins: 1, name: 'Dust Bunny',      speed: 60 },
+  sock_goblin:     { hp: 12, xp: 3, coins: 2, name: 'Sock Goblin',     speed: 50 },
+  crumb_slime:     { hp: 6,  xp: 1, coins: 1, name: 'Crumb Slime',     speed: 40 },
+  // Phase 5-A: new enemies
+  mop_golem:       { hp: 18, xp: 5, coins: 3, name: 'Mop Golem',       speed: 32 },
+  trash_bag_ghost: { hp: 9,  xp: 4, coins: 2, name: 'Trash Bag Ghost', speed: 80 },
 };
 
 // Weapons / attacks
@@ -114,6 +122,21 @@ export const WEAPON_UPGRADES = [
   { weapon: 'sponge', cost: 35, name: 'Toss Sponge',  desc: 'Wide-range area throw'     },
   { weapon: 'soap',   cost: 60, name: 'Soap Attack',  desc: 'Highest single-hit damage'  },
 ];
+
+// Chest loot drops — 20% chance on enemy defeat
+export const CHEST_DROP_CHANCE = 0.20;
+export const CHEST_REWARDS = [
+  { coins: 2, xp: 3 },
+  { coins: 3, xp: 4 },
+  { coins: 5, xp: 5 },
+  { coins: 4, xp: 8 },
+  { coins: 6, xp: 6 },
+];
+
+// Chore Surge world event — fires every SURGE_INTERVAL ms, lasts SURGE_DURATION ms
+export const SURGE_INTERVAL = 8 * 60 * 1000;  // 8 minutes between surges
+export const SURGE_DURATION = 90 * 1000;       // 90-second surge window
+export const SURGE_XP_MULT  = 2;               // 2× XP during surge
 
 // XP table: level -> xp needed to reach NEXT level
 export function xpForLevel(level) {
