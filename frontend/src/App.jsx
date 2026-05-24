@@ -86,17 +86,35 @@ class PageErrorBoundary extends Component {
   }
   render() {
     if (this.state.error) {
+      // Dynamic import failures (chunk load errors) cannot be retried by simply
+      // clearing React state — React.lazy caches the rejected promise.  A full
+      // page reload is the only reliable recovery, so detect the pattern and
+      // reload instead of trying to re-render the same broken lazy boundary.
+      const msg = this.state.error?.message || '';
+      const isChunkError =
+        msg.includes('Failed to fetch dynamically imported module') ||
+        msg.includes('Failed to load module script') ||
+        msg.includes('error loading dynamically imported module') ||
+        msg.includes('Importing a module script failed');
       return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 p-6 text-cream">
           <p className="text-base font-semibold">This page ran into a problem</p>
           <p className="text-sm text-muted text-center max-w-xs">
-            {this.state.error?.message || 'An unexpected error occurred.'}
+            {isChunkError
+              ? 'A page script failed to load. This usually fixes itself after a refresh.'
+              : msg || 'An unexpected error occurred.'}
           </p>
           <button
             className="game-btn game-btn-blue"
-            onClick={() => this.setState({ error: null })}
+            onClick={() => {
+              if (isChunkError) {
+                window.location.reload();
+              } else {
+                this.setState({ error: null });
+              }
+            }}
           >
-            Try again
+            {isChunkError ? 'Reload page' : 'Try again'}
           </button>
         </div>
       );
