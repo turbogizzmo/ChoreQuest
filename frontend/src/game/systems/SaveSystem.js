@@ -32,6 +32,7 @@ export const defaultSave = (userId) => ({
   playerY: 640,
   completedChoreIds: [],
   portalRestoreLevels: {},
+  bossDefeats: {},         // { [bossType]: timestamp_ms } — tracks 24-hr respawn
   equippedHat: null,
   tutorialSeen: false,
   savedAt: Date.now(),
