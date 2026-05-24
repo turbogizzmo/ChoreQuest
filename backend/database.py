@@ -58,6 +58,10 @@ async def init_db():
             ("chores", "max_completions_per_day", "INTEGER DEFAULT 1"),
             ("chore_assignments", "completion_count", "INTEGER DEFAULT 0"),
             ("bounty_board_claims", "completion_count", "INTEGER DEFAULT 0"),
+            # Adventure Mode leaderboard stats (synced from Phaser every 15 s)
+            ("users", "adventure_xp",    "INTEGER DEFAULT 0"),
+            ("users", "adventure_coins", "INTEGER DEFAULT 0"),
+            ("users", "adventure_level", "INTEGER DEFAULT 1"),
         ]
         for table, col, typedef in _migrations:
             try:

@@ -1,8 +1,8 @@
-"""Progress charts data endpoint — XP over time, completions, streaks."""
+"""Progress charts + Adventure Mode leaderboard endpoints."""
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,7 @@ from backend.models import (
     PointTransaction,
 )
 from backend.dependencies import get_current_user
+from backend.schemas import AdventureProgressUpdate
 
 router = APIRouter(prefix="/api/progress", tags=["progress"])
 
@@ -116,3 +117,45 @@ async def get_progress(
             "completion_rate": round(total_completed / total_assigned, 2) if total_assigned > 0 else 0,
         },
     }
+
+
+# ── Adventure Mode leaderboard ────────────────────────────────────────────────
+
+@router.post("/adventure/progress")
+async def update_adventure_progress(
+    data: AdventureProgressUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Sync adventure XP / coins / level from the Phaser client (kids only)."""
+    if current_user.role != UserRole.kid:
+        raise HTTPException(status_code=403, detail="Only kids can update adventure progress")
+    current_user.adventure_xp    = max(0, data.xp)
+    current_user.adventure_coins = max(0, data.coins)
+    current_user.adventure_level = max(1, data.level)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/adventure/leaderboard")
+async def get_adventure_leaderboard(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all active kids ranked by adventure XP (visible to everyone in the family)."""
+    result = await db.execute(
+        select(User)
+        .where(User.role == UserRole.kid, User.is_active == True)
+        .order_by(User.adventure_xp.desc())
+    )
+    kids = result.scalars().all()
+    return [
+        {
+            "id":              k.id,
+            "name":            k.display_name or k.username,
+            "adventure_level": getattr(k, "adventure_level", 1) or 1,
+            "adventure_xp":    getattr(k, "adventure_xp",    0) or 0,
+            "adventure_coins": getattr(k, "adventure_coins", 0) or 0,
+        }
+        for k in kids
+    ]
