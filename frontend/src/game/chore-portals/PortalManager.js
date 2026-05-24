@@ -102,8 +102,10 @@ export class PortalManager {
       ease: 'Sine.easeInOut',
     });
 
-    // Grow portal slightly as the zone restores (scale 1 → 1.4)
+    // Grow portal slightly as the zone restores (scale 1 → 1.4).
+    // refreshBody() keeps the static physics hitbox in sync with the new visual size.
     const scale = 1 + level * 0.1;
     child.setScale(scale);
+    child.refreshBody();
   }
 }

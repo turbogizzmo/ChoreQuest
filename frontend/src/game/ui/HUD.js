@@ -28,7 +28,6 @@ export class HUD {
 
     const xpY  = PADDING + HEART_SIZE + 6;
     const BAR_W = 128;
-    const HUD_BG_W = PADDING + MAX_HEARTS * (HEART_SIZE + HEART_GAP) + 4;
     const HUD_BG_H = xpY + 12 + 6;
 
     // ── Dark background strip for top-left HUD ───────────────────────

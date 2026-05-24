@@ -137,7 +137,9 @@ export default function AdventureMode() {
         scene.gameData.coins = next.coins;
         scene.sfx?.playChoreComplete();
         if (activePortal) {
-          const currentLevel = scene.gameData.portalRestoreLevels?.[activePortal.id] ?? 0;
+          // Guard: older/partial saves may not have this field yet
+          scene.gameData.portalRestoreLevels ||= {};
+          const currentLevel = scene.gameData.portalRestoreLevels[activePortal.id] ?? 0;
           const newLevel = Math.min(currentLevel + 1, 4);
           scene.gameData.portalRestoreLevels[activePortal.id] = newLevel;
           scene.portalMgr?.setRestoreLevel(activePortal.id, newLevel);

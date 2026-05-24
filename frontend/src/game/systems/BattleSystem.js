@@ -51,9 +51,12 @@ export class BattleSystem {
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist > range) return;
       if (!isRanged) {
-        // Dot product of normalised enemy direction vs facing direction
-        const dot = (dx / (dist || 1)) * facingVec[0] + (dy / (dist || 1)) * facingVec[1];
-        if (dot < ARC_DOT) return; // outside the forward 120° cone
+        // dist === 0 means the enemy is directly on top of the player — always in-arc.
+        // Otherwise compute dot product of normalised enemy direction vs facing direction.
+        if (dist > 0) {
+          const dot = (dx / dist) * facingVec[0] + (dy / dist) * facingVec[1];
+          if (dot < ARC_DOT) return; // outside the forward 120° cone
+        }
       }
       this.hurtEnemy(enemy, damage);
       hit++;

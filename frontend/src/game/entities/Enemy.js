@@ -50,8 +50,9 @@ export function spawnEnemy(scene, type, x, y, isBoss = false) {
 
     // Type-specific behaviour flags
     if (type === 'lint_titan') {
-      // Lint Titan: root-and-burst — freezes briefly then lunges at double speed
-      enemy._burstSpeed    = stats.speed * 2.4;
+      // Lint Titan: long root wind-up (600 ms) then a fast 3.5× burst lunge.
+      // Using _burstSpeed so the charge logic in updateEnemy reads it automatically.
+      enemy._burstSpeed    = stats.speed * 3.5;
       enemy._rootDur       = 600; // ms frozen during wind-up
     }
     if (type === 'paper_wraith') {
@@ -142,11 +143,20 @@ export function updateEnemy(enemy, playerSprite, delta) {
         const uiParts = [enemy._hpBarBg, enemy._hpBarFill, enemy._nameTag].filter(Boolean);
         enemy.setAlpha(0);
         uiParts.forEach((part) => part.setAlpha(0));
-        // Pick a position 80–140px away from the player at a random angle
+        // Pick a position 80–140px away from the player at a random angle,
+        // clamped to world bounds so the boss never lands outside the map.
         const teleportAngle = Math.random() * Math.PI * 2;
         const teleportDist  = 80 + Math.random() * 60;
-        const tx = playerSprite.x + Math.cos(teleportAngle) * teleportDist;
-        const ty = playerSprite.y + Math.sin(teleportAngle) * teleportDist;
+        const bounds = scene.physics.world.bounds;
+        const margin = 32; // keep the boss sprite inside the visible area
+        const tx = Phaser.Math.Clamp(
+          playerSprite.x + Math.cos(teleportAngle) * teleportDist,
+          bounds.x + margin, bounds.right  - margin,
+        );
+        const ty = Phaser.Math.Clamp(
+          playerSprite.y + Math.sin(teleportAngle) * teleportDist,
+          bounds.y + margin, bounds.bottom - margin,
+        );
         enemy.setPosition(tx, ty);
         scene.tweens.add({ targets: [enemy, ...uiParts], alpha: 1, duration: 300 });
         scene.sfx?.playBossWarning?.();
