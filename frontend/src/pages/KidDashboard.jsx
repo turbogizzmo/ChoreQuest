@@ -378,6 +378,14 @@ export default function KidDashboard() {
           <div className="flex items-center gap-3">
             <PointCounter value={user?.points_balance ?? 0} />
             <StreakDisplay streak={user?.current_streak ?? 0} />
+            <button
+              onClick={() => navigate('/adventure')}
+              className="game-btn game-btn-purple flex items-center gap-1.5 !py-1.5 !px-3 !text-xs"
+              title="Adventure Mode"
+            >
+              <Sword size={13} />
+              Adventure
+            </button>
           </div>
         </div>
 
