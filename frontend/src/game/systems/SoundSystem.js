@@ -169,19 +169,42 @@ export class SoundSystem {
 
   // ── Sound effects ────────────────────────────────────────────────────────────
 
-  playAttack() {
+  playAttack(weapon = 'broom') {
     const t = this._ctx.currentTime;
-    // Broom whoosh: square sweep down + hi-freq noise burst
-    const osc = this._ctx.createOscillator();
-    const g   = this._ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(520, t);
-    osc.frequency.exponentialRampToValueAtTime(130, t + 0.09);
-    g.gain.setValueAtTime(0.22, t);
-    g.gain.linearRampToValueAtTime(0, t + 0.10);
-    osc.connect(g); g.connect(this._master);
-    osc.start(t); osc.stop(t + 0.11);
-    this._noise(this._noiseBufs.sfx, t, 0.07, 2000);
+    if (weapon === 'vacuum') {
+      // Vacuum: rising mechanical whine + suction noise
+      const osc = this._ctx.createOscillator();
+      const g   = this._ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(160, t);
+      osc.frequency.exponentialRampToValueAtTime(620, t + 0.13);
+      g.gain.setValueAtTime(0.16, t);
+      g.gain.linearRampToValueAtTime(0, t + 0.15);
+      osc.connect(g); g.connect(this._master);
+      osc.start(t); osc.stop(t + 0.16);
+      this._noise(this._noiseBufs.sfx, t, 0.09, 500, 3500);
+    } else if (weapon === 'soap') {
+      // Soap bar: bubbly pop — two quick sine pings
+      this._tone(880,  t,        0.05, 0.16, 'sine');
+      this._tone(1046, t + 0.04, 0.05, 0.12, 'sine');
+      this._noise(this._noiseBufs.sfx, t, 0.05, 1800, 9000);
+    } else if (weapon === 'sponge') {
+      // Sponge: wet thwap — low filtered noise + dull thud
+      this._noise(this._noiseBufs.sfx, t, 0.22, 60, 900);
+      this._tone(130, t, 0.08, 0.12, 'square');
+    } else {
+      // Broom (default): square sweep down + hi-freq noise burst
+      const osc = this._ctx.createOscillator();
+      const g   = this._ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(520, t);
+      osc.frequency.exponentialRampToValueAtTime(130, t + 0.09);
+      g.gain.setValueAtTime(0.22, t);
+      g.gain.linearRampToValueAtTime(0, t + 0.10);
+      osc.connect(g); g.connect(this._master);
+      osc.start(t); osc.stop(t + 0.11);
+      this._noise(this._noiseBufs.sfx, t, 0.07, 2000);
+    }
   }
 
   playHit() {
