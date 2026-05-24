@@ -75,6 +75,7 @@ export default function AdventureMode() {
     const game = createGame(containerRef.current.id, {
       userId:     String(user.id),
       userName:   user.username ?? user.display_name ?? 'Hero',
+      avatarConfig: user.avatar_config ?? null,
       isKid:      user.role === 'kid',   // gates backend progress-sync POST in WorldScene
       headerH:    mobile ? 0 : HEADER_H, // no React header on mobile — full canvas height
       onExit:     handleExit,

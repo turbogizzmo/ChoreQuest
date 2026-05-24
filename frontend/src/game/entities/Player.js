@@ -2,6 +2,15 @@
 // Animation key convention: player_down/up/left/right (3 frames each).
 
 export const PLAYER_SPEED = 120;
+const MIN_FRAME_DELTA_MS = 8;
+const DEFAULT_FRAME_DELTA_MS = 16;
+const MAX_FRAME_DELTA_MS = 50;
+const WALK_STRETCH_FACTOR = 0.05;
+const WALK_SQUASH_RATIO = 0.65;
+const WALK_SWAY_DEGREES = 4;
+const IDLE_BREATH_X = 0.015;
+const IDLE_BREATH_Y = 0.012;
+const IDLE_SWAY_DEGREES = 1.5;
 
 export function createPlayerAnimations(scene) {
   const anims = scene.anims;
@@ -16,7 +25,7 @@ export function createPlayerAnimations(scene) {
     anims.create({
       key: `player_${dir}`,
       frames: anims.generateFrameNumbers('player', { start, end: start + 2 }),
-      frameRate: 6,
+      frameRate: 9,
       repeat: -1,
     });
     anims.create({
@@ -51,6 +60,7 @@ export function createPlayer(scene, x, y) {
   player.facing  = 'down';
   player.weapon  = 'broom';
   player.isAlive = true;
+  player._motionPhase = Math.random() * Math.PI * 2;
 
   return player;
 }
@@ -70,7 +80,7 @@ export function playAttackAnim(scene, player, durationMs = 180) {
   });
 }
 
-export function updatePlayer(player, cursors, wasd, speed = PLAYER_SPEED) {
+export function updatePlayer(player, cursors, wasd, speed = PLAYER_SPEED, delta = DEFAULT_FRAME_DELTA_MS) {
   if (!player.isAlive) return;
 
   const body = player.body;
@@ -94,6 +104,20 @@ export function updatePlayer(player, cursors, wasd, speed = PLAYER_SPEED) {
   }
 
   body.setVelocity(vx, vy);
+  const moving = vx !== 0 || vy !== 0;
+
+  const dSec = Math.max(MIN_FRAME_DELTA_MS, Math.min(delta || DEFAULT_FRAME_DELTA_MS, MAX_FRAME_DELTA_MS)) / 1000;
+  player._motionPhase = (player._motionPhase ?? 0) + dSec * (moving ? 12 : 4);
+  const wave = Math.sin(player._motionPhase);
+
+  if (moving) {
+    const stretch = Math.abs(wave) * WALK_STRETCH_FACTOR;
+    player.setScale(1 + stretch, 1 - (stretch * WALK_SQUASH_RATIO));
+    player.setAngle(wave * WALK_SWAY_DEGREES);
+  } else {
+    player.setScale(1 + (wave * IDLE_BREATH_X), 1 - (wave * IDLE_BREATH_Y));
+    player.setAngle(wave * IDLE_SWAY_DEGREES);
+  }
 
   const attackLocked = (player._attackLockUntil ?? 0) > player.scene.time.now;
   if (attackLocked) return;
