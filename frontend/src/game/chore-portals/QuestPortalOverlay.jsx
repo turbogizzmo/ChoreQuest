@@ -1,14 +1,13 @@
 // Quest portal popup — shown over the Phaser canvas when the player enters a portal.
 // Fetches today's pending assignments from /api/calendar and lets the player mark them done.
-// Completing a chore here calls POST /api/chores/{chore_id}/complete (same as the main app),
-// which marks the assignment completed and awaits parent verification for real points.
-// XP and coins shown in-game are a cosmetic "adventure currency" that mirrors chore.points —
-// they are intentionally separate from the app's verified PointTransaction system.
+// Completing a chore calls POST /api/chores/{chore_id}/complete (same as the main app).
+// XP and coins shown in-game are adventure currency that mirrors chore.points.
 
 import { useState, useEffect } from 'react';
 import { api } from '../../api/client.js';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import { toLocalISO } from '../../utils/dates.js';
+import { WEAPON_UPGRADES, WEAPON_STATS } from '../data/WorldData.js';
 
 const DIFFICULTY_COLORS = {
   easy:   '#58d854',
@@ -30,7 +29,89 @@ function DifficultyBadge({ difficulty }) {
   );
 }
 
-export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete }) {
+// ── Weapon Shop (shown inside the Reward Castle portal) ───────────────────────
+function WeaponShop({ gameData, onBuyWeapon, onEquipWeapon }) {
+  const owned    = gameData?.unlockedWeapons ?? ['broom'];
+  const equipped = gameData?.weapon ?? 'broom';
+  const coins    = gameData?.coins ?? 0;
+
+  return (
+    <div>
+      <div style={{ fontSize: 9, color: '#888', marginBottom: 10 }}>
+        Your coins: <strong style={{ color: '#fcd860' }}>{coins}</strong>
+      </div>
+      {WEAPON_UPGRADES.map((u) => {
+        const isOwned    = owned.includes(u.weapon);
+        const isEquipped = equipped === u.weapon;
+        const canAfford  = coins >= u.cost;
+        const stats      = WEAPON_STATS[u.weapon] ?? {};
+
+        return (
+          <div key={u.weapon} style={{
+            background: isEquipped ? '#1a2a1a' : '#252525',
+            border: `1px solid ${isEquipped ? '#58d854' : '#333'}`,
+            borderRadius: 6, padding: '10px 12px', marginBottom: 8,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, color: '#e5e5e5', fontWeight: 600 }}>
+                  {u.name}
+                  {isEquipped && (
+                    <span style={{ marginLeft: 6, fontSize: 9, color: '#58d854' }}>✓ EQUIPPED</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 9, color: '#666', marginTop: 2 }}>{u.desc}</div>
+                <div style={{ fontSize: 9, color: '#888', marginTop: 2 }}>
+                  <span style={{ color: '#f87858' }}>DMG {stats.damage}</span>
+                  {' · '}
+                  <span style={{ color: '#6888fc' }}>RNG {stats.range}</span>
+                </div>
+              </div>
+              {!isOwned && (
+                <span style={{ fontSize: 11, color: '#fcd860', fontWeight: 700 }}>
+                  {u.cost}¢
+                </span>
+              )}
+            </div>
+
+            {isOwned ? (
+              !isEquipped && (
+                <button
+                  onClick={() => onEquipWeapon({ weapon: u.weapon })}
+                  style={{
+                    padding: '5px 12px', background: '#334433', border: '1px solid #58d854',
+                    borderRadius: 4, color: '#58d854', fontFamily: 'monospace',
+                    fontSize: 10, cursor: 'pointer', fontWeight: 700,
+                  }}
+                >
+                  Equip
+                </button>
+              )
+            ) : (
+              <button
+                onClick={() => canAfford && onBuyWeapon({ weapon: u.weapon, cost: u.cost })}
+                disabled={!canAfford}
+                style={{
+                  padding: '5px 12px',
+                  background: canAfford ? '#10b981' : '#333',
+                  border: 'none', borderRadius: 4,
+                  color: canAfford ? '#000' : '#555',
+                  fontFamily: 'monospace', fontSize: 10,
+                  cursor: canAfford ? 'pointer' : 'not-allowed', fontWeight: 700,
+                }}
+              >
+                {canAfford ? `Buy for ${u.cost}¢` : `Need ${u.cost}¢`}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Main overlay ──────────────────────────────────────────────────────────────
+export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete, onBuyWeapon, onEquipWeapon }) {
   const { user }              = useAuth();
   const [chores, setChores]   = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,22 +119,17 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
   const [flash, setFlash]     = useState(null);
 
   useEffect(() => {
-    if (!zone) return;
+    if (!zone || zone.isRewardShop) { setLoading(false); return; }
     setLoading(true);
 
-    // GET /api/calendar defaults to the current week; pull today's slice.
-    // toLocalISO() uses the local calendar date (not UTC) — critical after ~7pm
-    // in western timezones where new Date().toISOString() returns tomorrow's date.
     const today = toLocalISO();
     api('/api/calendar')
       .then((data) => {
         const todayAssignments = data.days?.[today] ?? [];
         const list = todayAssignments.filter((a) => {
           if (a.status !== 'pending') return false;
-          // Filter to the current user only — /api/calendar returns all family members.
           if (user && a.user_id !== user.id) return false;
           if (!zone.choreCategories?.length) return true;
-          // category is a nested object: { id, name, icon, colour, is_default }
           const catName = (a.chore?.category?.name ?? '').toLowerCase();
           return zone.choreCategories.some((c) => catName.includes(c.toLowerCase()));
         });
@@ -66,14 +142,15 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
   async function handleComplete(assignment) {
     setDoing(assignment.id);
     try {
-      // Correct endpoint: POST /api/chores/{chore_id}/complete
-      // This auto-finds today's pending assignment for the logged-in kid.
       await api(`/api/chores/${assignment.chore_id}/complete`, { method: 'POST' });
 
-      // chore.points is the backend reward value; use it as adventure XP.
-      const xpGained    = assignment.chore?.points ?? 50;
+      // Streak bonus: if the user has a current streak > 2, award 1.5× XP
+      const streak      = user?.current_streak ?? 0;
+      const baseXp      = assignment.chore?.points ?? 50;
+      const xpGained    = streak > 2 ? Math.round(baseXp * 1.5) : baseXp;
       const coinsGained = Math.floor(xpGained / 10);
-      setFlash({ xp: xpGained, coins: coinsGained });
+
+      setFlash({ xp: xpGained, coins: coinsGained, streakBonus: streak > 2 });
       onChoreComplete({ assignment, xpGained, coinsGained });
       setChores((prev) => prev.filter((c) => c.id !== assignment.id));
       setTimeout(() => setFlash(null), 2000);
@@ -86,7 +163,6 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
 
   if (!zone) return null;
 
-  // zone.color is a hex number (e.g. 0xff6644); convert to CSS colour string.
   const zoneColorCss = `#${(zone.color ?? 0xffffff).toString(16).padStart(6, '0')}`;
 
   return (
@@ -97,7 +173,7 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
       zIndex: 50,
       fontFamily: 'monospace',
     }}>
-      {/* Flash reward */}
+      {/* Reward flash */}
       {flash && (
         <div style={{
           position: 'absolute', top: '30%', left: '50%', transform: 'translate(-50%,-50%)',
@@ -105,11 +181,14 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
           animation: 'fadeup 1.8s ease forwards',
         }}>
           <div style={{ fontSize: 28, color: '#58d854', textShadow: '0 2px 8px #000' }}>
-            +{flash.xp} XP
+            +{flash.xp} XP{flash.streakBonus && <span style={{ fontSize: 20 }}> 🔥</span>}
           </div>
           <div style={{ fontSize: 18, color: '#fcd860', marginTop: 4 }}>
             +{flash.coins} Coins
           </div>
+          {flash.streakBonus && (
+            <div style={{ fontSize: 11, color: '#ff8800', marginTop: 2 }}>Streak bonus ×1.5!</div>
+          )}
         </div>
       )}
 
@@ -125,14 +204,9 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
       }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <div style={{
-            width: 12, height: 12, borderRadius: 2,
-            background: zoneColorCss,
-          }} />
+          <div style={{ width: 12, height: 12, borderRadius: 2, background: zoneColorCss }} />
           <div>
-            <div style={{ fontSize: 14, color: '#fcd860', fontWeight: 700 }}>
-              {zone.label}
-            </div>
+            <div style={{ fontSize: 14, color: '#fcd860', fontWeight: 700 }}>{zone.label}</div>
             <div style={{ fontSize: 9, color: '#888' }}>{zone.description}</div>
           </div>
           <button
@@ -144,18 +218,26 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
           >✕</button>
         </div>
 
-        {/* Reward Castle special case */}
+        {/* Reward Castle — weapon shop */}
         {zone.isRewardShop && (
-          <div style={{ color: '#bcbcbc', fontSize: 11, textAlign: 'center', padding: '16px 0' }}>
-            <div style={{ fontSize: 20, marginBottom: 8 }}>🏰</div>
-            <div>Coins: <strong style={{ color: '#fcd860' }}>{gameData?.coins ?? 0}</strong></div>
-            <div style={{ marginTop: 8, fontSize: 9, color: '#666' }}>
-              Visit the Rewards page in ChoreQuest to redeem your coins for prizes!
+          <div>
+            <div style={{ color: '#bcbcbc', fontSize: 11, textAlign: 'center', marginBottom: 12 }}>
+              <div style={{ fontSize: 20, marginBottom: 4 }}>🏰</div>
+              <div>Coins: <strong style={{ color: '#fcd860' }}>{gameData?.coins ?? 0}</strong></div>
+            </div>
+            <div style={{ fontSize: 9, color: '#888', marginBottom: 8 }}>⚔ Weapon Shop</div>
+            <WeaponShop
+              gameData={gameData}
+              onBuyWeapon={onBuyWeapon}
+              onEquipWeapon={onEquipWeapon}
+            />
+            <div style={{ marginTop: 8, fontSize: 9, color: '#666', textAlign: 'center' }}>
+              Redeem coins for real rewards on the Rewards page!
             </div>
             <button
               onClick={onClose}
               style={{
-                marginTop: 12, padding: '8px 24px',
+                display: 'block', margin: '12px auto 0', padding: '8px 24px',
                 background: '#d4a017', border: 'none', borderRadius: 4,
                 color: '#000', fontFamily: 'monospace', fontSize: 11, cursor: 'pointer',
               }}
@@ -170,6 +252,11 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
           <>
             <div style={{ fontSize: 9, color: '#888', marginBottom: 8 }}>
               Active quests in this district:
+              {(user?.current_streak ?? 0) > 2 && (
+                <span style={{ marginLeft: 8, color: '#ff8800' }}>
+                  🔥 {user.current_streak}-day streak → 1.5× XP bonus!
+                </span>
+              )}
             </div>
 
             {loading && (
@@ -189,32 +276,29 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
             )}
 
             {chores.map((a) => {
-              // AssignmentResponse fields: id, chore_id, status, chore (ChoreResponse)
-              // ChoreResponse fields: title, points, difficulty, description, category.name
               const chore   = a.chore ?? {};
-              const xp      = chore.points ?? 50;
+              const baseXp  = chore.points ?? 50;
+              const streak  = user?.current_streak ?? 0;
+              const xp      = streak > 2 ? Math.round(baseXp * 1.5) : baseXp;
               const coins   = Math.floor(xp / 10);
               const diff    = chore.difficulty ?? 'easy';
               const isDoing = doing === a.id;
+              const hasStreak = streak > 2;
 
               return (
                 <div
                   key={a.id}
                   style={{
-                    background: '#252525',
-                    border: '1px solid #333',
-                    borderRadius: 6,
-                    padding: '10px 12px',
-                    marginBottom: 8,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
+                    background: '#252525', border: '1px solid #333', borderRadius: 6,
+                    padding: '10px 12px', marginBottom: 8,
+                    display: 'flex', flexDirection: 'column', gap: 6,
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 12, color: '#e5e5e5', fontWeight: 600 }}>
                         {chore.title ?? 'Chore Quest'}
+                        {hasStreak && <span style={{ marginLeft: 5, fontSize: 10 }}>🔥</span>}
                       </div>
                       {chore.description && (
                         <div style={{ fontSize: 9, color: '#666', marginTop: 2 }}>
@@ -226,7 +310,7 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
                   </div>
 
                   <div style={{ display: 'flex', gap: 12, fontSize: 9, color: '#888' }}>
-                    <span style={{ color: '#58d854' }}>+{xp} XP</span>
+                    <span style={{ color: '#58d854' }}>+{xp} XP{hasStreak && ' ×1.5'}</span>
                     <span style={{ color: '#fcd860' }}>+{coins} coins</span>
                   </div>
 
@@ -240,8 +324,7 @@ export function QuestPortalOverlay({ zone, gameData, onClose, onChoreComplete })
                       color: isDoing ? '#666' : '#000',
                       fontFamily: 'monospace', fontSize: 10,
                       cursor: isDoing ? 'not-allowed' : 'pointer',
-                      fontWeight: 700,
-                      transition: 'background 0.15s',
+                      fontWeight: 700, transition: 'background 0.15s',
                     }}
                   >
                     {isDoing ? 'Completing...' : '✓ Mark Complete'}

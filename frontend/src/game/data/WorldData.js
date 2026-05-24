@@ -97,6 +97,29 @@ export const WEAPON_STATS = {
   sponge:  { damage: 2, range: 120, cooldown: 600,  name: 'Toss Sponge' },
 };
 
+// Boss enemies — one per portal zone, respawn every 24 hours.
+// bossDefeats in save: { type: timestamp_ms }
+export const BOSS_ZONES = [
+  { type: 'grime_lord',   x: 12, y: 12, portalId: 'kitchen', label: 'Grime Lord'   },
+  { type: 'lint_titan',   x: 27, y: 12, portalId: 'laundry', label: 'Lint Titan'   },
+  { type: 'weed_golem',   x: 12, y: 27, portalId: 'yard',    label: 'Weed Golem'   },
+  { type: 'paper_wraith', x: 27, y: 27, portalId: 'study',   label: 'Paper Wraith' },
+];
+
+export const BOSS_STATS = {
+  grime_lord:   { hp: 24, xp: 15, coins: 8,  name: 'Grime Lord',   speed: 52 },
+  lint_titan:   { hp: 30, xp: 18, coins: 10, name: 'Lint Titan',   speed: 44 },
+  weed_golem:   { hp: 20, xp: 12, coins: 7,  name: 'Weed Golem',   speed: 58 },
+  paper_wraith: { hp: 18, xp: 10, coins: 6,  name: 'Paper Wraith', speed: 68 },
+};
+
+// Weapon upgrade shop items — sold in the Reward Castle portal.
+export const WEAPON_UPGRADES = [
+  { weapon: 'vacuum', cost: 20, name: 'Vacuum Blast', desc: 'More damage, longer range' },
+  { weapon: 'sponge', cost: 35, name: 'Toss Sponge',  desc: 'Wide-range area throw'     },
+  { weapon: 'soap',   cost: 60, name: 'Soap Attack',  desc: 'Highest single-hit damage'  },
+];
+
 // XP table: level -> xp needed to reach NEXT level
 export function xpForLevel(level) {
   return Math.floor(100 * Math.pow(1.4, level - 1));
