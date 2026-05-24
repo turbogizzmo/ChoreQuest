@@ -43,6 +43,8 @@ export class WorldScene extends Phaser.Scene {
 
     // Phase 5-A: Chore Surge & boss proximity
     this._surgeActive    = false;
+    this._surgeTimer     = null;
+    this._surgeEndTimer  = null;
     this._nearBoss       = false;
     this._bossProxTick   = 0;   // frame counter for proximity check throttle
     this._nightAlpha     = 0;   // updated each frame; seed to 0 (day) until first update()
@@ -466,6 +468,7 @@ export class WorldScene extends Phaser.Scene {
     this.player.isAlive = false;
     this.player.body.setVelocity(0, 0);
     this.physics.pause();
+    this._setSurgeTimersPaused(true);
 
     const w = this.scale.width;
     const h = this.scale.height;
@@ -541,9 +544,11 @@ export class WorldScene extends Phaser.Scene {
     this._paused = !this._paused;
     if (this._paused) {
       this.physics.pause();
+      this._setSurgeTimersPaused(true);
       this._showPauseMenu();
     } else {
       this.physics.resume();
+      this._setSurgeTimersPaused(false);
       if (this._pauseOverlay) {
         this._pauseOverlay.destroy();
         this._pauseOverlay = null;
@@ -585,6 +590,7 @@ export class WorldScene extends Phaser.Scene {
   _showTutorial() {
     this._paused = true;
     this.physics.pause();
+    this._setSurgeTimersPaused(true);
 
     const w  = this.scale.width;
     const h  = this.scale.height;
@@ -719,6 +725,7 @@ export class WorldScene extends Phaser.Scene {
       container.destroy();
       this._paused = false;
       this.physics.resume();
+      this._setSurgeTimersPaused(false);
       this.gameData.tutorialSeen = true;
       writeSave({ ...this.gameData, userId: this.userId });
       this.input.keyboard.off('keydown', dismiss);
@@ -773,7 +780,12 @@ export class WorldScene extends Phaser.Scene {
   // ── Phase 5-A: Chore Surge ────────────────────────────────────────────────────
 
   _startSurgeTimer() {
-    this.time.delayedCall(SURGE_INTERVAL, () => this._activateSurge());
+    this._surgeTimer?.remove(false);
+    this._surgeTimer = this.time.delayedCall(SURGE_INTERVAL, () => {
+      this._surgeTimer = null;
+      this._activateSurge();
+    });
+    this._surgeTimer.paused = this._paused;
   }
 
   _activateSurge() {
@@ -793,10 +805,18 @@ export class WorldScene extends Phaser.Scene {
     });
 
     // End surge after SURGE_DURATION, then restart the inter-surge timer
-    this.time.delayedCall(SURGE_DURATION, () => {
+    this._surgeEndTimer?.remove(false);
+    this._surgeEndTimer = this.time.delayedCall(SURGE_DURATION, () => {
+      this._surgeEndTimer = null;
       this._surgeActive = false;
       this._startSurgeTimer(); // schedule the next one
     });
+    this._surgeEndTimer.paused = this._paused;
+  }
+
+  _setSurgeTimersPaused(paused) {
+    if (this._surgeTimer) this._surgeTimer.paused = paused;
+    if (this._surgeEndTimer) this._surgeEndTimer.paused = paused;
   }
 
   // ── Phase 5-C: Boss proximity music ──────────────────────────────────────────

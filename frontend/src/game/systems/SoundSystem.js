@@ -453,23 +453,19 @@ export class SoundSystem {
 
   // ── Boss music API ────────────────────────────────────────────────────────────
 
-  // Switch to boss BGM. Seamlessly transitions on the next loop boundary
-  // by stopping the current scheduler and restarting in boss mode.
+  // Switch to boss BGM on the next loop boundary so already-scheduled notes
+  // can finish cleanly without overlapping a restarted loop.
   startBossMusic() {
     if (this._dead || this._bossMode) return;
     this._bossMode = true;
-    this.stopBGM();
-    this._nextLoop = this._ctx.currentTime + 0.05;
-    this._tick();
+    if (this._loopTimer === null) this.startBGM();
   }
 
-  // Return to normal BGM after boss proximity ends.
+  // Return to normal BGM on the next loop boundary.
   stopBossMusic() {
     if (this._dead || !this._bossMode) return;
     this._bossMode = false;
-    this.stopBGM();
-    this._nextLoop = this._ctx.currentTime + 0.05;
-    this._tick();
+    if (this._loopTimer === null) this.startBGM();
   }
 
   // ── Ambient sound tick ────────────────────────────────────────────────────────

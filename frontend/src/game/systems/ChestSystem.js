@@ -29,20 +29,29 @@ export class ChestSystem {
     const sprite = scene.physics.add.staticSprite(x, y - 8, 'chest', 0)
       .setScale(1.5).setDepth(9);
     sprite.refreshBody();
+    if (sprite.body) sprite.body.enable = false;
 
     // Pop-in entrance: start tiny + invisible, expand to full size
     sprite.setAlpha(0).setScale(0.2);
+    let pulseTween = null;
     scene.tweens.add({
       targets: sprite,
       alpha: 1, scaleX: 1.5, scaleY: 1.5,
       duration: 220, ease: 'Back.easeOut',
-    });
-
-    // Gentle scale-pulse so the chest is easy to spot
-    const pulseTween = scene.tweens.add({
-      targets: sprite,
-      scaleX: 1.7, scaleY: 1.3,
-      yoyo: true, repeat: -1, duration: 520, ease: 'Sine.easeInOut',
+      onComplete: () => {
+        if (!sprite.active) return;
+        sprite.setScale(1.5);
+        sprite.refreshBody();
+        if (sprite.body) sprite.body.enable = true;
+        pulseTween = scene.tweens.add({
+          targets: sprite,
+          alpha: 0.82,
+          yoyo: true,
+          repeat: -1,
+          duration: 520,
+          ease: 'Sine.easeInOut',
+        });
+      },
     });
 
     // Player overlap → collect

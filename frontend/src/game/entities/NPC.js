@@ -94,22 +94,7 @@ export class NPC {
       wordWrap: { width: 96, useAdvancedWrap: true },
     }).setDepth(20).setOrigin(0.5, 1);
 
-    // Bubble background (drawn around text bounds)
-    const pad = 6;
-    const bw  = textEl.width  + pad * 2;
-    const bh  = textEl.height + pad * 2;
-    const bx  = sx - bw / 2;
-    const by  = sy - 22 - bh;
-
     const bubble = scene.add.graphics().setDepth(19);
-    bubble.fillStyle(0x0d0d1e, 0.88);
-    bubble.fillRoundedRect(bx, by, bw, bh, 4);
-    bubble.lineStyle(1, 0xfcd860, 0.9);
-    bubble.strokeRoundedRect(bx, by, bw, bh, 4);
-    // Tail pointing down toward NPC head
-    bubble.fillStyle(0x0d0d1e, 0.88);
-    bubble.fillTriangle(sx - 5, sy - 22, sx + 5, sy - 22, sx, sy - 14);
-    bubble.lineStyle(0, 0, 0); // clear line style for fill
 
     this._bubble     = bubble;
     this._bubbleText = textEl;
@@ -117,7 +102,26 @@ export class NPC {
     // Fade in
     bubble.setAlpha(0);
     textEl.setAlpha(0);
-    scene.tweens.add({ targets: [bubble, textEl], alpha: 1, duration: 200 });
+    scene.time.delayedCall(32, () => {
+      if (this._bubble !== bubble || !textEl.active) return;
+      const pad = 6;
+      const bw  = textEl.width  + pad * 2;
+      const bh  = textEl.height + pad * 2;
+      const bx  = sx - bw / 2;
+      const by  = sy - 22 - bh;
+
+      bubble.clear();
+      bubble.fillStyle(0x0d0d1e, 0.88);
+      bubble.fillRoundedRect(bx, by, bw, bh, 4);
+      bubble.lineStyle(1, 0xfcd860, 0.9);
+      bubble.strokeRoundedRect(bx, by, bw, bh, 4);
+      // Tail pointing down toward NPC head
+      bubble.fillStyle(0x0d0d1e, 0.88);
+      bubble.fillTriangle(sx - 5, sy - 22, sx + 5, sy - 22, sx, sy - 14);
+      bubble.lineStyle(0, 0, 0); // clear line style for fill
+
+      scene.tweens.add({ targets: [bubble, textEl], alpha: 1, duration: 200 });
+    });
 
     // Auto-hide after 3.5 s
     this._hidingTimer = scene.time.delayedCall(3500, () => {
