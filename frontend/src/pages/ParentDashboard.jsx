@@ -552,6 +552,14 @@ export default function ParentDashboard() {
           <Sparkles size={14} />
           Award Bonus XP
         </button>
+        <button
+          className="game-btn game-btn-yellow flex items-center gap-2 justify-center flex-1"
+          onClick={() => navigate('/adventure')}
+          title="Preview Adventure Mode as it appears to kids"
+        >
+          <Swords size={14} />
+          Try Adventure
+        </button>
       </section>
 
       {/* Bonus XP Modal */}

@@ -176,6 +176,11 @@ export default function AdventureMode() {
         {level !== null && (
           <span style={{ color: '#bcbcbc' }}>LV {level} · {gameData.coins} coins</span>
         )}
+        {user?.role !== 'kid' && (
+          <span style={{ color: '#f97316', fontSize: 9, background: '#1a0a00', border: '1px solid #7c2d12', borderRadius: 3, padding: '1px 5px' }}>
+            PREVIEW — XP won't count on leaderboard
+          </span>
+        )}
         <span style={{ marginLeft: 'auto', fontSize: 9, color: '#555' }}>
           SPACE = attack · ESC = pause
         </span>
