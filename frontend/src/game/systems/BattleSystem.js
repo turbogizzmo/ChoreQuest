@@ -101,6 +101,11 @@ export class BattleSystem {
       onComplete: () => { enemy.clearTint(); enemy.setAlpha(1); },
     });
 
+    // Phase 5-C: micro screen shake on every boss hit so attacks feel impactful
+    if (enemy.isBoss) {
+      this.scene.cameras.main.shake(80, 0.005);
+    }
+
     if (enemy.hp <= 0) {
       this.defeatEnemy(enemy);
     }
