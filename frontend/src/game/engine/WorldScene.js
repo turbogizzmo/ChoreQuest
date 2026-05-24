@@ -370,7 +370,7 @@ export class WorldScene extends Phaser.Scene {
 
   _makePauseBtn(x, y, text, cb) {
     const bg = this.add.rectangle(x, y, 140, 24, 0x2a2a2a, 1)
-      .setScrollFactor(0)
+      .setScrollFactor(0)                   // must precede setInteractive so hit area aligns
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', cb)
       .on('pointerover',  () => bg.setFillStyle(0x444444))
