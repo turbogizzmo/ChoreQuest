@@ -685,6 +685,95 @@ const ENEMY_DEFS = {
     // Teal replaces lbrown/brown — crumb slime was previously invisible on dirt tiles
     p: { B: NES.lteal, b: NES.teal, w: NES.white, '.': null },
   },
+
+  // ── Phase 5-A: new enemy sprites ─────────────────────────────────────────────
+
+  mop_golem: {
+    // Slow cleaning golem — mop-head hair, bucket body, stubby arms
+    frames: [
+      [
+        '....MMMMMM......',
+        '...mMmMmMmM.....',
+        '...mmMmmMmm.....',
+        '....mmmmmm......',
+        '....BBBBBB......',
+        '...BBBBBBBBb....',
+        '..BBBBBBBBBBb...',
+        '..BBeebbeebbB...',
+        '..BBeebbeebbB...',
+        '..BBBBBBBBBBb...',
+        '..BBBHBBBBBB....',
+        '..BBBBBBBBBb....',
+        '...LLL..LLL.....',
+        '...LLL..LLL.....',
+        '..lLLL..lLLL....',
+        '................',
+      ],
+      [
+        '....MMMMMM......',
+        '..mMmMmMmMm.....',
+        '...mMmmMmmm.....',
+        '....mmmmmm......',
+        '....BBBBBB......',
+        '..BBBBBBBBBb....',
+        '..BBBBBBBBBBb...',
+        '..BBeebbeebbB...',
+        '..BBeebbeebbB...',
+        '..BBBBBBBBBBb...',
+        '..BBBBBHBBBb....',
+        '..BBBBBBBBBb....',
+        '...LLL..LLL.....',
+        '..lLLL..LLL.....',
+        '...LLL..lLLL....',
+        '................',
+      ],
+    ],
+    p: { M: NES.lyellow, m: NES.yellow, B: NES.mgray, b: NES.lgray,
+         H: NES.lred, e: NES.white, L: NES.lbrown, l: NES.brown, '.': null },
+  },
+
+  trash_bag_ghost: {
+    // Fast floaty ghost in a trash bag — bobs up/down between frames
+    frames: [
+      [
+        '................',
+        '....gggggg......',
+        '...gGGGGGGg.....',
+        '..gGGGGGGGGg....',
+        '..gGGGGGGGGg....',
+        '..gGeeeGeGGg....',
+        '..gGGGGGGGGg....',
+        '..gGGGGGGGGg....',
+        '...gGttttGg.....',
+        '....gtttttg.....',
+        '....ggg.ggg.....',
+        '...gg.....gg....',
+        '................',
+        '................',
+        '................',
+        '................',
+      ],
+      [
+        '................',
+        '................',
+        '....gggggg......',
+        '...gGGGGGGg.....',
+        '..gGGGGGGGGg....',
+        '..gGeeeGeGGg....',
+        '..gGGGGGGGGg....',
+        '..gGGGGGGGGg....',
+        '..gGGGGGGGGg....',
+        '...gGttttGg.....',
+        '....gtttttg.....',
+        '....ggg.ggg.....',
+        '...gg.....gg....',
+        '................',
+        '................',
+        '................',
+      ],
+    ],
+    p: { g: NES.teal, G: NES.lteal, e: NES.white, t: NES.dgray, '.': null },
+  },
 };
 
 export function generateEnemySheets(scene) {
@@ -1142,6 +1231,56 @@ export function generateUISprites(scene) {
   xpfctx.fillStyle = NES.lyellow;
   xpfctx.fillRect(0, 0, xpW, 1);               // bright top highlight
   addCanvasTexture(scene, 'xpbar_fill', xpfc);
+
+  // ── Chest sprite (8×8 source × SCALE, 2 frames: closed / open) ──────────────
+  const chW = 8, chH = 8;
+  const chc = createCanvas(2 * chW * SCALE, chH * SCALE);
+  const chctx = chc.getContext('2d');
+  // Frame 0 — closed chest: brown body, gold trim, gold latch
+  chctx.save();
+  chctx.translate(0, 0);
+  chctx.fillStyle = NES.lbrown;  chctx.fillRect(1*SCALE,2*SCALE,6*SCALE,5*SCALE);  // body
+  chctx.fillStyle = NES.brown;   chctx.fillRect(1*SCALE,5*SCALE,6*SCALE,2*SCALE);  // shadow
+  chctx.fillStyle = NES.lyellow; chctx.fillRect(0*SCALE,2*SCALE,8*SCALE,1*SCALE);  // lid top
+  chctx.fillStyle = NES.lyellow; chctx.fillRect(0*SCALE,4*SCALE,8*SCALE,1*SCALE);  // mid band
+  chctx.fillStyle = NES.yellow;  chctx.fillRect(3*SCALE,3*SCALE,2*SCALE,3*SCALE);  // latch
+  chctx.restore();
+  // Frame 1 — open chest: lid flipped back, glowing interior
+  chctx.save();
+  chctx.translate(chW * SCALE, 0);
+  chctx.fillStyle = NES.lbrown;  chctx.fillRect(1*SCALE,4*SCALE,6*SCALE,4*SCALE);  // lower body
+  chctx.fillStyle = NES.brown;   chctx.fillRect(1*SCALE,6*SCALE,6*SCALE,2*SCALE);  // shadow
+  chctx.fillStyle = NES.lyellow; chctx.fillRect(0*SCALE,4*SCALE,8*SCALE,1*SCALE);  // mid band
+  chctx.fillStyle = NES.lyellow; chctx.fillRect(1*SCALE,0*SCALE,6*SCALE,1*SCALE);  // lid back top
+  chctx.fillStyle = NES.lbrown;  chctx.fillRect(1*SCALE,1*SCALE,6*SCALE,3*SCALE);  // lid back body
+  chctx.fillStyle = NES.lyellow; chctx.fillRect(2*SCALE,2*SCALE,4*SCALE,2*SCALE);  // glowing loot
+  chctx.restore();
+  addCanvasSpriteSheet(scene, 'chest', chc, chW * SCALE, chH * SCALE);
+
+  // ── NPC shopkeeper sprite (8×8 source × SCALE, 2 idle frames) ─────────────
+  const nW = 8, nH = 8;
+  const nc = createCanvas(2 * nW * SCALE, nH * SCALE);
+  const nctx = nc.getContext('2d');
+  [[0, false], [1, true]].forEach(([frame, blink]) => {
+    nctx.save();
+    nctx.translate(frame * nW * SCALE, 0);
+    // Hat (purple wizard hat)
+    nctx.fillStyle = NES.purple;   nctx.fillRect(2*SCALE,0*SCALE,4*SCALE,1*SCALE);
+    nctx.fillStyle = NES.lpurple;  nctx.fillRect(2*SCALE,1*SCALE,4*SCALE,2*SCALE);
+    nctx.fillStyle = NES.lpurple;  nctx.fillRect(1*SCALE,2*SCALE,6*SCALE,1*SCALE);
+    // Face
+    nctx.fillStyle = NES.skin;     nctx.fillRect(1*SCALE,3*SCALE,6*SCALE,2*SCALE);
+    if (!blink) {
+      nctx.fillStyle = NES.brown;  nctx.fillRect(2*SCALE,3*SCALE,1*SCALE,1*SCALE); // left eye
+      nctx.fillStyle = NES.brown;  nctx.fillRect(5*SCALE,3*SCALE,1*SCALE,1*SCALE); // right eye
+    }
+    nctx.fillStyle = NES.lred;     nctx.fillRect(3*SCALE,4*SCALE,2*SCALE,1*SCALE); // mouth
+    // Robe (blue)
+    nctx.fillStyle = NES.blue;     nctx.fillRect(0*SCALE,5*SCALE,8*SCALE,3*SCALE);
+    nctx.fillStyle = NES.lblue;    nctx.fillRect(1*SCALE,5*SCALE,6*SCALE,1*SCALE); // collar
+    nctx.restore();
+  });
+  addCanvasSpriteSheet(scene, 'npc_shopkeeper', nc, nW * SCALE, nH * SCALE);
 }
 
 export function generateAllSprites(scene) {

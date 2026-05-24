@@ -9,7 +9,9 @@ import { BattleSystem }          from '../systems/BattleSystem.js';
 import { HUD }                   from '../ui/HUD.js';
 import { writeSave }             from '../systems/SaveSystem.js';
 import { SoundSystem }           from '../systems/SoundSystem.js';
-import { PORTAL_ZONES, ENEMY_ZONES, BOSS_ZONES, BOSS_STATS, TILE_SIZE, MAP_COLS, levelFromXp } from '../data/WorldData.js';
+import { PORTAL_ZONES, ENEMY_ZONES, BOSS_ZONES, BOSS_STATS, TILE_SIZE, MAP_COLS, levelFromXp, SURGE_INTERVAL, SURGE_DURATION, SURGE_XP_MULT } from '../data/WorldData.js';
+import { ChestSystem } from '../systems/ChestSystem.js';
+import { NPC }         from '../entities/NPC.js';
 import { api } from '../../api/client.js';
 
 const HUD_DEPTH = 100;
@@ -34,6 +36,12 @@ export class WorldScene extends Phaser.Scene {
     this._saveTick       = 0;
     this._paused         = false;
     this._lastLevel      = levelFromXp(data.gameData?.xp ?? 0);
+
+    // Phase 5-A: Chore Surge & boss proximity
+    this._surgeActive    = false;
+    this._nearBoss       = false;
+    this._bossProxTick   = 0;   // frame counter for proximity check throttle
+    this._nightAlpha     = 0;   // updated each frame; seed to 0 (day) until first update()
   }
 
   create() {
@@ -105,7 +113,10 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.events.on('enemyDefeated', ({ enemy, xpDrop, coinDrop }) => {
-      this.gameData.xp    += xpDrop;
+      // Phase 5-A: apply 2× XP multiplier during a Chore Surge
+      const surgeXp = this._surgeActive ? Math.round(xpDrop * SURGE_XP_MULT) : xpDrop;
+
+      this.gameData.xp    += surgeXp;
       this.gameData.coins += coinDrop;
 
       // Record boss defeat for 24-hour respawn timer
@@ -114,13 +125,17 @@ export class WorldScene extends Phaser.Scene {
         this.gameData.bossDefeats[enemy.enemyType] = Date.now();
       }
 
-      this.hud.showFloatingText(enemy.x, enemy.y, `+${xpDrop} XP`, '#58d854');
+      const xpLabel = this._surgeActive ? `+${surgeXp} XP ⚡` : `+${surgeXp} XP`;
+      this.hud.showFloatingText(enemy.x, enemy.y, xpLabel, this._surgeActive ? '#fcd860' : '#58d854');
       this.hud.showFloatingText(enemy.x, enemy.y + 14, `+${coinDrop}¢`, '#fcd860');
       this.sfx.playEnemyDefeat();
       if (coinDrop > 0) this.time.delayedCall(280, () => this.sfx.playCoinPickup());
 
       // Loot drop: animated coin sprites that fly toward the player
       if (coinDrop > 0) this._spawnCoinDrop(enemy.x, enemy.y, coinDrop);
+
+      // Phase 5-A: 20% chance to drop a chest
+      this.chestSystem?.trySpawn(enemy.x, enemy.y);
     });
 
     this.events.on('comboHit', ({ multiplier }) => {
@@ -187,6 +202,38 @@ export class WorldScene extends Phaser.Scene {
     ).setScrollFactor(0).setDepth(HUD_DEPTH + 5).setOrigin(1, 0).setInteractive({ useHandCursor: true });
     exitBtn.on('pointerdown', () => this._exitGame());
 
+    // ── Phase 5-A: Chest loot system ──────────────────────────────────
+    this.chestSystem = new ChestSystem(this);
+    this.events.on('chestCollect', ({ coins, xp }) => {
+      this.gameData.coins += coins;
+      this.gameData.xp    += xp;
+      this.sfx.playCoinPickup();
+      this.hud.showFloatingText(
+        this.player?.x ?? 320, this.player?.y ?? 240,
+        `+${coins}¢  +${xp} XP`, '#fcd860',
+      );
+    });
+
+    // ── Phase 5-A: NPC shopkeeper (2 tiles right + 1 tile above castle portal)
+    // Castle is at tile (19, 18); place NPC at (22, 16) — visible but not blocking
+    this.npc = new NPC(this, 22, 16);
+
+    // ── Phase 5-A: Chore Surge world event ────────────────────────────
+    // First surge fires SURGE_INTERVAL ms after scene start.
+    // Players see a HUD banner + 2× XP multiplier for SURGE_DURATION ms.
+    this._startSurgeTimer();
+
+    // ── Phase 5-C: Ambient sound tick — every ~3.5 s ──────────────────
+    this.time.addEvent({
+      delay: 3500, loop: true,
+      callback: () => {
+        if (!this._paused && this.sfx) {
+          const ratio = this._nightAlpha / 0.55; // normalise 0–1
+          this.sfx.tickAmbient(ratio);
+        }
+      },
+    });
+
     // ── Tutorial (first visit only) ───────────────────────────────────
     if (!this.gameData.tutorialSeen) {
       this.time.delayedCall(400, () => this._showTutorial());
@@ -235,6 +282,7 @@ export class WorldScene extends Phaser.Scene {
     const CYCLE_MS   = 10 * 60 * 1000;
     const phase      = ((this.time.now - this._cycleStart) % CYCLE_MS) / CYCLE_MS;
     const nightAlpha = 0.55 * 0.5 * (1 - Math.cos(2 * Math.PI * phase));
+    this._nightAlpha = nightAlpha; // stored for ambient tick callback
     this._nightOverlay.setAlpha(nightAlpha);
     this.hud.updateNightCycle(nightAlpha);
     // Enemies get up to 30% faster at peak night
@@ -264,6 +312,16 @@ export class WorldScene extends Phaser.Scene {
           body: JSON.stringify({ xp: this.gameData.xp, coins: this.gameData.coins, level: lvl }),
         }).catch(() => {});
       }
+    }
+
+    // Phase 5-A: NPC proximity dialogue
+    this.npc?.update(this.player);
+
+    // Phase 5-C: Boss proximity music (checked every 60 frames to avoid cost)
+    this._bossProxTick++;
+    if (this._bossProxTick >= 60) {
+      this._bossProxTick = 0;
+      this._checkBossProximity();
     }
 
     // Update HUD
@@ -680,6 +738,57 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
+  // ── Phase 5-A: Chore Surge ────────────────────────────────────────────────────
+
+  _startSurgeTimer() {
+    this.time.delayedCall(SURGE_INTERVAL, () => this._activateSurge());
+  }
+
+  _activateSurge() {
+    if (this._surgeActive) return; // shouldn't happen, but guard
+    this._surgeActive = true;
+    this.hud.showSurgeBanner(SURGE_DURATION);
+    this.sfx?.playSurge();
+
+    // Screen tint pulse: brief gold flash to signal the event
+    const cam   = this.cameras.main;
+    const flash = this.add.rectangle(cam.width / 2, cam.height / 2, cam.width, cam.height, 0xfcd860, 0)
+      .setScrollFactor(0).setDepth(199);
+    this.tweens.add({
+      targets: flash, alpha: 0.18,
+      yoyo: true, duration: 180, repeat: 2,
+      onComplete: () => flash.destroy(),
+    });
+
+    // End surge after SURGE_DURATION, then restart the inter-surge timer
+    this.time.delayedCall(SURGE_DURATION, () => {
+      this._surgeActive = false;
+      this._startSurgeTimer(); // schedule the next one
+    });
+  }
+
+  // ── Phase 5-C: Boss proximity music ──────────────────────────────────────────
+
+  _checkBossProximity() {
+    if (!this.sfx || !this.player) return;
+    const BOSS_MUSIC_RANGE = 220; // pixels — bosses have a 3× sprite scale, range feels fair
+    let nearBoss = false;
+    this.enemies.getChildren().forEach((e) => {
+      if (!e.active || !e.isBoss) return;
+      const dx = e.x - this.player.x;
+      const dy = e.y - this.player.y;
+      if (dx * dx + dy * dy < BOSS_MUSIC_RANGE * BOSS_MUSIC_RANGE) nearBoss = true;
+    });
+
+    if (nearBoss && !this._nearBoss) {
+      this._nearBoss = true;
+      this.sfx.startBossMusic();
+    } else if (!nearBoss && this._nearBoss) {
+      this._nearBoss = false;
+      this.sfx.stopBossMusic();
+    }
+  }
+
   _exitGame() {
     writeSave({ ...this.gameData, userId: this.userId });
     this.onExit();
@@ -687,5 +796,7 @@ export class WorldScene extends Phaser.Scene {
 
   shutdown() {
     this.sfx?.destroy();
+    this.chestSystem?.destroy();
+    this.npc?.destroy();
   }
 }

@@ -66,6 +66,45 @@ const HARMONY = [
 
 const LOOP_DUR = MELODY.reduce((s, [, d]) => s + d, 0); // 16.0 s
 
+// ── Boss BGM — C harmonic minor, 150 BPM, 8-bar loop ─────────────────────────
+const BQ = 0.40; // quarter note at 150 BPM
+const BE = 0.20;
+const BH = 0.80;
+
+// Pulse 1: aggressive staccato melody (C harmonic minor)
+const BOSS_MELODY = [
+  // bar 1
+  [HZ.C5,BE],[HZ.B4,BE],[HZ.C5,BE],[_,BE],[HZ.G4,BE],[_,BE],[HZ.E4,BE],[_,BE],
+  // bar 2
+  [HZ.F4,BE],[HZ.E4,BE],[HZ.D4,BE],[_,BE],[HZ.G4,BE],[_,BE],[HZ.C4,BE],[_,BE],
+  // bar 3
+  [HZ.E4,BE],[HZ.F4,BE],[HZ.G4,BE],[HZ.A4,BE],[HZ.B4,BE],[_,BE],[HZ.C5,BE],[_,BE],
+  // bar 4 (dramatic pause + hit)
+  [_,BQ],[HZ.G4,BE],[HZ.A4,BE],[HZ.G4,BQ],[_,BQ],
+  // bar 5
+  [HZ.E5,BE],[HZ.D5,BE],[HZ.E5,BE],[_,BE],[HZ.C5,BE],[_,BE],[HZ.G5,BE],[_,BE],
+  // bar 6
+  [HZ.A5,BE],[HZ.G5,BE],[HZ.F5,BE],[_,BE],[HZ.E5,BE],[_,BE],[HZ.D5,BE],[_,BE],
+  // bar 7
+  [HZ.C5,BE],[HZ.D5,BE],[HZ.E5,BE],[HZ.G5,BE],[HZ.A5,BE],[_,BE],[HZ.G5,BE],[_,BE],
+  // bar 8 (resolve)
+  [HZ.E5,BQ],[_,BQ],[HZ.C5,BH],
+];
+
+// Triangle: heavy bass ostinato
+const BOSS_BASS = [
+  [HZ.C3,BQ],[_,BQ],[HZ.C3,BQ],[HZ.G2,BQ],
+  [HZ.C3,BQ],[_,BQ],[HZ.C3,BQ],[HZ.G2,BQ],
+  [HZ.F2,BQ],[_,BQ],[HZ.G2,BQ],[HZ.C3,BQ],
+  [HZ.G2,BQ],[_,BQ],[HZ.G2,BQ],[_,BQ],
+  [HZ.C3,BQ],[_,BQ],[HZ.C3,BQ],[HZ.G2,BQ],
+  [HZ.C3,BQ],[_,BQ],[HZ.C3,BQ],[HZ.G2,BQ],
+  [HZ.F2,BQ],[_,BQ],[HZ.G2,BQ],[HZ.C3,BQ],
+  [HZ.G2,BH],[HZ.C3,BH],
+];
+
+const BOSS_LOOP_DUR = BOSS_MELODY.reduce((s, [, d]) => s + d, 0);
+
 // ── SoundSystem ──────────────────────────────────────────────────────────────
 export class SoundSystem {
   constructor(scene) {
@@ -91,6 +130,9 @@ export class SoundSystem {
 
     this._nextLoop  = null;
     this._loopTimer = null;
+
+    // Boss music state
+    this._bossMode  = false;
   }
 
   // ── Utility builders ────────────────────────────────────────────────────────
@@ -314,15 +356,21 @@ export class SoundSystem {
   _tick() {
     if (this._dead) return;
     const loopStart = this._nextLoop;
-    this._nextLoop += LOOP_DUR;
 
-    // ── Schedule note patterns ──
-    this._playPattern(MELODY,   loopStart, 0.17, 'square',   this._w25, 0.88);
-    this._playPattern(BASS,     loopStart, 0.10, 'triangle', null,       0.92);
-    this._playPattern(HARMONY,  loopStart, 0.07, 'square',   null,       0.82);
-
-    // ── Schedule drum track ──
-    this._playDrums(loopStart);
+    if (this._bossMode) {
+      // ── Boss BGM: aggressive C-harmonic-minor loop ──
+      this._nextLoop += BOSS_LOOP_DUR;
+      this._playPattern(BOSS_MELODY, loopStart, 0.19, 'square',   this._w25, 0.86);
+      this._playPattern(BOSS_BASS,   loopStart, 0.13, 'triangle', null,       0.92);
+      this._playBossDrums(loopStart);
+    } else {
+      // ── Normal BGM: "Broken Village" loop ──
+      this._nextLoop += LOOP_DUR;
+      this._playPattern(MELODY,   loopStart, 0.17, 'square',   this._w25, 0.88);
+      this._playPattern(BASS,     loopStart, 0.10, 'triangle', null,       0.92);
+      this._playPattern(HARMONY,  loopStart, 0.07, 'square',   null,       0.82);
+      this._playDrums(loopStart);
+    }
 
     // Re-schedule 500 ms before this loop ends so the next loop queues seamlessly
     const msUntilNext = (this._nextLoop - this._ctx.currentTime - 0.5) * 1000;
@@ -384,6 +432,91 @@ export class SoundSystem {
   // NES hi-hat: very short high-freq noise tick
   _hat(t, vol = 0.045) {
     this._noise(this._noiseBufs.hat, t, vol, 7000);
+  }
+
+  // Boss-drum track: harder double-kick pattern at 150 BPM
+  _playBossDrums(loopStart) {
+    const BAR = BQ * 4; // 1.6 s per 4/4 bar at 150 BPM
+    const bars = Math.ceil(BOSS_LOOP_DUR / BAR);
+    for (let b = 0; b < bars; b++) {
+      const bs = loopStart + b * BAR;
+      this._kick(bs);                          // beat 1
+      this._kick(bs + BQ + BE);                // beat 2 off-beat (double-kick feel)
+      this._snare(bs + BQ * 2);                // beat 3 snare
+      this._kick(bs + BQ * 3);                 // beat 4
+      // 16th-note hi-hat (denser than normal BGM)
+      for (let h = 0; h < 8; h++) {
+        this._hat(bs + h * BE, h % 2 === 0 ? 0.06 : 0.028);
+      }
+    }
+  }
+
+  // ── Boss music API ────────────────────────────────────────────────────────────
+
+  // Switch to boss BGM. Seamlessly transitions on the next loop boundary
+  // by stopping the current scheduler and restarting in boss mode.
+  startBossMusic() {
+    if (this._dead || this._bossMode) return;
+    this._bossMode = true;
+    this.stopBGM();
+    this._nextLoop = this._ctx.currentTime + 0.05;
+    this._tick();
+  }
+
+  // Return to normal BGM after boss proximity ends.
+  stopBossMusic() {
+    if (this._dead || !this._bossMode) return;
+    this._bossMode = false;
+    this.stopBGM();
+    this._nextLoop = this._ctx.currentTime + 0.05;
+    this._tick();
+  }
+
+  // ── Ambient sound tick ────────────────────────────────────────────────────────
+  // Called by WorldScene every ~3.5 s via a looping timer.
+  // nightRatio: 0 = full day, 1 = full night.
+  tickAmbient(nightRatio) {
+    if (this._dead) return;
+    const t = this._ctx.currentTime;
+    if (nightRatio > 0.5) {
+      // Night: cricket double-chirp (60% chance per tick)
+      if (Math.random() < 0.60) {
+        this._tone(3200, t,        0.04, 0.035, 'square');
+        this._tone(3600, t + 0.06, 0.04, 0.030, 'square');
+      }
+    } else {
+      // Day: bird-like trill (40% chance per tick)
+      if (Math.random() < 0.40) {
+        const notes = [1320, 1568, 1760, 2093];
+        const hz    = notes[Math.floor(Math.random() * notes.length)];
+        this._tone(hz, t, 0.06, 0.028, 'square', this._w12);
+        if (Math.random() < 0.55) {
+          this._tone(hz * 1.25, t + 0.09, 0.05, 0.020, 'square', this._w12);
+        }
+      }
+    }
+  }
+
+  // ── Chore Surge fanfare ───────────────────────────────────────────────────────
+  // Short celebratory sting — plays when a Chore Surge event begins.
+  playSurge() {
+    const t = this._ctx.currentTime;
+    // Rising C-major broken chord + drum accent
+    const seq = [
+      [HZ.C5, E * 0.9],
+      [HZ.E5, E * 0.9],
+      [HZ.G5, E * 0.9],
+      [HZ.C6, Q * 0.9],
+    ];
+    let off = 0;
+    seq.forEach(([f, d]) => {
+      this._tone(f,     t + off,        d,       0.22, 'square',   this._w25);
+      this._tone(f * 2, t + off + 0.01, d * 0.5, 0.07, 'square',   this._w12);
+      off += d + 0.01;
+    });
+    // Noise accent on beat 1 and landing note
+    this._noise(this._noiseBufs.sfx, t,       0.06, 300, 6000);
+    this._noise(this._noiseBufs.sfx, t + off, 0.08, 200, 4000);
   }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────

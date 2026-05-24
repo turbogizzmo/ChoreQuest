@@ -414,6 +414,41 @@ export class HUD {
     this._updateMinimap();
   }
 
+  // ── Chore Surge banner ────────────────────────────────────────────────────────
+  // Slides in from the top, holds for most of durationMs, then slides out.
+  showSurgeBanner(durationMs = 90_000) {
+    const scene = this.scene;
+    const cam   = scene.cameras.main;
+    const w     = cam.width;
+
+    const bg = scene.add.rectangle(w / 2, -30, Math.min(w * 0.82, 340), 28, 0x1a1000, 0.92)
+      .setScrollFactor(0).setDepth(160)
+      .setStrokeStyle(2, 0xf8b800);
+
+    const txt = scene.add.text(w / 2, -30, '⚡  CHORE SURGE!  2× XP', {
+      fontSize: '12px', fontFamily: 'monospace', color: '#fcd860',
+      stroke: '#000', strokeThickness: 4, resolution: 2,
+    }).setScrollFactor(0).setDepth(161).setOrigin(0.5);
+
+    const targetY = 50; // just below the hearts/XP HUD strip
+
+    scene.tweens.add({
+      targets: [bg, txt], y: targetY,
+      duration: 340, ease: 'Back.easeOut',
+      onComplete: () => {
+        // Slide out 1 s before the surge ends
+        const holdMs = Math.max(200, durationMs - 1000);
+        scene.time.delayedCall(holdMs, () => {
+          scene.tweens.add({
+            targets: [bg, txt], y: -50, alpha: 0,
+            duration: 400, ease: 'Power2',
+            onComplete: () => { bg.destroy(); txt.destroy(); },
+          });
+        });
+      },
+    });
+  }
+
   showFloatingText(x, y, text, color = '#fcd860') {
     const scene = this.scene;
     const cam   = scene.cameras.main;
