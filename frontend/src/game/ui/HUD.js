@@ -332,17 +332,25 @@ export class HUD {
 
   showCombo(multiplier) {
     if (!this._comboLabel) return;
+    this.scene.tweens.killTweensOf(this._comboLabel);
+    if (this._comboFadeTimer) {
+      this._comboFadeTimer.remove(false);
+      this._comboFadeTimer = null;
+    }
+
     const color = multiplier >= 3 ? '#ff4444' : '#ff8800';
     const stars = multiplier >= 3 ? '★★★' : '★★';
     this._comboLabel.setText(`${multiplier}× COMBO! ${stars}`)
       .setColor(color).setVisible(true).setAlpha(1);
 
     // Cancel any running fade and restart 1.5 s countdown
-    if (this._comboFadeTimer) this._comboFadeTimer.remove(false);
     this._comboFadeTimer = this.scene.time.delayedCall(1500, () => {
       this.scene.tweens.add({
         targets: this._comboLabel, alpha: 0, duration: 400,
-        onComplete: () => this._comboLabel?.setVisible(false),
+        onComplete: () => {
+          this._comboLabel?.setVisible(false);
+          this._comboFadeTimer = null;
+        },
       });
     });
   }

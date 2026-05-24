@@ -58,8 +58,14 @@ export function createPlayer(scene, x, y) {
 // Play the directional attack frame for `durationMs`, then return to idle
 export function playAttackAnim(scene, player, durationMs = 180) {
   const dir = player.facing ?? 'down';
+  if (player._attackResetTimer) {
+    player._attackResetTimer.remove(false);
+    player._attackResetTimer = null;
+  }
+  player._attackLockUntil = scene.time.now + durationMs;
   player.play(`player_attack_${dir}`, true);
-  scene.time.delayedCall(durationMs, () => {
+  player._attackResetTimer = scene.time.delayedCall(durationMs, () => {
+    player._attackResetTimer = null;
     if (player.active) player.play(`player_${dir}_idle`, true);
   });
 }
@@ -88,6 +94,9 @@ export function updatePlayer(player, cursors, wasd, speed = PLAYER_SPEED) {
   }
 
   body.setVelocity(vx, vy);
+
+  const attackLocked = (player._attackLockUntil ?? 0) > player.scene.time.now;
+  if (attackLocked) return;
 
   // Direction + animation
   if (vx < 0)      { player.facing = 'left';  player.play('player_left',  true); }

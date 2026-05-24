@@ -122,10 +122,9 @@ export function updateEnemy(enemy, playerSprite, delta) {
         enemy._chargeState = 'charging';
         enemy._chargeDur   = 450;
         const nd = dist || 1;
-        // Lint Titan burst uses enhanced speed
-        const chargeSpeedMult = (enemy.enemyType === 'lint_titan') ? 4 : 3;
-        enemy._chargeVx = (dx / nd) * enemy.baseSpeed * chargeSpeedMult;
-        enemy._chargeVy = (dy / nd) * enemy.baseSpeed * chargeSpeedMult;
+        const chargeSpeed = enemy._burstSpeed ?? (enemy.baseSpeed * 3);
+        enemy._chargeVx = (dx / nd) * chargeSpeed;
+        enemy._chargeVy = (dy / nd) * chargeSpeed;
         enemy.clearTint();
       }
       return;
@@ -137,14 +136,16 @@ export function updateEnemy(enemy, playerSprite, delta) {
         enemy._hasTeleported = true;
         // Fade out → reposition near player → fade in
         const scene = enemy.scene;
+        const uiParts = [enemy._hpBarBg, enemy._hpBarFill, enemy._nameTag].filter(Boolean);
         enemy.setAlpha(0);
+        uiParts.forEach((part) => part.setAlpha(0));
         // Pick a position 80–140px away from the player at a random angle
         const teleportAngle = Math.random() * Math.PI * 2;
         const teleportDist  = 80 + Math.random() * 60;
         const tx = playerSprite.x + Math.cos(teleportAngle) * teleportDist;
         const ty = playerSprite.y + Math.sin(teleportAngle) * teleportDist;
         enemy.setPosition(tx, ty);
-        scene.tweens.add({ targets: enemy, alpha: 1, duration: 300 });
+        scene.tweens.add({ targets: [enemy, ...uiParts], alpha: 1, duration: 300 });
         scene.sfx?.playBossWarning?.();
       }
     }
@@ -155,7 +156,7 @@ export function updateEnemy(enemy, playerSprite, delta) {
       if (enemy._chargeTimer <= 0) {
         enemy._chargeState = 'windup';
         // Lint Titan has a longer, more dramatic root wind-up
-        enemy._windupDur = (enemy.enemyType === 'lint_titan') ? 700 : 350;
+        enemy._windupDur = enemy._rootDur ?? 350;
         enemy.setTint(0xffff00); // yellow flash = warning
         enemy.scene?.sfx?.playBossWarning?.();
       }

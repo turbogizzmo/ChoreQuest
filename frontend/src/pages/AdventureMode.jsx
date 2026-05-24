@@ -138,7 +138,7 @@ export default function AdventureMode() {
         scene.sfx?.playChoreComplete();
         if (activePortal) {
           const currentLevel = scene.gameData.portalRestoreLevels?.[activePortal.id] ?? 0;
-          const newLevel = Math.min(currentLevel + 1, 3);
+          const newLevel = Math.min(currentLevel + 1, 4);
           scene.gameData.portalRestoreLevels[activePortal.id] = newLevel;
           scene.portalMgr?.setRestoreLevel(activePortal.id, newLevel);
           scene.hud?.showFloatingText(

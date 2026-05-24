@@ -70,7 +70,7 @@ export class BattleSystem {
 
     const count    = this._recentHits.length;
     const newMult  = count >= 5 ? 3 : count >= 3 ? 2 : 1;
-    if (newMult > this._lastComboMult) {
+    if (hit > 0 && newMult > 1) {
       this._lastComboMult   = newMult;
       this._comboMultiplier = newMult;
       this.scene.events.emit('comboHit', { multiplier: newMult });
@@ -129,8 +129,9 @@ export class BattleSystem {
 
     if (enemy.isBoss) {
       // Boss: big flash + dramatic scale-burst
+      const cam = scene.cameras.main;
       const flash = scene.add.rectangle(
-        enemy.x, enemy.y, scene.cameras.main.width, scene.cameras.main.height,
+        cam.width / 2, cam.height / 2, cam.width, cam.height,
         0xffffff, 0,
       ).setScrollFactor(0).setDepth(200);
       scene.tweens.add({
