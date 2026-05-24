@@ -118,7 +118,19 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
-      }).catch(() => cached);
+      }).catch((err) => {
+        // Two distinct cases:
+        // 1. cached IS a Response (stale-while-revalidate — background fetch failed):
+        //    return the cached copy so the Promise resolves cleanly. Simply
+        //    throwing here would leave `fetched` as an unhandled rejection.
+        // 2. cached is undefined (first-load cache miss AND network failure):
+        //    re-throw so event.respondWith() receives a rejected promise. iOS
+        //    Safari incorrectly reports an `undefined` respondWith result as
+        //    "importing module script failed"; a real rejection propagates as an
+        //    ordinary network error instead.
+        if (cached) return cached;
+        throw err;
+      });
       return cached || fetched;
     })
   );

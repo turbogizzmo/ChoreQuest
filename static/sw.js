@@ -10,8 +10,13 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  // Don't call skipWaiting() automatically — wait for the app to signal
-  // via postMessage so we can show an "Update available" prompt first.
+  // Auto-skip waiting so the new SW activates immediately.
+  // This prevents Safari PWA home-screen bookmarks from getting stuck on a
+  // blank screen when the app is redeployed: without skipWaiting() the new SW
+  // sits in "waiting" forever if the page is already blank (can't tap the
+  // update banner). The controllerchange handler in main.jsx auto-reloads
+  // the page once this SW takes control, so all clients get fresh assets.
+  self.skipWaiting();
 });
 
 self.addEventListener('message', (event) => {
@@ -113,7 +118,19 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
-      }).catch(() => cached);
+      }).catch((err) => {
+        // Two distinct cases:
+        // 1. cached IS a Response (stale-while-revalidate — background fetch failed):
+        //    return the cached copy so the Promise resolves cleanly. Simply
+        //    throwing here would leave `fetched` as an unhandled rejection.
+        // 2. cached is undefined (first-load cache miss AND network failure):
+        //    re-throw so event.respondWith() receives a rejected promise. iOS
+        //    Safari incorrectly reports an `undefined` respondWith result as
+        //    "importing module script failed"; a real rejection propagates as an
+        //    ordinary network error instead.
+        if (cached) return cached;
+        throw err;
+      });
       return cached || fetched;
     })
   );

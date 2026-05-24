@@ -35,9 +35,11 @@ export default defineConfig({
     },
   },
   build: {
-    // Target modern browsers — skips legacy JS transforms and shaves ~20% off
-    // esbuild minification time (no need to downlevel optional chaining, etc.)
-    target: 'es2020',
+    // Target modern browsers including iOS Safari 14+.
+    // 'safari14' tells esbuild to downlevel any ES2022+ syntax (e.g. private
+    // class fields used by Phaser 3.88) that Safari 14 doesn't support, so the
+    // Phaser chunk never causes "importing module script failed" on older iPhones.
+    target: ['es2020', 'safari14'],
     rollupOptions: {
       output: {
         // Isolate Phaser in its own chunk. Without this, Rollup walks Phaser's
