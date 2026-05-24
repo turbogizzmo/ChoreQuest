@@ -6,7 +6,7 @@ import { BootScene }  from './BootScene.js';
 import { WorldScene } from './WorldScene.js';
 
 export function createGame(containerId, options = {}) {
-  const { userId, userName, headerH = 34, onExit, onComplete } = options;
+  const { userId, userName, isKid = false, headerH = 34, onExit, onComplete } = options;
 
   const container = document.getElementById(containerId);
   const availW = container ? container.clientWidth  : window.innerWidth;
@@ -41,7 +41,7 @@ export function createGame(containerId, options = {}) {
   const game = new Phaser.Game(config);
 
   game.events.once('ready', () => {
-    game.scene.start('BootScene', { userId, userName, onExit, onComplete });
+    game.scene.start('BootScene', { userId, userName, isKid, onExit, onComplete });
   });
 
   return game;

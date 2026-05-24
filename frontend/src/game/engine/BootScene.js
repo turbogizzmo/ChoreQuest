@@ -13,6 +13,7 @@ export class BootScene extends Phaser.Scene {
   init(data) {
     this.userId    = data.userId ?? 'guest';
     this.userName  = data.userName ?? 'Hero';
+    this.isKid     = data.isKid ?? false;
     this.onExit    = data.onExit ?? (() => {});
     this.onComplete = data.onComplete ?? (() => {});
   }
@@ -49,6 +50,7 @@ export class BootScene extends Phaser.Scene {
       this.scene.start('WorldScene', {
         userId:    this.userId,
         userName:  this.userName,
+        isKid:     this.isKid,
         gameData,
         tileMap,
         onExit:    this.onExit,
