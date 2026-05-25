@@ -530,6 +530,18 @@ export class WorldScene extends Phaser.Scene {
       });
       this.gameData.playerX = safeRespawn.x;
       this.gameData.playerY = safeRespawn.y;
+
+      // Explicitly stop and destroy the SoundSystem before restarting the
+      // scene.  scene.restart() queues a shutdown+start pair that executes on
+      // the next frame; by the time Phaser's own shutdown() fires the Web
+      // Audio scheduler may have already pre-queued another 16-second music
+      // loop.  Destroying here (with gain ramped to 0) guarantees the old
+      // music stops immediately, regardless of Phaser's lifecycle timing.
+      if (this.sfx) {
+        this.sfx.destroy();
+        this.sfx = null;
+      }
+
       this.scene.restart({
         userId: this.userId, userName: this.userName,
         gameData: this.gameData, tileMap: this.tileMap,
