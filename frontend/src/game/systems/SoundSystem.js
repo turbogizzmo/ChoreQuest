@@ -524,6 +524,15 @@ export class SoundSystem {
   destroy() {
     this._dead = true;
     this.stopBGM();
-    try { this._master.disconnect(); } catch (_) { /* already disconnected */ }
+    try {
+      // Immediately silence the master gain so any already-scheduled Web Audio
+      // oscillator nodes stop producing output right away.  Without this, notes
+      // that were pre-queued for the current 16-second loop would continue to
+      // play on top of the new SoundSystem created after a scene restart.
+      const now = this._ctx.currentTime;
+      this._master.gain.cancelScheduledValues(now);
+      this._master.gain.setValueAtTime(0, now);
+      this._master.disconnect();
+    } catch (_) { /* already disconnected or context closed */ }
   }
 }
