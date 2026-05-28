@@ -37,6 +37,7 @@ export class WorldScene extends Phaser.Scene {
     this.onComplete = data.onComplete ?? (() => {});
 
     this._portalCooldown = 0;
+    this._portalLockId   = null;
     this._saveTick       = 0;
     this._paused         = false;
     this._lastLevel      = levelFromXp(data.gameData?.xp ?? 0);
@@ -164,9 +165,11 @@ export class WorldScene extends Phaser.Scene {
 
     // ── Portal entry ───────────────────────────────────────────────────
     this.events.on('portalEnter', (zoneData) => {
+      if (zoneData?.id && this._portalLockId === zoneData.id) return;
       const now = Date.now();
       if (now - this._portalCooldown < 2000) return;
       this._portalCooldown = now;
+      this._portalLockId = zoneData?.id ?? null;
       this.sfx.playPortalEnter();
       this.onComplete({ type: 'portalEnter', zone: zoneData, gameData: this.gameData });
     });
@@ -254,6 +257,9 @@ export class WorldScene extends Phaser.Scene {
 
   update(time, delta) {
     if (this._paused) return;
+    if (!this.physics.overlap(this.player, this.portalMgr?.portals)) {
+      this._portalLockId = null;
+    }
 
     // Build combined input (keyboard + touch)
     const touch = this.hud?.touchKeys ?? {};

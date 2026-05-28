@@ -200,6 +200,54 @@ test.describe('Adventure mode preview', () => {
   });
 });
 
+test.describe('Adventure portal behavior', () => {
+  test('portal does not re-trigger until the player leaves it', async ({ loginAsKid: page }) => {
+    await page.goto('/adventure');
+    await expect(page).toHaveURL(/\/adventure/);
+    await expect(page.getByText('Loading Adventure Mode...')).toBeHidden();
+    await expect(page.locator('#adventure-game-container canvas').first()).toBeVisible();
+
+    await page.waitForFunction(() => {
+      const game = window.__CHOREQUEST_ACTIVE_GAME;
+      const scene = game?.scene?.getScene?.('WorldScene');
+      return !!scene?.events;
+    });
+
+    const result = await page.evaluate(() => {
+      const game = window.__CHOREQUEST_ACTIVE_GAME;
+      const scene = game?.scene?.getScene?.('WorldScene');
+      if (!scene) return null;
+
+      const seen = [];
+      const originalOnComplete = scene.onComplete;
+      const originalOverlap = scene.physics.overlap.bind(scene.physics);
+
+      scene.onComplete = (event) => { seen.push(event?.type); };
+      scene._paused = false;
+      scene.physics.resume();
+      scene._portalCooldown = 0;
+      scene._portalLockId = 'kitchen';
+      scene.events.emit('portalEnter', { id: 'kitchen' });
+      const blockedCount = seen.filter((t) => t === 'portalEnter').length;
+
+      scene.physics.overlap = () => false;
+      scene.update(scene.time.now, 16);
+      scene.physics.overlap = originalOverlap;
+
+      scene._portalCooldown = 0;
+      scene.events.emit('portalEnter', { id: 'kitchen' });
+      const releasedCount = seen.filter((t) => t === 'portalEnter').length;
+
+      scene.onComplete = originalOnComplete;
+      return { blockedCount, releasedCount };
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.blockedCount).toBe(0);
+    expect(result?.releasedCount).toBe(1);
+  });
+});
+
 test.describe('Adventure avatar sync', () => {
   test('adventure player sprite uses the kid avatar colors', async ({ page }) => {
     const { kidToken } = loadTokens();
