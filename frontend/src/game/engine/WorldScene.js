@@ -165,11 +165,12 @@ export class WorldScene extends Phaser.Scene {
 
     // ── Portal entry ───────────────────────────────────────────────────
     this.events.on('portalEnter', (zoneData) => {
-      if (zoneData?.id && this._portalLockId === zoneData.id) return;
+      if (!zoneData?.id) return;
+      if (this._portalLockId === zoneData.id) return;
       const now = Date.now();
       if (now - this._portalCooldown < 2000) return;
       this._portalCooldown = now;
-      this._portalLockId = zoneData?.id ?? null;
+      this._portalLockId = zoneData.id;
       this.sfx.playPortalEnter();
       this.onComplete({ type: 'portalEnter', zone: zoneData, gameData: this.gameData });
     });
@@ -257,7 +258,8 @@ export class WorldScene extends Phaser.Scene {
 
   update(time, delta) {
     if (this._paused) return;
-    if (!this.physics.overlap(this.player, this.portalMgr?.portals)) {
+    const portals = this.portalMgr?.portals;
+    if (this._portalLockId && portals && !this.physics.overlap(this.player, portals)) {
       this._portalLockId = null;
     }
 

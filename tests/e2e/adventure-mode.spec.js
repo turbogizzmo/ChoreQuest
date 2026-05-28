@@ -217,34 +217,46 @@ test.describe('Adventure portal behavior', () => {
       const game = window.__CHOREQUEST_ACTIVE_GAME;
       const scene = game?.scene?.getScene?.('WorldScene');
       if (!scene) return null;
+      const originalX = scene.player?.x;
+      const originalY = scene.player?.y;
 
       const seen = [];
       const originalOnComplete = scene.onComplete;
-      const originalOverlap = scene.physics.overlap.bind(scene.physics);
+      try {
+        scene.onComplete = (event) => {
+          if (event?.type === 'portalEnter') seen.push(event);
+          originalOnComplete(event);
+        };
+        scene._paused = false;
+        scene.physics.resume();
+        scene._portalCooldown = 0;
+        scene._portalLockId = 'kitchen';
+        scene.events.emit('portalEnter', { id: 'kitchen' });
+        const blockedCount = seen.length;
 
-      scene.onComplete = (event) => { seen.push(event?.type); };
-      scene._paused = false;
-      scene.physics.resume();
-      scene._portalCooldown = 0;
-      scene._portalLockId = 'kitchen';
-      scene.events.emit('portalEnter', { id: 'kitchen' });
-      const blockedCount = seen.filter((t) => t === 'portalEnter').length;
+        scene.player.setPosition(64, 64);
+        const leftPortalOverlap = !scene.physics.overlap(scene.player, scene.portalMgr?.portals);
+        scene.update(scene.time.now, 16);
 
-      scene.physics.overlap = () => false;
-      scene.update(scene.time.now, 16);
-      scene.physics.overlap = originalOverlap;
+        scene._portalCooldown = 0;
+        scene.events.emit('portalEnter', { id: 'kitchen' });
+        const releasedCount = seen.length;
+        const releasedZoneId = seen.at(-1)?.zone?.id ?? null;
 
-      scene._portalCooldown = 0;
-      scene.events.emit('portalEnter', { id: 'kitchen' });
-      const releasedCount = seen.filter((t) => t === 'portalEnter').length;
-
-      scene.onComplete = originalOnComplete;
-      return { blockedCount, releasedCount };
+        return { blockedCount, releasedCount, leftPortalOverlap, releasedZoneId };
+      } finally {
+        scene.onComplete = originalOnComplete;
+        if (scene.player && Number.isFinite(originalX) && Number.isFinite(originalY)) {
+          scene.player.setPosition(originalX, originalY);
+        }
+      }
     });
 
     expect(result).not.toBeNull();
     expect(result?.blockedCount).toBe(0);
+    expect(result?.leftPortalOverlap).toBe(true);
     expect(result?.releasedCount).toBe(1);
+    expect(result?.releasedZoneId).toBe('kitchen');
   });
 });
 
