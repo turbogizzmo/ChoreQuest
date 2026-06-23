@@ -36,6 +36,20 @@ A gamified family chore management app with full RPG theming. Parents create que
 
 ---
 
+## 🆕 What's New
+
+Recent additions around AI-assisted chore creation:
+
+- **AI quest drafting** in the quest create modal for parents
+- **Configurable AI providers**: Google Gemini, OpenAI, Anthropic Claude, and Ollama
+- **Provider settings in-app** under **Settings → AI Quest Generation**
+- **Privacy guardrails**: static style examples only, so existing family chore text is not sent upstream
+- **Safety limits**: 5 generations every 5 minutes per parent, plus capped AI-suggested XP
+
+For setup and day-to-day usage, see [AI-Assisted Quest Creation](#-ai-assisted-quest-creation) below or the wiki page: [AI-Assisted Quest Creation](https://github.com/turbogizzmo/ChoreQuest/wiki/AI-Assisted-Quest-Creation).
+
+---
+
 ## 🚀 Quick Start
 
 ### Requirements
@@ -110,6 +124,10 @@ When triggered, `watchdog.sh` runs `deploy.sh` which does `git pull` + `docker c
 | `VAPID_PUBLIC_KEY` | *(empty)* | VAPID public key for push notifications |
 | `VAPID_PRIVATE_KEY` | *(empty)* | VAPID private key for push notifications |
 | `VAPID_CLAIM_EMAIL` | `mailto:admin@example.com` | Contact email for push requests |
+| `GEMINI_API_KEY` | *(empty)* | Optional Gemini API key override for AI quest generation |
+| `OPENAI_API_KEY` | *(empty)* | Optional OpenAI API key override for AI quest generation |
+| `ANTHROPIC_API_KEY` | *(empty)* | Optional Anthropic API key override for AI quest generation |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Optional Ollama base URL override for AI quest generation |
 
 ### Data persistence
 
@@ -118,6 +136,92 @@ All data lives in `./data`:
 - `uploads/` — photo proof files
 
 Back up this directory to preserve everything.
+
+---
+
+## 🤖 AI-Assisted Quest Creation
+
+Parents can turn a plain chore idea like `clean the garage` into a fantasy-styled quest draft directly from the quest creation modal.
+
+### What it does
+
+- Rewrites a plain chore into a quest-style **title** and **description**
+- Suggests **XP**, **difficulty**, and the best-fit **category**
+- Prefills the normal quest form so the parent can review and edit before saving
+
+### How to set it up
+
+You have two ways to configure AI providers:
+
+1. **In the app**
+   - Sign in as a **parent or admin**
+   - Open **Profile → Family Settings**
+   - Find **AI Quest Generation**
+   - Choose a provider, enter the required fields, and click **Save AI Provider**
+
+2. **With environment variables**
+   - Add one or more provider values to `.env`
+   - Restart the app after changing env values
+   - Environment variables take precedence over values saved in the app UI
+
+### Provider options
+
+- **Google Gemini**
+  - Required: `API key`
+  - Default provider for new setups
+  - Good first choice if you want a low-friction hosted option
+
+- **OpenAI**
+  - Required: `API key`
+  - Optional: `Organization`, `Project`
+  - Lets you choose your own GPT model
+
+- **Anthropic Claude**
+  - Required: `API key`
+  - Lets you choose your own Claude model
+
+- **Ollama**
+  - Required: `Base URL`, `Model`
+  - No API key is required by default for a local Ollama instance
+  - Useful for self-hosted/local model setups
+
+### Environment examples
+
+```env
+# Gemini
+GEMINI_API_KEY=your-gemini-api-key
+
+# OpenAI
+OPENAI_API_KEY=your-openai-api-key
+
+# Anthropic
+ANTHROPIC_API_KEY=your-anthropic-api-key
+
+# Ollama
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+### How parents use it
+
+1. Open **New Quest Scroll**
+2. Click **Generate with AI**
+3. Describe the chore in plain language
+4. Review the generated draft
+5. Edit anything you want, then save it like a normal quest
+
+### Privacy and safety behavior
+
+- Do **not** include names or private family details in the prompt
+- The app uses static style examples and does **not** send your saved family chore text as prompt context
+- Generation is limited to **5 requests every 5 minutes per parent**
+- AI-suggested XP is capped before it reaches the save flow
+- Saved provider secrets are handled separately from normal settings and are not returned to the browser in plain text
+
+### If the button does not appear
+
+- Make sure at least one provider is configured successfully
+- Check **Settings → AI Quest Generation** for the provider status pills
+- If you are using env vars, restart the app after editing `.env`
 
 ---
 
@@ -228,6 +332,7 @@ Detailed documentation lives in the [GitHub Wiki](https://github.com/turbogizzmo
 - [Streaks & Vacation](https://github.com/turbogizzmo/ChoreQuest/wiki/Streaks-and-Vacation) — streak logic, freeze, vacation mode
 - [Rotation System](https://github.com/turbogizzmo/ChoreQuest/wiki/Rotation-System) — cadences, inverse linking
 - [Parent Tools](https://github.com/turbogizzmo/ChoreQuest/wiki/Parent-Tools) — calendar, verify override, bounty board, audit log
+- [AI-Assisted Quest Creation](https://github.com/turbogizzmo/ChoreQuest/wiki/AI-Assisted-Quest-Creation) — provider setup, usage, privacy, troubleshooting
 - [Achievements & Ranks](https://github.com/turbogizzmo/ChoreQuest/wiki/Achievements-and-Ranks) — tiers, XP thresholds
 - [Avatar & Pets](https://github.com/turbogizzmo/ChoreQuest/wiki/Avatar-and-Pets) — editor, pet levels, drops
 - [Adventure Mode](https://github.com/turbogizzmo/ChoreQuest/wiki/Adventure-Mode) — gameplay loop, enemies, rewards, weapons
