@@ -344,7 +344,13 @@ export default function Calendar() {
             <button
               onClick={nextPeriod}
               className="p-2 rounded hover:bg-surface-raised transition-colors text-muted hover:text-cream"
-              aria-label="Next period"
+              aria-label={
+                viewMode === 'week'
+                  ? 'Next week'
+                  : viewMode === '3day'
+                    ? 'Next 3 days'
+                    : 'Next day'
+              }
             >
               <ChevronRight size={20} />
             </button>
