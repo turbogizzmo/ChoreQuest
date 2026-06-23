@@ -46,7 +46,11 @@ function DifficultyStars({ level }) {
   const numLevel =
     typeof level === 'string' ? DIFFICULTY_LEVEL[level] || 1 : level || 1;
   return (
-    <div className="flex items-center gap-0.5">
+    <div
+      className="flex items-center gap-0.5"
+      aria-label={`Difficulty: ${numLevel} out of 4`}
+      role="img"
+    >
       {[1, 2, 3, 4].map((i) => (
         <Star
           key={i}
@@ -56,6 +60,13 @@ function DifficultyStars({ level }) {
       ))}
     </div>
   );
+}
+
+function formatExpandedDate(dayStr) {
+  return new Date(dayStr + 'T00:00:00').toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 function statusStyle(assignment, dayStr) {
@@ -286,11 +297,16 @@ export default function Calendar() {
 
         <div className="flex flex-wrap items-center gap-2">
           {/* View mode selector */}
-          <div className="flex items-center rounded-md border border-border overflow-hidden">
+          <div
+            className="flex items-center rounded-md border border-border overflow-hidden"
+            role="group"
+            aria-label="Calendar view"
+          >
             {VIEW_MODES.map((v) => (
               <button
                 key={v.key}
                 onClick={() => changeView(v.key)}
+                aria-pressed={viewMode === v.key}
                 className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   viewMode === v.key
                     ? 'bg-accent text-navy'
@@ -405,7 +421,7 @@ export default function Calendar() {
                 >
                   <div className={`font-medium ${expanded ? 'text-sm' : 'text-xs'}`}>
                     {expanded
-                      ? `${label}, ${new Date(dayStr + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                      ? `${label}, ${formatExpandedDate(dayStr)}`
                       : label}
                   </div>
                   {!expanded && (
