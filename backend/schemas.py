@@ -437,8 +437,8 @@ class QuestTemplateResponse(BaseModel):
 
 # AI quest generation
 class QuestGenerateRequest(BaseModel):
-    # Plain-language chore idea, e.g. "clean the garage". Length-capped as the
-    # abuse guard (there is no rate-limit library in this repo).
+    # Plain-language chore idea, e.g. "clean the garage". Length-capped as an
+    # abuse guard, with per-parent endpoint rate limiting enforced server-side.
     prompt: str = Field(min_length=3, max_length=300)
 
 

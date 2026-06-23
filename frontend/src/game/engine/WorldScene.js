@@ -37,6 +37,7 @@ export class WorldScene extends Phaser.Scene {
     this.onComplete = data.onComplete ?? (() => {});
 
     this._portalCooldown = 0;
+    this._portalLockId   = null;
     this._saveTick       = 0;
     this._paused         = false;
     this._lastLevel      = levelFromXp(data.gameData?.xp ?? 0);
@@ -164,9 +165,12 @@ export class WorldScene extends Phaser.Scene {
 
     // ── Portal entry ───────────────────────────────────────────────────
     this.events.on('portalEnter', (zoneData) => {
+      if (!zoneData?.id) return;
+      if (this._portalLockId === zoneData.id) return;
       const now = Date.now();
       if (now - this._portalCooldown < 2000) return;
       this._portalCooldown = now;
+      this._portalLockId = zoneData.id;
       this.sfx.playPortalEnter();
       this.onComplete({ type: 'portalEnter', zone: zoneData, gameData: this.gameData });
     });
@@ -254,6 +258,10 @@ export class WorldScene extends Phaser.Scene {
 
   update(time, delta) {
     if (this._paused) return;
+    const portals = this.portalMgr?.portals;
+    if (this._portalLockId && portals && !this.physics.overlap(this.player, portals)) {
+      this._portalLockId = null;
+    }
 
     // Build combined input (keyboard + touch)
     const touch = this.hud?.touchKeys ?? {};
@@ -530,6 +538,18 @@ export class WorldScene extends Phaser.Scene {
       });
       this.gameData.playerX = safeRespawn.x;
       this.gameData.playerY = safeRespawn.y;
+
+      // Explicitly stop and destroy the SoundSystem before restarting the
+      // scene.  scene.restart() queues a shutdown+start pair that executes on
+      // the next frame; by the time Phaser's own shutdown() fires the Web
+      // Audio scheduler may have already pre-queued another 16-second music
+      // loop.  Destroying here (with gain ramped to 0) guarantees the old
+      // music stops immediately, regardless of Phaser's lifecycle timing.
+      if (this.sfx) {
+        this.sfx.destroy();
+        this.sfx = null;
+      }
+
       this.scene.restart({
         userId: this.userId, userName: this.userName,
         gameData: this.gameData, tileMap: this.tileMap,

@@ -200,6 +200,66 @@ test.describe('Adventure mode preview', () => {
   });
 });
 
+test.describe('Adventure portal behavior', () => {
+  test('portal does not re-trigger until the player leaves it', async ({ loginAsKid: page }) => {
+    await page.goto('/adventure');
+    await expect(page).toHaveURL(/\/adventure/);
+    await expect(page.getByText('Loading Adventure Mode...')).toBeHidden();
+    await expect(page.locator('#adventure-game-container canvas').first()).toBeVisible();
+
+    await page.waitForFunction(() => {
+      const game = window.__CHOREQUEST_ACTIVE_GAME;
+      const scene = game?.scene?.getScene?.('WorldScene');
+      return !!scene?.events;
+    });
+
+    const result = await page.evaluate(() => {
+      const game = window.__CHOREQUEST_ACTIVE_GAME;
+      const scene = game?.scene?.getScene?.('WorldScene');
+      if (!scene) return null;
+      const originalX = scene.player?.x;
+      const originalY = scene.player?.y;
+
+      const seen = [];
+      const originalOnComplete = scene.onComplete;
+      try {
+        scene.onComplete = (event) => {
+          if (event?.type === 'portalEnter') seen.push(event);
+          originalOnComplete(event);
+        };
+        scene._paused = false;
+        scene.physics.resume();
+        scene._portalCooldown = 0;
+        scene._portalLockId = 'kitchen';
+        scene.events.emit('portalEnter', { id: 'kitchen' });
+        const blockedCount = seen.length;
+
+        scene.player.setPosition(64, 64);
+        const leftPortalOverlap = !scene.physics.overlap(scene.player, scene.portalMgr?.portals);
+        scene.update(scene.time.now, 16);
+
+        scene._portalCooldown = 0;
+        scene.events.emit('portalEnter', { id: 'kitchen' });
+        const releasedCount = seen.length;
+        const releasedZoneId = seen.at(-1)?.zone?.id ?? null;
+
+        return { blockedCount, releasedCount, leftPortalOverlap, releasedZoneId };
+      } finally {
+        scene.onComplete = originalOnComplete;
+        if (scene.player && Number.isFinite(originalX) && Number.isFinite(originalY)) {
+          scene.player.setPosition(originalX, originalY);
+        }
+      }
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.blockedCount).toBe(0);
+    expect(result?.leftPortalOverlap).toBe(true);
+    expect(result?.releasedCount).toBe(1);
+    expect(result?.releasedZoneId).toBe('kitchen');
+  });
+});
+
 test.describe('Adventure avatar sync', () => {
   test('adventure player sprite uses the kid avatar colors', async ({ page }) => {
     const { kidToken } = loadTokens();

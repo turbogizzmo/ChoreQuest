@@ -23,6 +23,7 @@ from backend.models import (
     ChoreCategory,
     ChoreExclusion,
     ChoreRotation,
+    Difficulty,
     QuestTemplate,
     User,
     UserRole,
@@ -348,7 +349,7 @@ async def generate_quest(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_parent),
 ):
-    """Rewrite a plain chore idea as an on-style RPG quest draft.
+    """Rewrite a plain chore idea as an on-theme RPG quest draft.
 
     Returns a suggested title/description/points/difficulty/category. Nothing is
     saved — the parent reviews and edits in the create form, then saves via the
