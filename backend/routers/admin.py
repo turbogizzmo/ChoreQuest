@@ -358,6 +358,11 @@ async def update_settings(
 ):
     """Update application settings. Body: {"settings": {"key": "value"}}."""
     for key, value in body.settings.items():
+        if key in SENSITIVE_SETTING_KEYS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Setting '{key}' is a secret and must be updated via the /settings/ai endpoint.",
+            )
         result = await db.execute(
             select(AppSetting).where(AppSetting.key == key)
         )
