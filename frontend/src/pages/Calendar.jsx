@@ -14,11 +14,12 @@ import {
   Clock,
   Slash,
   ArrowRightLeft,
-  CalendarDays,
   Loader2,
   X,
   Trash2,
   ShieldCheck,
+  Star,
+  Zap,
 } from 'lucide-react';
 
 function toISO(date) {
@@ -32,6 +33,30 @@ function addDays(dateStr, n) {
 }
 
 const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const DIFFICULTY_LEVEL = { easy: 1, medium: 2, hard: 3, expert: 4 };
+
+const VIEW_MODES = [
+  { key: 'day', label: 'Day', days: 1 },
+  { key: '3day', label: '3-Day', days: 3 },
+  { key: 'week', label: 'Week', days: 7 },
+];
+
+function DifficultyStars({ level }) {
+  const numLevel =
+    typeof level === 'string' ? DIFFICULTY_LEVEL[level] || 1 : level || 1;
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4].map((i) => (
+        <Star
+          key={i}
+          size={11}
+          className={i <= numLevel ? 'text-gold fill-gold' : 'text-muted'}
+        />
+      ))}
+    </div>
+  );
+}
 
 function statusStyle(assignment, dayStr) {
   const today = todayLocalISO();
@@ -81,6 +106,11 @@ export default function Calendar() {
   const { colorTheme } = useTheme();
   const isKid = user?.role === 'kid';
 
+  const [viewMode, setViewMode] = useState(
+    () => localStorage.getItem('calendar_view') || 'week'
+  );
+  const viewDays = VIEW_MODES.find((v) => v.key === viewMode)?.days || 7;
+
   const [startDate, setStartDate] = useState(() => toISO(new Date()));
   const [assignments, setAssignments] = useState({});
   const [loading, setLoading] = useState(true);
@@ -103,8 +133,8 @@ export default function Calendar() {
     setLoading(true);
     setError('');
     try {
-      // The backend requires week_start to be a Monday. Our 7-day window
-      // may span two Mon-Sun weeks, so fetch both if needed.
+      // The backend requires week_start to be a Monday. Our window may span
+      // two Mon-Sun weeks, so fetch both if needed.
       const d = new Date(startDate + 'T00:00:00');
       const dayOfWeek = d.getDay(); // 0=Sun..6=Sat
       const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -112,19 +142,19 @@ export default function Calendar() {
 
       const data = await api(`/api/calendar?week_start=${monday1}`);
       const byDay = {};
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < viewDays; i++) {
         const dayKey = addDays(startDate, i);
         byDay[dayKey] = data.days?.[dayKey] || [];
       }
 
       // If our window extends past Sunday of that week, fetch next week too
       const monday2 = addDays(monday1, 7);
-      const lastDay = addDays(startDate, 6);
+      const lastDay = addDays(startDate, viewDays - 1);
       const sunday1 = addDays(monday1, 6);
       if (lastDay > sunday1) {
         try {
           const data2 = await api(`/api/calendar?week_start=${monday2}`);
-          for (let i = 0; i < 7; i++) {
+          for (let i = 0; i < viewDays; i++) {
             const dayKey = addDays(startDate, i);
             if (!byDay[dayKey]?.length && data2.days?.[dayKey]) {
               byDay[dayKey] = data2.days[dayKey];
@@ -138,7 +168,7 @@ export default function Calendar() {
     } finally {
       setLoading(false);
     }
-  }, [startDate]);
+  }, [startDate, viewDays]);
 
   useEffect(() => {
     fetchCalendar();
@@ -151,9 +181,14 @@ export default function Calendar() {
     return () => window.removeEventListener('ws:message', handler);
   }, [fetchCalendar]);
 
-  const prevWeek = () => setStartDate(addDays(startDate, -7));
-  const nextWeek = () => setStartDate(addDays(startDate, 7));
+  const prevPeriod = () => setStartDate(addDays(startDate, -viewDays));
+  const nextPeriod = () => setStartDate(addDays(startDate, viewDays));
   const goToday = () => setStartDate(toISO(new Date()));
+
+  const changeView = (mode) => {
+    setViewMode(mode);
+    localStorage.setItem('calendar_view', mode);
+  };
 
   const openTrade = async (assignment) => {
     setTradeAssignment(assignment);
@@ -233,7 +268,7 @@ export default function Calendar() {
     }
   };
 
-  const endDate = addDays(startDate, 6);
+  const endDate = addDays(startDate, viewDays - 1);
   const today = toISO(new Date());
   const isAtToday = startDate === today;
   const formatShortDate = (str) => {
@@ -249,25 +284,44 @@ export default function Calendar() {
           Calendar
         </h1>
 
-        {/* Week navigation */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* View mode selector */}
+          <div className="flex items-center rounded-md border border-border overflow-hidden">
+            {VIEW_MODES.map((v) => (
+              <button
+                key={v.key}
+                onClick={() => changeView(v.key)}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  viewMode === v.key
+                    ? 'bg-accent text-navy'
+                    : 'text-muted hover:text-cream hover:bg-surface-raised'
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Period navigation */}
           <div className="flex items-center gap-1">
             <button
-              onClick={prevWeek}
+              onClick={prevPeriod}
               className="p-2 rounded hover:bg-surface-raised transition-colors text-muted hover:text-cream"
-              aria-label="Previous week"
+              aria-label="Previous period"
             >
               <ChevronLeft size={20} />
             </button>
 
             <span className="text-cream text-sm min-w-[140px] sm:min-w-[180px] text-center">
-              {formatShortDate(startDate)} &ndash; {formatShortDate(endDate)}
+              {viewMode === 'day'
+                ? formatShortDate(startDate)
+                : `${formatShortDate(startDate)} \u2013 ${formatShortDate(endDate)}`}
             </span>
 
             <button
-              onClick={nextWeek}
+              onClick={nextPeriod}
               className="p-2 rounded hover:bg-surface-raised transition-colors text-muted hover:text-cream"
-              aria-label="Next 7 days"
+              aria-label="Next period"
             >
               <ChevronRight size={20} />
             </button>
@@ -318,9 +372,17 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* Calendar Grid — 7 days starting from startDate */}
-      <div className={`grid grid-cols-1 md:grid-cols-7 gap-3 ${loading ? 'opacity-30 pointer-events-none select-none' : ''}`}>
-          {Array.from({ length: 7 }, (_, i) => {
+      {/* Calendar Grid */}
+      <div
+        className={`grid gap-3 ${
+          viewMode === 'day'
+            ? 'grid-cols-1'
+            : viewMode === '3day'
+            ? 'grid-cols-1 md:grid-cols-3'
+            : 'grid-cols-1 md:grid-cols-7'
+        } ${loading ? 'opacity-30 pointer-events-none select-none' : ''}`}
+      >
+          {Array.from({ length: viewDays }, (_, i) => {
             const dayStr = addDays(startDate, i);
             const d = new Date(dayStr + 'T00:00:00');
             const label = SHORT_DAYS[d.getDay()];
@@ -329,6 +391,7 @@ export default function Calendar() {
             const dayAssignments = isKid
               ? allDayAssignments.filter((a) => a.user_id === user?.id)
               : allDayAssignments;
+            const expanded = viewMode === 'day' || viewMode === '3day';
 
             return (
               <div key={dayStr} className="min-w-0">
@@ -340,16 +403,20 @@ export default function Calendar() {
                       : 'bg-surface-raised/30 border-border text-muted'
                   }`}
                 >
-                  <div className="text-xs font-medium">
-                    {label}
+                  <div className={`font-medium ${expanded ? 'text-sm' : 'text-xs'}`}>
+                    {expanded
+                      ? `${label}, ${new Date(dayStr + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                      : label}
                   </div>
-                  <div className="text-sm mt-1">
-                    {new Date(dayStr + 'T00:00:00').getDate()}
-                  </div>
+                  {!expanded && (
+                    <div className="text-sm mt-1">
+                      {new Date(dayStr + 'T00:00:00').getDate()}
+                    </div>
+                  )}
                 </div>
 
                 {/* Assignments */}
-                <div className="space-y-2 mt-2 min-h-[80px]">
+                <div className={`space-y-2 mt-2 ${expanded ? 'min-h-[120px]' : 'min-h-[80px]'}`}>
                   {!loading && dayAssignments.length === 0 && (
                     <p className="text-muted/40 text-xs text-center py-4">
                       No quests
@@ -357,10 +424,14 @@ export default function Calendar() {
                   )}
                   {dayAssignments.map((a) => {
                     const style = statusStyle(a, dayStr);
+                    const chore = a.chore || {};
+                    const category = chore.category;
                     return (
                       <div
                         key={a.id}
-                        className={`game-panel !border ${style.border} ${style.bg} p-2 cursor-pointer hover:border-accent/40 transition-colors`}
+                        className={`game-panel !border ${style.border} ${style.bg} ${
+                          expanded ? 'p-3' : 'p-2'
+                        } cursor-pointer hover:border-accent/40 transition-colors`}
                         onClick={() =>
                           navigate(`/chores/${a.chore_id || a.id}`)
                         }
@@ -369,16 +440,53 @@ export default function Calendar() {
                           {style.icon}
                           <div className="min-w-0 flex-1">
                             <p
-                              className={`text-sm leading-tight truncate ${
+                              className={`leading-tight truncate ${
                                 style.textClass || 'text-cream'
-                              }`}
+                              } ${expanded ? 'text-base font-medium' : 'text-sm'}`}
                             >
-                              {themedTitle(a.chore?.title || a.chore_title || 'Quest', colorTheme)}
+                              {chore.icon && (
+                                <span className="mr-1">{chore.icon}</span>
+                              )}
+                              {themedTitle(chore.title || a.chore_title || 'Quest', colorTheme)}
                             </p>
+
                             {/* Show assigned kid for parents */}
                             {!isKid && (a.user?.display_name || a.assigned_to_name) && (
-                              <p className="text-xs text-purple font-medium mt-0.5 truncate">
+                              <p className={`text-purple font-medium mt-0.5 truncate ${expanded ? 'text-sm' : 'text-xs'}`}>
                                 {a.user?.display_name || a.assigned_to_name}
+                              </p>
+                            )}
+
+                            {/* Expanded details: category, XP, difficulty */}
+                            {expanded && (
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                {/* XP badge */}
+                                {chore.points != null && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-gold/10 border border-gold/30 text-gold text-xs font-medium">
+                                    <Zap size={11} />
+                                    {chore.points} XP
+                                  </span>
+                                )}
+                                {/* Category badge */}
+                                {category?.name && (
+                                  <span
+                                    className="inline-block px-2 py-0.5 rounded-md text-xs border bg-surface-raised border-border text-muted capitalize"
+                                    style={category.colour ? { borderColor: `${category.colour}40`, color: category.colour } : {}}
+                                  >
+                                    {category.icon ? `${category.icon} ` : ''}{category.name}
+                                  </span>
+                                )}
+                                {/* Difficulty stars */}
+                                {chore.difficulty && (
+                                  <DifficultyStars level={chore.difficulty} />
+                                )}
+                              </div>
+                            )}
+
+                            {/* Description for day view only */}
+                            {viewMode === 'day' && chore.description && (
+                              <p className="text-muted text-xs mt-1.5 line-clamp-2">
+                                {chore.description}
                               </p>
                             )}
                           </div>
@@ -454,7 +562,7 @@ export default function Calendar() {
         Object.values(assignments).every((arr) => arr.length === 0) && (
           <div className="text-center py-16">
             <p className="text-muted text-sm">
-              No tasks scheduled this week.
+              No tasks scheduled for this period.
             </p>
           </div>
         )}
