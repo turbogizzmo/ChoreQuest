@@ -380,7 +380,7 @@ _GEMINI_RESPONSE_SCHEMA = {
 }
 
 def _build_ai_example_block() -> str:
-    """Use static style anchors so family chore data never leaves the app."""
+    """Build example block for AI prompt styling."""
     return "\n\n".join(
         f"Title: {title}\nDescription: {desc}"
         for title, desc in _SEED_STYLE_EXAMPLES
@@ -393,7 +393,7 @@ async def generate_quest(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_parent),
 ):
-    """Rewrite a plain chore idea as an on-style RPG quest draft.
+    """Rewrite a plain chore idea as an on-theme RPG quest draft.
 
     Returns a suggested title/description/points/difficulty/category. Nothing is
     saved — the parent reviews and edits in the create form, then saves via the
@@ -416,8 +416,6 @@ async def generate_quest(
     categories = cat_result.scalars().all()
     category_names = [c.name for c in categories]
 
-    # Static examples preserve the fantasy tone without sending family-specific
-    # chore titles or descriptions to a third-party model.
     example_block = _build_ai_example_block()
     category_block = ", ".join(category_names) if category_names else "General"
 
