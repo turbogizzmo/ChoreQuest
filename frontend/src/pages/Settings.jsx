@@ -433,6 +433,10 @@ export default function Settings() {
         onChange={(e) => updateAiSecretInput(field, e.target.value)}
         placeholder="Leave blank to keep current saved key"
         className="field-input"
+        autoComplete="off"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
       />
       <label className="flex items-center gap-2 text-xs text-muted">
         <input

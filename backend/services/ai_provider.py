@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
@@ -100,6 +101,39 @@ def _default_model_for(provider: str) -> str:
     return DEFAULT_MODELS.get(provider, DEFAULT_MODELS[DEFAULT_PROVIDER])
 
 
+def _validate_ollama_base_url(url: str) -> str:
+    """Validate and normalise the Ollama base URL.
+
+    Rejects anything that is not a plain http/https host[:port] to prevent
+    SSRF via embedded paths, credentials, or non-HTTP schemes.
+    """
+    url = url.strip()
+    if not url:
+        return DEFAULT_OLLAMA_BASE_URL
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(
+            status_code=400,
+            detail="Ollama base URL must use http or https",
+        )
+    if not parsed.netloc:
+        raise HTTPException(
+            status_code=400,
+            detail="Ollama base URL must include a hostname",
+        )
+    if parsed.username or parsed.password:
+        raise HTTPException(
+            status_code=400,
+            detail="Ollama base URL must not include credentials",
+        )
+    if parsed.path and parsed.path.strip("/"):
+        raise HTTPException(
+            status_code=400,
+            detail="Ollama base URL must not include a path",
+        )
+    return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, "", "", "", ""))
+
+
 def _build_ai_example_block() -> str:
     return "\n\n".join(
         f"Title: {title}\nDescription: {desc}"
@@ -162,8 +196,13 @@ async def get_ai_settings_payload(db: AsyncSession) -> dict:
     config = await get_ai_provider_config(db)
     stored = await _load_settings_map(db)
 
-    def has_saved_secret(setting_key: str, env_key: str) -> bool:
-        return bool(os.environ.get(env_key) or stored.get(setting_key))
+    def has_saved_secret(secret_field: str) -> bool:
+        """Check configured status using the already-decrypted config value.
+
+        This avoids a false positive when the raw DB token exists but
+        decryption fails (in which case get_ai_provider_config returns "").
+        """
+        return bool(getattr(config, secret_field, "").strip())
 
     provider_states = {}
     for provider in SUPPORTED_AI_PROVIDERS:
@@ -174,8 +213,7 @@ async def get_ai_settings_payload(db: AsyncSession) -> dict:
             ) or (
                 _PROVIDER_REQUIRED_SECRET_FIELD[provider] is not None
                 and has_saved_secret(
-                    _SECRET_SETTING_KEYS[_PROVIDER_REQUIRED_SECRET_FIELD[provider]],
-                    _SECRET_ENV_KEYS[_PROVIDER_REQUIRED_SECRET_FIELD[provider]],
+                    _PROVIDER_REQUIRED_SECRET_FIELD[provider],
                 )
             ),
             "default_model": _default_model_for(provider),
@@ -202,7 +240,7 @@ async def save_ai_settings(db: AsyncSession, body) -> dict:
         "ai_model": body.model.strip() or _default_model_for(provider),
         "ai_openai_organization": (body.openai_organization or "").strip(),
         "ai_openai_project": (body.openai_project or "").strip(),
-        "ai_ollama_base_url": (body.ollama_base_url or DEFAULT_OLLAMA_BASE_URL).strip(),
+        "ai_ollama_base_url": _validate_ollama_base_url(body.ollama_base_url or DEFAULT_OLLAMA_BASE_URL),
     }
 
     for key, value in values_to_write.items():
