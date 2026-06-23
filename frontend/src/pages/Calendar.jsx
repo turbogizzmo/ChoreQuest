@@ -462,7 +462,9 @@ export default function Calendar() {
                               } ${expanded ? 'text-base font-medium' : 'text-sm'}`}
                             >
                               {chore.icon && (
-                                <ChoreIcon name={chore.icon} size={14} className="inline mr-1" />
+                                <span aria-hidden="true">
+                                  <ChoreIcon name={chore.icon} size={14} className="inline mr-1" />
+                                </span>
                               )}
                               {themedTitle(chore.title || a.chore_title || 'Quest', colorTheme)}
                             </p>
