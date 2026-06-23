@@ -118,9 +118,16 @@ export default function Calendar() {
   const { colorTheme } = useTheme();
   const isKid = user?.role === 'kid';
 
-  const [viewMode, setViewMode] = useState(
-    () => localStorage.getItem('calendar_view') || 'week'
-  );
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      const storedViewMode = localStorage.getItem('calendar_view');
+      return VIEW_MODES.some((mode) => mode.key === storedViewMode)
+        ? storedViewMode
+        : 'week';
+    } catch {
+      return 'week';
+    }
+  });
   const viewDays = VIEW_MODES.find((v) => v.key === viewMode)?.days || 7;
 
   const [startDate, setStartDate] = useState(() => toISO(new Date()));
@@ -199,7 +206,11 @@ export default function Calendar() {
 
   const changeView = (mode) => {
     setViewMode(mode);
-    localStorage.setItem('calendar_view', mode);
+    try {
+      localStorage.setItem('calendar_view', mode);
+    } catch {
+      // best-effort persistence
+    }
   };
 
   const openTrade = async (assignment) => {
@@ -476,6 +487,8 @@ export default function Calendar() {
                               {chore.icon && (
                                 <span aria-hidden="true">
                                   <ChoreIcon name={chore.icon} size={14} className="inline mr-1" />
+                                <span aria-hidden="true">
+                                  <ChoreIcon name={chore.icon} size={14} className="inline mr-1" />
                                 </span>
                               )}
                               {themedTitle(chore.title || a.chore_title || 'Quest', colorTheme)}
@@ -504,7 +517,12 @@ export default function Calendar() {
                                     className="inline-block px-2 py-0.5 rounded-md text-xs border bg-surface-raised border-border text-muted capitalize"
                                     style={category.colour ? { borderColor: `${category.colour}40`, color: category.colour } : {}}
                                   >
-                                    {category.icon ? `${category.icon} ` : ''}{category.name}
+                                    {category.icon && (
+                                      <span className="inline-flex align-text-bottom mr-1">
+                                        <ChoreIcon name={category.icon} size={12} className="text-current" />
+                                      </span>
+                                    )}
+                                    {category.name}
                                   </span>
                                 )}
                                 {/* Difficulty stars */}
