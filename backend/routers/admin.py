@@ -324,8 +324,9 @@ async def get_feature_settings(
     features["grace_period_days"] = "1"
     for s in settings_list:
         features[s.key] = s.value
-    # Env-derived capability (not a DB setting): AI quest generation is only
-    # available when a Gemini API key is configured in the deployment.
+    # Env-derived capability (not a DB setting): AI quest generation is
+    # available when any supported provider (Gemini/OpenAI/Anthropic via env or
+    # encrypted DB secret, or Ollama base URL + model) is configured.
     features["ai_quest_generation"] = (
         "true" if await ai_generation_available(db) else "false"
     )
@@ -356,7 +357,11 @@ async def update_settings(
     db: AsyncSession = Depends(get_db),
     _parent: User = Depends(require_parent),
 ):
-    """Update application settings. Body: {"settings": {"key": "value"}}."""
+    """Update application settings. Body: {"settings": {"key": "value"}}.
+
+    Updates to sensitive keys (AI/VAPID secrets) are rejected; use the
+    dedicated /settings/ai endpoint to manage those values.
+    """
     for key, value in body.settings.items():
         if key in SENSITIVE_SETTING_KEYS:
             raise HTTPException(

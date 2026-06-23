@@ -212,7 +212,7 @@ export default function QuestCreateModal({
           </div>
         )}
 
-        {/* AI generate panel (only when creating + a Gemini key is configured) */}
+        {/* AI generate panel (only when creating + an AI provider is configured) */}
         {!editingChore && aiEnabled && (
           <div>
             <button
