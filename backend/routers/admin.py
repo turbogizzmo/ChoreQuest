@@ -22,9 +22,12 @@ from backend.schemas import (
     InviteCodeResponse,
     AuditLogResponse,
     SettingsUpdate,
+    AISettingsUpdate,
 )
 from backend.auth import hash_password
 from backend.dependencies import require_admin, require_parent, get_current_user
+from backend.services.ai_provider import get_ai_settings_payload, save_ai_settings, ai_generation_available
+from backend.services.secure_settings import SENSITIVE_SETTING_KEYS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -292,7 +295,7 @@ async def get_settings(
     """Get all application settings as a key-value dict."""
     result = await db.execute(select(AppSetting))
     settings_list = result.scalars().all()
-    return {s.key: s.value for s in settings_list}
+    return {s.key: s.value for s in settings_list if s.key not in SENSITIVE_SETTING_KEYS}
 
 
 # ---------- GET /settings/features ----------
@@ -321,12 +324,30 @@ async def get_feature_settings(
     features["grace_period_days"] = "1"
     for s in settings_list:
         features[s.key] = s.value
-    # Env-derived capability (not a DB setting): AI quest generation is only
-    # available when a Gemini API key is configured in the deployment.
+    # Env-derived capability (not a DB setting): AI quest generation is
+    # available when any supported provider (Gemini/OpenAI/Anthropic via env or
+    # encrypted DB secret, or Ollama base URL + model) is configured.
     features["ai_quest_generation"] = (
-        "true" if os.environ.get("GEMINI_API_KEY") else "false"
+        "true" if await ai_generation_available(db) else "false"
     )
     return features
+
+
+@router.get("/settings/ai")
+async def get_ai_settings(
+    db: AsyncSession = Depends(get_db),
+    _parent: User = Depends(require_parent),
+):
+    return await get_ai_settings_payload(db)
+
+
+@router.put("/settings/ai")
+async def update_ai_settings(
+    body: AISettingsUpdate,
+    db: AsyncSession = Depends(get_db),
+    _parent: User = Depends(require_parent),
+):
+    return await save_ai_settings(db, body)
 
 
 # ---------- PUT /settings ----------
@@ -336,8 +357,17 @@ async def update_settings(
     db: AsyncSession = Depends(get_db),
     _parent: User = Depends(require_parent),
 ):
-    """Update application settings. Body: {"settings": {"key": "value"}}."""
+    """Update application settings. Body: {"settings": {"key": "value"}}.
+
+    Updates to sensitive keys (AI/VAPID secrets) are rejected; use the
+    dedicated /settings/ai endpoint to manage those values.
+    """
     for key, value in body.settings.items():
+        if key in SENSITIVE_SETTING_KEYS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Setting '{key}' is a secret and must be updated via the /settings/ai endpoint.",
+            )
         result = await db.execute(
             select(AppSetting).where(AppSetting.key == key)
         )
