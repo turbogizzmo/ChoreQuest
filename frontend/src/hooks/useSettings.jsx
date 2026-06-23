@@ -8,6 +8,7 @@ const SettingsContext = createContext({
   chore_trading_enabled: true,
   grace_period_days: 1,
   enable_debug_endpoints: false,
+  ai_quest_generation: false,
 });
 
 export function SettingsProvider({ children }) {
@@ -18,6 +19,7 @@ export function SettingsProvider({ children }) {
     chore_trading_enabled: true,
     grace_period_days: 1,
     enable_debug_endpoints: false,
+    ai_quest_generation: false,
   });
 
   const fetchFeatures = useCallback(async () => {
@@ -30,6 +32,7 @@ export function SettingsProvider({ children }) {
         chore_trading_enabled: data.chore_trading_enabled !== 'false',
         grace_period_days: parseInt(data.grace_period_days ?? '1', 10),
         enable_debug_endpoints: data.enable_debug_endpoints === 'true',
+        ai_quest_generation: data.ai_quest_generation === 'true',
       });
     } catch {
       // If fetch fails, keep defaults (all enabled)

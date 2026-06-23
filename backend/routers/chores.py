@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, date, timezone, timedelta
 
 from backend.utils import utc_iso
+from backend.rate_limit import rate_limiter
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import select, and_, func, delete, text
@@ -19,6 +20,7 @@ from backend.models import (
     ChoreCategory,
     ChoreExclusion,
     ChoreRotation,
+    Difficulty,
     QuestTemplate,
     User,
     UserRole,
@@ -41,6 +43,8 @@ from backend.schemas import (
     ChoreAssignRequest,
     AssignmentRuleUpdate,
     QuestTemplateResponse,
+    QuestGenerateRequest,
+    QuestGenerateResponse,
     RotationResponse,
     RotationSummary,
     QuestFeedbackRequest,
@@ -329,6 +333,182 @@ async def list_templates(
 ):
     result = await db.execute(select(QuestTemplate))
     return [QuestTemplateResponse.model_validate(t) for t in result.scalars().all()]
+
+
+# ---------------------------------------------------------------------------
+# AI quest generation (Google Gemini free tier)
+# ---------------------------------------------------------------------------
+
+# Free-tier flash model — fast and no billing required.
+_GEMINI_MODEL = "gemini-2.0-flash"
+_AI_QUEST_RATE_LIMIT_MAX_REQUESTS = 5
+_AI_QUEST_RATE_LIMIT_WINDOW_SECONDS = 300
+_AI_QUEST_MAX_POINTS = 50
+
+# Fallback style anchors used only when the family has no chores yet.
+_SEED_STYLE_EXAMPLES = [
+    (
+        "The Chamber of Rest",
+        "Venture into your sleeping quarters and restore order to the land. "
+        "Make the bed, clear the floor, and banish the chaos that lurks within.",
+    ),
+    (
+        "Dishwasher's Oath",
+        "The enchanted basin overflows with relics of past feasts. Empty its "
+        "contents and return each vessel to its rightful place in the kingdom's cupboards.",
+    ),
+    (
+        "Beast Keeper's Round",
+        "The loyal creatures of the realm hunger for sustenance and care. Fill "
+        "their bowls, refresh their water, and tend to their domain.",
+    ),
+]
+
+_GEMINI_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "description": {"type": "string"},
+        "points": {"type": "integer"},
+        "difficulty": {
+            "type": "string",
+            "enum": [d.value for d in Difficulty],
+        },
+        "category_name": {"type": "string"},
+    },
+    "required": ["title", "description", "points", "difficulty", "category_name"],
+}
+
+
+def gemini_enabled() -> bool:
+    """True when a Gemini API key is configured in the environment."""
+    return bool(os.environ.get("GEMINI_API_KEY"))
+
+
+def _build_ai_example_block() -> str:
+    """Use static style anchors so family chore data never leaves the app."""
+    return "\n\n".join(
+        f"Title: {title}\nDescription: {desc}"
+        for title, desc in _SEED_STYLE_EXAMPLES
+    )
+
+
+@router.post("/generate", response_model=QuestGenerateResponse)
+async def generate_quest(
+    body: QuestGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_parent),
+):
+    """Rewrite a plain chore idea as an on-style RPG quest draft.
+
+    Returns a suggested title/description/points/difficulty/category. Nothing is
+    saved — the parent reviews and edits in the create form, then saves via the
+    normal POST /api/chores path.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=503, detail="AI quest generation is not configured."
+        )
+
+    rate_limiter.check(
+        key=f"ai-quest-generate:{user.id}",
+        max_requests=_AI_QUEST_RATE_LIMIT_MAX_REQUESTS,
+        window_seconds=_AI_QUEST_RATE_LIMIT_WINDOW_SECONDS,
+    )
+
+    # Category names the model must choose from.
+    cat_result = await db.execute(select(ChoreCategory))
+    categories = cat_result.scalars().all()
+    category_names = [c.name for c in categories]
+
+    # Static examples preserve the fantasy tone without sending family-specific
+    # chore titles or descriptions to a third-party model.
+    example_block = _build_ai_example_block()
+    category_block = ", ".join(category_names) if category_names else "General"
+
+    system_instruction = (
+        "You are a quest writer for a family chore app that frames chores as "
+        "epic RPG/fantasy quests. Rewrite the parent's plain chore idea as a "
+        "single quest that matches the voice, tone, and style of the examples: "
+        "a short evocative fantasy title and a 1-2 sentence description that "
+        "renames ordinary household items and actions in medieval/fantasy terms "
+        "while keeping the real task clear. Pick the single best-fit category "
+        f"from this list (use the exact name): {category_block}. Suggest an XP "
+        "reward as a positive integer (easy chores ~10-15, medium ~20-25, hard "
+        "~30) and a difficulty of easy, medium, hard, or expert. Respond with "
+        "JSON only."
+    )
+    contents = (
+        f"Examples of the desired style:\n\n{example_block}\n\n"
+        f"Parent's chore idea: {body.prompt}"
+    )
+
+    try:
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=api_key)
+        response = await client.aio.models.generate_content(
+            model=_GEMINI_MODEL,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                response_mime_type="application/json",
+                response_schema=_GEMINI_RESPONSE_SCHEMA,
+                temperature=0.9,
+                max_output_tokens=600,
+            ),
+        )
+        import json
+
+        data = json.loads(response.text)
+    except Exception:
+        logger.exception("Gemini quest generation failed")
+        raise HTTPException(
+            status_code=502,
+            detail="The oracle could not be reached. Please try again.",
+        )
+
+    # Coerce / validate model output.
+    title = str(data.get("title") or "").strip()[:200]
+    description = str(data.get("description") or "").strip() or None
+    if not title:
+        raise HTTPException(
+            status_code=502, detail="The oracle returned an empty quest."
+        )
+
+    try:
+        points = int(data.get("points") or 10)
+    except (TypeError, ValueError):
+        points = 10
+    points = min(_AI_QUEST_MAX_POINTS, max(1, points))
+
+    raw_difficulty = str(data.get("difficulty") or "").lower()
+    try:
+        difficulty = Difficulty(raw_difficulty)
+    except ValueError:
+        difficulty = Difficulty.easy
+
+    # Resolve category name -> id (case-insensitive), mirroring the frontend.
+    category_name = str(data.get("category_name") or "").strip()
+    category_id = next(
+        (c.id for c in categories if c.name.lower() == category_name.lower()),
+        None,
+    )
+    if category_id is None and categories:
+        # Fall back to the first category so the form is still usable.
+        category_id = categories[0].id
+        category_name = categories[0].name
+
+    return QuestGenerateResponse(
+        title=title,
+        description=description,
+        points=points,
+        difficulty=difficulty,
+        category_name=category_name,
+        category_id=category_id,
+    )
 
 
 @router.get("/{chore_id}", response_model=ChoreResponse)

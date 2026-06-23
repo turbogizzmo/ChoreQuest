@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api/client';
 import { useTheme } from '../hooks/useTheme';
+import { useSettings } from '../hooks/useSettings';
 import { themedTitle, themedDescription } from '../utils/questThemeText';
 import Modal from './Modal';
 import {
@@ -8,6 +9,7 @@ import {
   Star,
   Scroll,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 
 const DIFFICULTY_OPTIONS = [
@@ -38,12 +40,17 @@ export default function QuestCreateModal({
   editingChore,
 }) {
   const { colorTheme } = useTheme();
+  const { ai_quest_generation: aiEnabled } = useSettings();
   const [form, setForm] = useState({ ...emptyForm });
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [existingTitles, setExistingTitles] = useState(new Set());
+  const [showAi, setShowAi] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -61,6 +68,9 @@ export default function QuestCreateModal({
       }
       setFormError('');
       setShowTemplates(false);
+      setShowAi(false);
+      setAiPrompt('');
+      setAiError('');
     }
   }, [isOpen, editingChore]);
 
@@ -97,6 +107,34 @@ export default function QuestCreateModal({
       category_id: catMatch ? String(catMatch.id) : '',
     });
     setShowTemplates(false);
+  };
+
+  const handleGenerate = async () => {
+    const prompt = aiPrompt.trim();
+    if (prompt.length < 3) {
+      setAiError('Describe the chore in a few words first.');
+      return;
+    }
+    setAiLoading(true);
+    setAiError('');
+    try {
+      const draft = await api('/api/chores/generate', {
+        method: 'POST',
+        body: { prompt },
+      });
+      setForm((prev) => ({
+        ...prev,
+        title: draft.title,
+        description: draft.description || '',
+        points: draft.points,
+        difficulty: draft.difficulty,
+        category_id: draft.category_id ? String(draft.category_id) : prev.category_id,
+      }));
+    } catch (err) {
+      setAiError(err.message || 'The oracle could not be reached. Please try again.');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -171,6 +209,52 @@ export default function QuestCreateModal({
         {formError && (
           <div className="p-2 rounded border border-crimson/40 bg-crimson/10 text-crimson text-sm">
             {formError}
+          </div>
+        )}
+
+        {/* AI generate panel (only when creating + a Gemini key is configured) */}
+        {!editingChore && aiEnabled && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAi(!showAi)}
+              className="flex items-center gap-2 text-accent text-sm hover:text-accent/80 transition-colors"
+            >
+              <Sparkles size={14} />
+              {showAi ? 'Hide AI helper' : 'Generate with AI'}
+            </button>
+
+            {showAi && (
+              <div className="mt-3 space-y-2 border border-border rounded-lg p-3 bg-surface-raised/30">
+                <p className="text-muted text-xs">
+                  Describe a chore in plain words and avoid names or private details.
+                  Uses Google Gemini to style it as a quest.
+                </p>
+                <p className="text-muted text-xs">
+                  Up to 5 generations every 5 minutes. Suggested XP is capped for balance.
+                </p>
+                <textarea
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  placeholder="e.g. clean the garage"
+                  rows={2}
+                  maxLength={300}
+                  className="field-input resize-none"
+                />
+                {aiError && (
+                  <p className="text-crimson text-xs">{aiError}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={aiLoading}
+                  className="game-btn game-btn-gold flex items-center gap-2"
+                >
+                  <Sparkles size={14} />
+                  {aiLoading ? 'Consulting the oracle...' : 'Generate Quest'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

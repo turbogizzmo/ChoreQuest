@@ -321,6 +321,11 @@ async def get_feature_settings(
     features["grace_period_days"] = "1"
     for s in settings_list:
         features[s.key] = s.value
+    # Env-derived capability (not a DB setting): AI quest generation is only
+    # available when a Gemini API key is configured in the deployment.
+    features["ai_quest_generation"] = (
+        "true" if os.environ.get("GEMINI_API_KEY") else "false"
+    )
     return features
 
 
