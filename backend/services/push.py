@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import settings
 from backend.models import PushSubscription, AppSetting
+from backend.services.secure_settings import encrypt_secret, decrypt_secret
 
 logger = logging.getLogger(__name__)
 
@@ -112,10 +113,20 @@ async def get_vapid_keys(db: AsyncSession) -> tuple[str, str]:
     if "vapid_private_key" in stored and "vapid_public_key" in stored:
         # Verify key pair actually matches
         try:
-            priv = _load_private_key(stored["vapid_private_key"])
+            priv_raw = decrypt_secret(stored["vapid_private_key"])
+            priv = _load_private_key(priv_raw)
             derived_pub = _public_key_b64(priv)
             if derived_pub == stored["vapid_public_key"]:
-                return stored["vapid_private_key"], stored["vapid_public_key"]
+                # One-time migration: re-encrypt legacy plaintext keys at read time
+                if not stored["vapid_private_key"].startswith("enc:"):
+                    row_result = await db.execute(
+                        select(AppSetting).where(AppSetting.key == "vapid_private_key")
+                    )
+                    row = row_result.scalar_one_or_none()
+                    if row:
+                        row.value = encrypt_secret(priv_raw)
+                        await db.commit()
+                return priv_raw, stored["vapid_public_key"]
             logger.warning(
                 "VAPID key pair mismatch — stored public key does not match "
                 "private key. Regenerating."
@@ -134,7 +145,7 @@ async def get_vapid_keys(db: AsyncSession) -> tuple[str, str]:
         logger.warning("cryptography not installed — cannot generate VAPID keys")
         return "", ""
 
-    db.add(AppSetting(key="vapid_private_key", value=priv))
+    db.add(AppSetting(key="vapid_private_key", value=encrypt_secret(priv)))
     db.add(AppSetting(key="vapid_public_key", value=pub))
     await db.commit()
     logger.info("Generated and stored new VAPID key pair")
