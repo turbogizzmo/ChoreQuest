@@ -435,6 +435,22 @@ class QuestTemplateResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# AI quest generation
+class QuestGenerateRequest(BaseModel):
+    # Plain-language chore idea, e.g. "clean the garage". Length-capped as an
+    # abuse guard, with per-parent endpoint rate limiting enforced server-side.
+    prompt: str = Field(min_length=3, max_length=300)
+
+
+class QuestGenerateResponse(BaseModel):
+    title: str
+    description: str | None
+    points: int
+    difficulty: Difficulty
+    category_name: str
+    category_id: int | None
+
+
 # Rotations
 class RotationCreate(BaseModel):
     chore_id: int
