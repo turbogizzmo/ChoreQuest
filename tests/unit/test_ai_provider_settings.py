@@ -5,6 +5,8 @@ from fastapi import HTTPException
 from backend.models import AppSetting, UserRole
 from backend.services.ai_provider import (
     AIProviderConfig,
+    DEFAULT_MODELS,
+    _map_ai_provider_error,
     ai_generation_available,
     coerce_generated_quest,
     get_ai_provider_config,
@@ -46,6 +48,7 @@ async def test_ai_settings_loads_env_override_for_gemini(db, monkeypatch):
     config = await get_ai_provider_config(db)
 
     assert config.provider == "gemini"
+    assert config.model == DEFAULT_MODELS["gemini"]
     assert config.gemini_api_key == "env-gemini-key"
     assert config.is_configured is True
 
@@ -125,3 +128,21 @@ async def test_coerce_generated_quest_requires_non_empty_title(db):
         )
 
     assert exc_info.value.status_code == 502
+
+
+def test_map_ai_provider_error_for_gemini_quota():
+    error = _map_ai_provider_error(
+        "gemini",
+        RuntimeError("429 RESOURCE_EXHAUSTED quota exceeded"),
+    )
+    assert error.status_code == 503
+    assert "quota exceeded" in error.detail.lower()
+
+
+def test_map_ai_provider_error_for_gemini_retired_model():
+    error = _map_ai_provider_error(
+        "gemini",
+        RuntimeError("404 NOT_FOUND model is no longer available"),
+    )
+    assert error.status_code == 503
+    assert "no longer available" in error.detail.lower()

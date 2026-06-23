@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PROVIDER = "gemini"
 DEFAULT_MODELS = {
-    "gemini": "gemini-2.0-flash",
+    "gemini": "gemini-3.5-flash",
     "openai": "gpt-5.5-mini",
     "anthropic": "claude-sonnet-4-5",
     "ollama": "gemma3",
@@ -340,12 +340,9 @@ async def generate_quest_draft(
             raise HTTPException(status_code=400, detail="Unsupported AI provider")
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
         logger.exception("AI quest generation failed for provider %s", config.provider)
-        raise HTTPException(
-            status_code=502,
-            detail="The oracle could not be reached. Please try again.",
-        )
+        raise _map_ai_provider_error(config.provider, exc)
 
     return coerce_generated_quest(data, categories)
 
@@ -393,7 +390,6 @@ async def _generate_with_gemini(
     contents: str,
 ) -> dict:
     from google import genai
-    from google.genai import types
 
     response_schema = {
         "type": "object",
@@ -410,18 +406,22 @@ async def _generate_with_gemini(
         "required": ["title", "description", "points", "difficulty", "category_name"],
     }
     client = genai.Client(api_key=config.gemini_api_key)
-    response = await client.aio.models.generate_content(
+    interaction = await client.aio.interactions.create(
         model=config.model,
-        contents=contents,
-        config=types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            response_mime_type="application/json",
-            response_schema=response_schema,
-            temperature=0.9,
-            max_output_tokens=600,
-        ),
+        input=contents,
+        system_instruction=system_instruction,
+        response_format={
+            "type": "text",
+            "mime_type": "application/json",
+            "schema": response_schema,
+        },
+        generation_config={
+            "temperature": 0.9,
+            "max_output_tokens": 600,
+            "thinking_level": "low",
+        },
     )
-    return json.loads(response.text)
+    return json.loads(interaction.output_text)
 
 
 def _generate_with_openai(
@@ -524,3 +524,28 @@ def _post_json(url: str, payload: dict, headers: dict[str, str]) -> dict:
         body = exc.read().decode("utf-8", errors="ignore")
         logger.warning("AI provider HTTP error %s for %s: %s", exc.code, url, body)
         raise
+
+
+def _map_ai_provider_error(provider: str, exc: Exception) -> HTTPException:
+    text = str(exc)
+    lower = text.lower()
+    if provider == "gemini":
+        if "429" in text and "resource_exhausted" in lower:
+            return HTTPException(
+                status_code=503,
+                detail="Gemini quota exceeded. Update the Gemini key/project or switch providers.",
+            )
+        if "404" in text and "no longer available" in lower:
+            return HTTPException(
+                status_code=503,
+                detail="The configured Gemini model is no longer available. Choose a current Gemini model in Family Settings.",
+            )
+        if "401" in text or "403" in text:
+            return HTTPException(
+                status_code=503,
+                detail="Gemini rejected the API key. Check the saved Gemini key and its project restrictions.",
+            )
+    return HTTPException(
+        status_code=502,
+        detail="The oracle could not be reached. Please try again.",
+    )

@@ -13,28 +13,31 @@ from tests.unit.conftest import make_category, make_chore, make_user
 
 
 def _install_fake_google(monkeypatch, response_payload, captured):
-    class FakeGenerateContentConfig:
-        def __init__(self, **kwargs):
-            self.kwargs = kwargs
-
-    class FakeModels:
-        async def generate_content(self, *, model, contents, config):
+    class FakeInteractions:
+        async def create(
+            self,
+            *,
+            model,
+            input,
+            system_instruction,
+            response_format,
+            generation_config,
+        ):
             captured["model"] = model
-            captured["contents"] = contents
-            captured["config"] = config
-            return types.SimpleNamespace(text=json.dumps(response_payload))
+            captured["contents"] = input
+            captured["system_instruction"] = system_instruction
+            captured["response_format"] = response_format
+            captured["generation_config"] = generation_config
+            return types.SimpleNamespace(output_text=json.dumps(response_payload))
 
     class FakeClient:
         def __init__(self, api_key):
             captured["api_key"] = api_key
-            self.aio = types.SimpleNamespace(models=FakeModels())
+            self.aio = types.SimpleNamespace(interactions=FakeInteractions())
 
     google_module = types.ModuleType("google")
     genai_module = types.ModuleType("google.genai")
     genai_module.Client = FakeClient
-    genai_module.types = types.SimpleNamespace(
-        GenerateContentConfig=FakeGenerateContentConfig
-    )
     google_module.genai = genai_module
 
     monkeypatch.setitem(sys.modules, "google", google_module)
