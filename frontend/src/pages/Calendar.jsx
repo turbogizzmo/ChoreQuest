@@ -324,7 +324,13 @@ export default function Calendar() {
             <button
               onClick={prevPeriod}
               className="p-2 rounded hover:bg-surface-raised transition-colors text-muted hover:text-cream"
-              aria-label="Previous period"
+              aria-label={
+                viewMode === 'week'
+                  ? 'Previous week'
+                  : viewMode === '3day'
+                    ? 'Previous 3 days'
+                    : 'Previous day'
+              }
             >
               <ChevronLeft size={20} />
             </button>
