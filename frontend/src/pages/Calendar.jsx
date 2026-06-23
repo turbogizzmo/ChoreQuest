@@ -7,6 +7,7 @@ import { toLocalISO, todayLocalISO } from '../utils/dates';
 import { useTheme } from '../hooks/useTheme';
 import { themedTitle } from '../utils/questThemeText';
 import Modal from '../components/Modal';
+import ChoreIcon from '../components/ChoreIcon';
 import {
   ChevronLeft,
   ChevronRight,
@@ -461,7 +462,7 @@ export default function Calendar() {
                               } ${expanded ? 'text-base font-medium' : 'text-sm'}`}
                             >
                               {chore.icon && (
-                                <span className="mr-1">{chore.icon}</span>
+                                <ChoreIcon name={chore.icon} size={14} className="inline mr-1" />
                               )}
                               {themedTitle(chore.title || a.chore_title || 'Quest', colorTheme)}
                             </p>
