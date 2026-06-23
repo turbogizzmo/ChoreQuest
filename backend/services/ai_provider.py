@@ -1,0 +1,488 @@
+import asyncio
+import json
+import logging
+import os
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.models import AppSetting, ChoreCategory, Difficulty
+from backend.rate_limit import rate_limiter
+from backend.services.secure_settings import decrypt_secret, encrypt_secret
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_PROVIDER = "gemini"
+DEFAULT_MODELS = {
+    "gemini": "gemini-2.0-flash",
+    "openai": "gpt-5.5-mini",
+    "anthropic": "claude-sonnet-4-5",
+    "ollama": "gemma3",
+}
+SUPPORTED_AI_PROVIDERS = tuple(DEFAULT_MODELS.keys())
+AI_QUEST_RATE_LIMIT_MAX_REQUESTS = 5
+AI_QUEST_RATE_LIMIT_WINDOW_SECONDS = 300
+AI_QUEST_MAX_POINTS = 50
+DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
+
+_SETTING_DEFAULTS = {
+    "ai_provider": DEFAULT_PROVIDER,
+    "ai_model": DEFAULT_MODELS[DEFAULT_PROVIDER],
+    "ai_openai_organization": "",
+    "ai_openai_project": "",
+    "ai_ollama_base_url": DEFAULT_OLLAMA_BASE_URL,
+}
+_SECRET_SETTING_KEYS = {
+    "gemini_api_key": "ai_gemini_api_key",
+    "openai_api_key": "ai_openai_api_key",
+    "anthropic_api_key": "ai_anthropic_api_key",
+}
+_SECRET_ENV_KEYS = {
+    "gemini_api_key": "GEMINI_API_KEY",
+    "openai_api_key": "OPENAI_API_KEY",
+    "anthropic_api_key": "ANTHROPIC_API_KEY",
+}
+_PROVIDER_REQUIRED_SECRET_FIELD = {
+    "gemini": "gemini_api_key",
+    "openai": "openai_api_key",
+    "anthropic": "anthropic_api_key",
+    "ollama": None,
+}
+_SEED_STYLE_EXAMPLES = [
+    (
+        "The Chamber of Rest",
+        "Venture into your sleeping quarters and restore order to the land. "
+        "Make the bed, clear the floor, and banish the chaos that lurks within.",
+    ),
+    (
+        "Dishwasher's Oath",
+        "The enchanted basin overflows with relics of past feasts. Empty its "
+        "contents and return each vessel to its rightful place in the kingdom's cupboards.",
+    ),
+    (
+        "Beast Keeper's Round",
+        "The loyal creatures of the realm hunger for sustenance and care. Fill "
+        "their bowls, refresh their water, and tend to their domain.",
+    ),
+]
+
+
+@dataclass
+class AIProviderConfig:
+    provider: str
+    model: str
+    gemini_api_key: str = ""
+    openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    openai_organization: str = ""
+    openai_project: str = ""
+    ollama_base_url: str = DEFAULT_OLLAMA_BASE_URL
+
+    @property
+    def required_secret_field(self) -> str | None:
+        return _PROVIDER_REQUIRED_SECRET_FIELD.get(self.provider)
+
+    @property
+    def is_configured(self) -> bool:
+        if self.provider == "ollama":
+            return bool((self.ollama_base_url or "").strip() and self.model.strip())
+        secret_field = self.required_secret_field
+        if not secret_field:
+            return False
+        return bool(getattr(self, secret_field, "").strip() and self.model.strip())
+
+
+def _default_model_for(provider: str) -> str:
+    return DEFAULT_MODELS.get(provider, DEFAULT_MODELS[DEFAULT_PROVIDER])
+
+
+def _build_ai_example_block() -> str:
+    return "\n\n".join(
+        f"Title: {title}\nDescription: {desc}"
+        for title, desc in _SEED_STYLE_EXAMPLES
+    )
+
+
+async def _load_settings_map(db: AsyncSession) -> dict[str, str]:
+    keys = list(_SETTING_DEFAULTS.keys()) + list(_SECRET_SETTING_KEYS.values())
+    result = await db.execute(select(AppSetting).where(AppSetting.key.in_(keys)))
+    return {row.key: row.value for row in result.scalars().all()}
+
+
+def _decrypt_optional_secret(raw_value: str | None) -> str:
+    if not raw_value:
+        return ""
+    try:
+        return decrypt_secret(raw_value)
+    except ValueError:
+        logger.exception("Failed to decrypt stored AI provider secret")
+        return ""
+
+
+async def get_ai_provider_config(db: AsyncSession) -> AIProviderConfig:
+    stored = await _load_settings_map(db)
+    secret_values = {
+        public_key: (
+            os.environ.get(env_key)
+            or _decrypt_optional_secret(stored.get(setting_key))
+        )
+        for public_key, setting_key in _SECRET_SETTING_KEYS.items()
+        for env_key in [_SECRET_ENV_KEYS[public_key]]
+    }
+    provider = stored.get("ai_provider", _SETTING_DEFAULTS["ai_provider"]).strip() or DEFAULT_PROVIDER
+    if provider not in SUPPORTED_AI_PROVIDERS:
+        provider = DEFAULT_PROVIDER
+    model = stored.get("ai_model", "").strip() or _default_model_for(provider)
+    return AIProviderConfig(
+        provider=provider,
+        model=model,
+        gemini_api_key=secret_values["gemini_api_key"],
+        openai_api_key=secret_values["openai_api_key"],
+        anthropic_api_key=secret_values["anthropic_api_key"],
+        openai_organization=stored.get("ai_openai_organization", "").strip(),
+        openai_project=stored.get("ai_openai_project", "").strip(),
+        ollama_base_url=(
+            os.environ.get("OLLAMA_BASE_URL")
+            or stored.get("ai_ollama_base_url", DEFAULT_OLLAMA_BASE_URL).strip()
+            or DEFAULT_OLLAMA_BASE_URL
+        ),
+    )
+
+
+async def ai_generation_available(db: AsyncSession) -> bool:
+    config = await get_ai_provider_config(db)
+    return config.is_configured
+
+
+async def get_ai_settings_payload(db: AsyncSession) -> dict:
+    config = await get_ai_provider_config(db)
+    stored = await _load_settings_map(db)
+
+    def has_saved_secret(setting_key: str, env_key: str) -> bool:
+        return bool(os.environ.get(env_key) or stored.get(setting_key))
+
+    provider_states = {}
+    for provider in SUPPORTED_AI_PROVIDERS:
+        provider_states[provider] = {
+            "configured": (
+                provider == "ollama"
+                and bool(config.ollama_base_url.strip())
+            ) or (
+                _PROVIDER_REQUIRED_SECRET_FIELD[provider] is not None
+                and has_saved_secret(
+                    _SECRET_SETTING_KEYS[_PROVIDER_REQUIRED_SECRET_FIELD[provider]],
+                    _SECRET_ENV_KEYS[_PROVIDER_REQUIRED_SECRET_FIELD[provider]],
+                )
+            ),
+            "default_model": _default_model_for(provider),
+        }
+
+    return {
+        "provider": config.provider,
+        "model": config.model,
+        "openai_organization": config.openai_organization,
+        "openai_project": config.openai_project,
+        "ollama_base_url": config.ollama_base_url,
+        "providers": provider_states,
+        "active_provider_configured": config.is_configured,
+    }
+
+
+async def save_ai_settings(db: AsyncSession, body) -> dict:
+    provider = body.provider.strip().lower()
+    if provider not in SUPPORTED_AI_PROVIDERS:
+        raise HTTPException(status_code=400, detail="Unsupported AI provider")
+
+    values_to_write = {
+        "ai_provider": provider,
+        "ai_model": body.model.strip() or _default_model_for(provider),
+        "ai_openai_organization": (body.openai_organization or "").strip(),
+        "ai_openai_project": (body.openai_project or "").strip(),
+        "ai_ollama_base_url": (body.ollama_base_url or DEFAULT_OLLAMA_BASE_URL).strip(),
+    }
+
+    for key, value in values_to_write.items():
+        result = await db.execute(select(AppSetting).where(AppSetting.key == key))
+        existing = result.scalar_one_or_none()
+        if existing:
+            existing.value = value
+        else:
+            db.add(AppSetting(key=key, value=value))
+
+    secret_updates = {
+        "gemini_api_key": body.gemini_api_key,
+        "openai_api_key": body.openai_api_key,
+        "anthropic_api_key": body.anthropic_api_key,
+    }
+    secret_clears = {
+        "gemini_api_key": body.clear_gemini_api_key,
+        "openai_api_key": body.clear_openai_api_key,
+        "anthropic_api_key": body.clear_anthropic_api_key,
+    }
+
+    for public_key, setting_key in _SECRET_SETTING_KEYS.items():
+        result = await db.execute(select(AppSetting).where(AppSetting.key == setting_key))
+        existing = result.scalar_one_or_none()
+        if secret_clears[public_key]:
+            if existing:
+                await db.delete(existing)
+            continue
+        secret_value = (secret_updates[public_key] or "").strip()
+        if not secret_value:
+            continue
+        encrypted = encrypt_secret(secret_value)
+        if existing:
+            existing.value = encrypted
+        else:
+            db.add(AppSetting(key=setting_key, value=encrypted))
+
+    await db.commit()
+    return await get_ai_settings_payload(db)
+
+
+def check_ai_generation_rate_limit(user_id: int):
+    rate_limiter.check(
+        key=f"ai-quest-generate:{user_id}",
+        max_requests=AI_QUEST_RATE_LIMIT_MAX_REQUESTS,
+        window_seconds=AI_QUEST_RATE_LIMIT_WINDOW_SECONDS,
+    )
+
+
+async def generate_quest_draft(
+    *,
+    prompt: str,
+    categories: list[ChoreCategory],
+    config: AIProviderConfig,
+) -> dict:
+    if not config.is_configured:
+        raise HTTPException(
+            status_code=503,
+            detail="AI quest generation is not configured.",
+        )
+
+    category_names = [c.name for c in categories]
+    category_block = ", ".join(category_names) if category_names else "General"
+    system_instruction = (
+        "You are a quest writer for a family chore app that frames chores as "
+        "epic RPG/fantasy quests. Rewrite the parent's plain chore idea as a "
+        "single quest that matches the voice, tone, and style of the examples: "
+        "a short evocative fantasy title and a 1-2 sentence description that "
+        "renames ordinary household items and actions in medieval/fantasy terms "
+        "while keeping the real task clear. Pick the single best-fit category "
+        f"from this list (use the exact name): {category_block}. Suggest an XP "
+        "reward as a positive integer (easy chores ~10-15, medium ~20-25, hard "
+        "~30) and a difficulty of easy, medium, hard, or expert. Respond with "
+        "JSON only using keys title, description, points, difficulty, and category_name."
+    )
+    contents = (
+        f"Examples of the desired style:\n\n{_build_ai_example_block()}\n\n"
+        f"Parent's chore idea: {prompt}"
+    )
+
+    try:
+        if config.provider == "gemini":
+            data = await _generate_with_gemini(config, system_instruction, contents)
+        elif config.provider == "openai":
+            data = await asyncio.to_thread(
+                _generate_with_openai, config, system_instruction, contents
+            )
+        elif config.provider == "anthropic":
+            data = await asyncio.to_thread(
+                _generate_with_anthropic, config, system_instruction, contents
+            )
+        elif config.provider == "ollama":
+            data = await asyncio.to_thread(
+                _generate_with_ollama, config, system_instruction, contents
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported AI provider")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("AI quest generation failed for provider %s", config.provider)
+        raise HTTPException(
+            status_code=502,
+            detail="The oracle could not be reached. Please try again.",
+        )
+
+    return coerce_generated_quest(data, categories)
+
+
+def coerce_generated_quest(data: dict, categories: list[ChoreCategory]) -> dict:
+    title = str(data.get("title") or "").strip()[:200]
+    description = str(data.get("description") or "").strip() or None
+    if not title:
+        raise HTTPException(status_code=502, detail="The oracle returned an empty quest.")
+
+    try:
+        points = int(data.get("points") or 10)
+    except (TypeError, ValueError):
+        points = 10
+    points = min(AI_QUEST_MAX_POINTS, max(1, points))
+
+    raw_difficulty = str(data.get("difficulty") or "").lower()
+    try:
+        difficulty = Difficulty(raw_difficulty)
+    except ValueError:
+        difficulty = Difficulty.easy
+
+    category_name = str(data.get("category_name") or "").strip()
+    category_id = next(
+        (c.id for c in categories if c.name.lower() == category_name.lower()),
+        None,
+    )
+    if category_id is None and categories:
+        category_id = categories[0].id
+        category_name = categories[0].name
+
+    return {
+        "title": title,
+        "description": description,
+        "points": points,
+        "difficulty": difficulty,
+        "category_name": category_name,
+        "category_id": category_id,
+    }
+
+
+async def _generate_with_gemini(
+    config: AIProviderConfig,
+    system_instruction: str,
+    contents: str,
+) -> dict:
+    from google import genai
+    from google.genai import types
+
+    response_schema = {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "description": {"type": "string"},
+            "points": {"type": "integer"},
+            "difficulty": {
+                "type": "string",
+                "enum": [d.value for d in Difficulty],
+            },
+            "category_name": {"type": "string"},
+        },
+        "required": ["title", "description", "points", "difficulty", "category_name"],
+    }
+    client = genai.Client(api_key=config.gemini_api_key)
+    response = await client.aio.models.generate_content(
+        model=config.model,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            response_mime_type="application/json",
+            response_schema=response_schema,
+            temperature=0.9,
+            max_output_tokens=600,
+        ),
+    )
+    return json.loads(response.text)
+
+
+def _generate_with_openai(
+    config: AIProviderConfig,
+    system_instruction: str,
+    contents: str,
+) -> dict:
+    headers = {
+        "Authorization": f"Bearer {config.openai_api_key}",
+        "Content-Type": "application/json",
+    }
+    if config.openai_organization:
+        headers["OpenAI-Organization"] = config.openai_organization
+    if config.openai_project:
+        headers["OpenAI-Project"] = config.openai_project
+    payload = {
+        "model": config.model,
+        "instructions": system_instruction,
+        "input": contents,
+    }
+    data = _post_json("https://api.openai.com/v1/responses", payload, headers)
+    text = data.get("output_text")
+    if not text:
+        chunks = []
+        for item in data.get("output", []):
+            for content in item.get("content", []):
+                if isinstance(content, dict) and content.get("text"):
+                    chunks.append(content["text"])
+        text = "\n".join(chunks)
+    return _parse_json_text(text)
+
+
+def _generate_with_anthropic(
+    config: AIProviderConfig,
+    system_instruction: str,
+    contents: str,
+) -> dict:
+    payload = {
+        "model": config.model,
+        "max_tokens": 600,
+        "system": system_instruction,
+        "messages": [{"role": "user", "content": contents}],
+    }
+    headers = {
+        "x-api-key": config.anthropic_api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    data = _post_json("https://api.anthropic.com/v1/messages", payload, headers)
+    text = "\n".join(
+        part.get("text", "")
+        for part in data.get("content", [])
+        if isinstance(part, dict)
+    )
+    return _parse_json_text(text)
+
+
+def _generate_with_ollama(
+    config: AIProviderConfig,
+    system_instruction: str,
+    contents: str,
+) -> dict:
+    payload = {
+        "model": config.model,
+        "stream": False,
+        "format": "json",
+        "messages": [
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": contents},
+        ],
+    }
+    base_url = config.ollama_base_url.rstrip("/")
+    data = _post_json(f"{base_url}/api/chat", payload, {"Content-Type": "application/json"})
+    text = data.get("message", {}).get("content", "")
+    return _parse_json_text(text)
+
+
+def _parse_json_text(text: str) -> dict:
+    if not text:
+        raise ValueError("Provider returned empty text")
+    text = text.strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        raise ValueError("Provider returned non-JSON output")
+    return json.loads(text[start:end + 1])
+
+
+def _post_json(url: str, payload: dict, headers: dict[str, str]) -> dict:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="ignore")
+        logger.warning("AI provider HTTP error %s for %s: %s", exc.code, url, body)
+        raise

@@ -19,8 +19,16 @@ import {
   Copy,
   Trash2,
   LayoutDashboard,
+  Sparkles,
 } from 'lucide-react';
 import VacationSettings from '../components/VacationSettings';
+
+const AI_PROVIDER_LABELS = {
+  gemini: 'Google Gemini',
+  openai: 'OpenAI GPT',
+  anthropic: 'Anthropic Claude',
+  ollama: 'Ollama',
+};
 
 function UpdatePanel({ isAdmin }) {
   const [version, setVersion] = useState(null);
@@ -221,6 +229,15 @@ export default function Settings() {
   const [dashboardToken, setDashboardToken] = useState(null);
   const [dashboardTokenLoading, setDashboardTokenLoading] = useState(false);
   const [dashboardCopied, setDashboardCopied] = useState(false);
+  const [aiSettings, setAiSettings] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiSaveMsg, setAiSaveMsg] = useState('');
+  const [aiSecretInputs, setAiSecretInputs] = useState({
+    gemini_api_key: '',
+    openai_api_key: '',
+    anthropic_api_key: '',
+  });
 
   const fetchDashboardToken = useCallback(async () => {
     try {
@@ -309,16 +326,34 @@ export default function Settings() {
     }
   }, []);
 
+  const fetchAiSettings = useCallback(async () => {
+    setAiLoading(true);
+    try {
+      const data = await api('/api/admin/settings/ai');
+      setAiSettings({
+        ...data,
+        clear_gemini_api_key: false,
+        clear_openai_api_key: false,
+        clear_anthropic_api_key: false,
+      });
+    } catch {
+      setAiSettings(null);
+    } finally {
+      setAiLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isParentOrAdmin) {
       fetchSettings();
       fetchAchievements();
       fetchDashboardToken();
+      fetchAiSettings();
     } else {
       setLoading(false);
       setError('Access denied. Only parents and admins can access settings.');
     }
-  }, [isParentOrAdmin, fetchSettings, fetchAchievements, fetchDashboardToken]);
+  }, [isParentOrAdmin, fetchSettings, fetchAchievements, fetchDashboardToken, fetchAiSettings]);
 
   const updateSetting = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -338,6 +373,77 @@ export default function Settings() {
       setTimeout(() => setSaveMsg(''), 3000);
     }
   };
+
+  const updateAiSetting = (key, value) => {
+    setAiSettings((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateAiSecretInput = (key, value) => {
+    setAiSecretInputs((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const saveAiSettings = async () => {
+    if (!aiSettings) return;
+    setAiSaving(true);
+    setAiSaveMsg('');
+    try {
+      const data = await api('/api/admin/settings/ai', {
+        method: 'PUT',
+        body: {
+          provider: aiSettings.provider,
+          model: aiSettings.model,
+          openai_organization: aiSettings.openai_organization || '',
+          openai_project: aiSettings.openai_project || '',
+          ollama_base_url: aiSettings.ollama_base_url || '',
+          gemini_api_key: aiSecretInputs.gemini_api_key || null,
+          openai_api_key: aiSecretInputs.openai_api_key || null,
+          anthropic_api_key: aiSecretInputs.anthropic_api_key || null,
+          clear_gemini_api_key: aiSettings.clear_gemini_api_key || false,
+          clear_openai_api_key: aiSettings.clear_openai_api_key || false,
+          clear_anthropic_api_key: aiSettings.clear_anthropic_api_key || false,
+        },
+      });
+      setAiSettings({
+        ...data,
+        clear_gemini_api_key: false,
+        clear_openai_api_key: false,
+        clear_anthropic_api_key: false,
+      });
+      setAiSecretInputs({
+        gemini_api_key: '',
+        openai_api_key: '',
+        anthropic_api_key: '',
+      });
+      setAiSaveMsg('AI settings saved!');
+      window.dispatchEvent(new CustomEvent('settings:updated'));
+    } catch (err) {
+      setAiSaveMsg(err.message || 'Failed to save AI settings');
+    } finally {
+      setAiSaving(false);
+      setTimeout(() => setAiSaveMsg(''), 4000);
+    }
+  };
+
+  const renderSecretField = (field, label, clearFlag) => (
+    <div className="space-y-2">
+      <label className="block text-cream text-sm">{label}</label>
+      <input
+        type="password"
+        value={aiSecretInputs[field]}
+        onChange={(e) => updateAiSecretInput(field, e.target.value)}
+        placeholder="Leave blank to keep current saved key"
+        className="field-input"
+      />
+      <label className="flex items-center gap-2 text-xs text-muted">
+        <input
+          type="checkbox"
+          checked={Boolean(aiSettings?.[clearFlag])}
+          onChange={(e) => updateAiSetting(clearFlag, e.target.checked)}
+        />
+        Clear saved key
+      </label>
+    </div>
+  );
 
   const updateAchievementPoints = async (achievement) => {
     setAchievementsSaving((prev) => ({ ...prev, [achievement.id]: true }));
@@ -457,6 +563,155 @@ export default function Settings() {
                 description="Enables /api/chores/{id}/debug for troubleshooting rotation and assignment issues. Requires parent login or API key."
               />
             </div>
+          </div>
+
+          <div className="game-panel p-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-accent" />
+              <h2 className="text-cream text-sm font-semibold">
+                AI Quest Generation
+              </h2>
+            </div>
+            <p className="text-muted text-xs leading-relaxed">
+              Choose which AI provider rewrites plain chores into quest text. Gemini stays the
+              default, but you can switch to OpenAI, Claude, or a local Ollama server.
+            </p>
+
+            {aiLoading && (
+              <div className="flex justify-center py-4">
+                <Loader2 size={20} className="text-accent animate-spin" />
+              </div>
+            )}
+
+            {!aiLoading && aiSettings && (
+              <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="block text-cream text-sm mb-1">Provider</label>
+                    <select
+                      value={aiSettings.provider}
+                      onChange={(e) => {
+                        const nextProvider = e.target.value;
+                        updateAiSetting('provider', nextProvider);
+                        updateAiSetting(
+                          'model',
+                          aiSettings.providers?.[nextProvider]?.default_model || ''
+                        );
+                      }}
+                      className="field-input"
+                    >
+                      {Object.entries(AI_PROVIDER_LABELS).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-cream text-sm mb-1">Model</label>
+                    <input
+                      type="text"
+                      value={aiSettings.model || ''}
+                      onChange={(e) => updateAiSetting('model', e.target.value)}
+                      className="field-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(AI_PROVIDER_LABELS).map(([provider, label]) => {
+                    const configured = aiSettings.providers?.[provider]?.configured;
+                    return (
+                      <span
+                        key={provider}
+                        className={`text-[11px] px-2 py-1 rounded-full border ${
+                          configured
+                            ? 'border-emerald/30 bg-emerald/10 text-emerald'
+                            : 'border-border bg-surface-raised/30 text-muted'
+                        }`}
+                      >
+                        {label}: {configured ? 'Configured' : 'Needs setup'}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                {aiSettings.provider === 'gemini' && (
+                  <>
+                    {renderSecretField('gemini_api_key', 'Gemini API Key', 'clear_gemini_api_key')}
+                    <p className="text-muted text-xs">
+                      Uses Google Gemini with an API key. Best default option for the family app.
+                    </p>
+                  </>
+                )}
+
+                {aiSettings.provider === 'openai' && (
+                  <div className="space-y-3">
+                    {renderSecretField('openai_api_key', 'OpenAI API Key', 'clear_openai_api_key')}
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div>
+                        <label className="block text-cream text-sm mb-1">Organization (optional)</label>
+                        <input
+                          type="text"
+                          value={aiSettings.openai_organization || ''}
+                          onChange={(e) => updateAiSetting('openai_organization', e.target.value)}
+                          className="field-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-cream text-sm mb-1">Project (optional)</label>
+                        <input
+                          type="text"
+                          value={aiSettings.openai_project || ''}
+                          onChange={(e) => updateAiSetting('openai_project', e.target.value)}
+                          className="field-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {aiSettings.provider === 'anthropic' && (
+                  <>
+                    {renderSecretField('anthropic_api_key', 'Anthropic API Key', 'clear_anthropic_api_key')}
+                    <p className="text-muted text-xs">
+                      Uses Claude via Anthropic&apos;s API. The app sends the required API version header automatically.
+                    </p>
+                  </>
+                )}
+
+                {aiSettings.provider === 'ollama' && (
+                  <div className="space-y-2">
+                    <label className="block text-cream text-sm">Ollama Base URL</label>
+                    <input
+                      type="text"
+                      value={aiSettings.ollama_base_url || ''}
+                      onChange={(e) => updateAiSetting('ollama_base_url', e.target.value)}
+                      className="field-input"
+                    />
+                    <p className="text-muted text-xs">
+                      Typical local value is http://localhost:11434. No API key is required unless your proxy adds one.
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={saveAiSettings}
+                  disabled={aiSaving}
+                  className="game-btn game-btn-gold flex items-center gap-2"
+                >
+                  {aiSaving ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Save size={14} />
+                  )}
+                  {aiSaving ? 'Saving AI Settings...' : 'Save AI Provider'}
+                </button>
+                {aiSaveMsg && (
+                  <p className={`text-sm ${aiSaveMsg.includes('!') ? 'text-emerald' : 'text-crimson'}`}>
+                    {aiSaveMsg}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Daily reset hour */}

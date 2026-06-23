@@ -540,6 +540,20 @@ class SettingsUpdate(BaseModel):
     settings: dict[str, str]
 
 
+class AISettingsUpdate(BaseModel):
+    provider: str = Field(min_length=1, max_length=20)
+    model: str = Field(min_length=1, max_length=100)
+    gemini_api_key: str | None = None
+    openai_api_key: str | None = None
+    anthropic_api_key: str | None = None
+    openai_organization: str | None = Field(default=None, max_length=100)
+    openai_project: str | None = Field(default=None, max_length=100)
+    ollama_base_url: str | None = Field(default=None, max_length=300)
+    clear_gemini_api_key: bool = False
+    clear_openai_api_key: bool = False
+    clear_anthropic_api_key: bool = False
+
+
 # Shoutouts
 class ShoutoutCreate(BaseModel):
     to_user_id: int

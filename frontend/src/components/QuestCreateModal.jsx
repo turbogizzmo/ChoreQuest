@@ -228,7 +228,7 @@ export default function QuestCreateModal({
               <div className="mt-3 space-y-2 border border-border rounded-lg p-3 bg-surface-raised/30">
                 <p className="text-muted text-xs">
                   Describe a chore in plain words and avoid names or private details.
-                  Uses Google Gemini to style it as a quest.
+                  Uses your configured AI provider to style it as a quest.
                 </p>
                 <p className="text-muted text-xs">
                   Up to 5 generations every 5 minutes. Suggested XP is capped for balance.
