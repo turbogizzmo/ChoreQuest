@@ -345,7 +345,7 @@ _AI_QUEST_RATE_LIMIT_MAX_REQUESTS = 5
 _AI_QUEST_RATE_LIMIT_WINDOW_SECONDS = 300
 _AI_QUEST_MAX_POINTS = 50
 
-# Fallback style anchors used only when the family has no chores yet.
+# Static style anchors used for tone guidance in every AI generation request.
 _SEED_STYLE_EXAMPLES = [
     (
         "The Chamber of Rest",
@@ -378,12 +378,6 @@ _GEMINI_RESPONSE_SCHEMA = {
     },
     "required": ["title", "description", "points", "difficulty", "category_name"],
 }
-
-
-def gemini_enabled() -> bool:
-    """True when a Gemini API key is configured in the environment."""
-    return bool(os.environ.get("GEMINI_API_KEY"))
-
 
 def _build_ai_example_block() -> str:
     """Use static style anchors so family chore data never leaves the app."""
