@@ -13,35 +13,33 @@ from tests.unit.conftest import make_category, make_chore, make_user
 
 
 def _install_fake_google(monkeypatch, response_payload, captured):
-    class FakeInteractions:
-        async def create(
-            self,
-            *,
-            model,
-            input,
-            system_instruction,
-            response_format,
-            generation_config,
-        ):
+    class FakeModels:
+        async def generate_content(self, *, model, contents, config):
             captured["model"] = model
-            captured["contents"] = input
-            captured["system_instruction"] = system_instruction
-            captured["response_format"] = response_format
-            captured["generation_config"] = generation_config
-            return types.SimpleNamespace(output_text=json.dumps(response_payload))
+            captured["contents"] = contents
+            captured["config"] = config
+            return types.SimpleNamespace(text=json.dumps(response_payload))
 
     class FakeClient:
         def __init__(self, api_key):
             captured["api_key"] = api_key
-            self.aio = types.SimpleNamespace(interactions=FakeInteractions())
+            self.aio = types.SimpleNamespace(models=FakeModels())
+
+    def fake_generate_content_config(**kwargs):
+        captured["config_kwargs"] = kwargs
+        return types.SimpleNamespace(**kwargs)
 
     google_module = types.ModuleType("google")
     genai_module = types.ModuleType("google.genai")
     genai_module.Client = FakeClient
+    genai_types_module = types.ModuleType("google.genai.types")
+    genai_types_module.GenerateContentConfig = fake_generate_content_config
+    genai_module.types = genai_types_module
     google_module.genai = genai_module
 
     monkeypatch.setitem(sys.modules, "google", google_module)
     monkeypatch.setitem(sys.modules, "google.genai", genai_module)
+    monkeypatch.setitem(sys.modules, "google.genai.types", genai_types_module)
 
 
 @pytest.mark.asyncio

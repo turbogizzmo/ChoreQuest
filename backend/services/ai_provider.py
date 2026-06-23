@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PROVIDER = "gemini"
 DEFAULT_MODELS = {
-    "gemini": "gemini-3.5-flash",
+    "gemini": "gemini-2.0-flash",
     "openai": "gpt-5.5-mini",
     "anthropic": "claude-sonnet-4-5",
     "ollama": "gemma3",
@@ -390,6 +390,7 @@ async def _generate_with_gemini(
     contents: str,
 ) -> dict:
     from google import genai
+    from google.genai import types
 
     response_schema = {
         "type": "object",
@@ -406,22 +407,18 @@ async def _generate_with_gemini(
         "required": ["title", "description", "points", "difficulty", "category_name"],
     }
     client = genai.Client(api_key=config.gemini_api_key)
-    interaction = await client.aio.interactions.create(
+    response = await client.aio.models.generate_content(
         model=config.model,
-        input=contents,
-        system_instruction=system_instruction,
-        response_format={
-            "type": "text",
-            "mime_type": "application/json",
-            "schema": response_schema,
-        },
-        generation_config={
-            "temperature": 0.9,
-            "max_output_tokens": 600,
-            "thinking_level": "low",
-        },
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction=system_instruction,
+            response_mime_type="application/json",
+            response_schema=response_schema,
+            temperature=0.9,
+            max_output_tokens=600,
+        ),
     )
-    return json.loads(interaction.output_text)
+    return json.loads(response.text)
 
 
 def _generate_with_openai(
