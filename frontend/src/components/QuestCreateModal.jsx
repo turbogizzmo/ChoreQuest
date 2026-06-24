@@ -74,6 +74,8 @@ export default function QuestCreateModal({
           ? [editingChore.title, editingChore.description]
               .filter(Boolean)
               .join(' — ')
+              // Clamp to backend QuestGenerateRequest.max_length limit.
+              .slice(0, 300)
           : ''
       );
       setAiError('');

@@ -189,8 +189,6 @@ def test_default_anthropic_model_is_current():
     assert DEFAULT_MODELS["anthropic"] == "claude-haiku-4-5"
 
 
-
-
 def test_get_json_redacts_query_in_error_logs(monkeypatch):
     from backend.services import ai_provider
 
