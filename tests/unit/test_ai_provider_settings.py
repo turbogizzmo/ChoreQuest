@@ -146,3 +146,24 @@ def test_map_ai_provider_error_for_gemini_retired_model():
     )
     assert error.status_code == 503
     assert "no longer available" in error.detail.lower()
+
+
+def test_map_ai_provider_error_for_unsupported_gemini_model():
+    # The interactions API rejects unsupported model families (e.g. gemini-2.0)
+    # with a 400; surface an actionable message instead of a generic 502.
+    error = _map_ai_provider_error(
+        "gemini",
+        RuntimeError(
+            "Error code: 400 - {'error': {'message': 'Model family "
+            "gemini-2.0 is not supported.', 'code': 'invalid_request'}}"
+        ),
+    )
+    assert error.status_code == 503
+    assert "isn't supported" in error.detail
+    assert "Family Settings" in error.detail
+
+
+def test_default_gemini_model_is_a_supported_family():
+    # gemini-2.0-* is rejected by the interactions API; the default must not be it.
+    assert DEFAULT_MODELS["gemini"] == "gemini-flash-latest"
+    assert not DEFAULT_MODELS["gemini"].startswith("gemini-2.0")

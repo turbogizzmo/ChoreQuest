@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PROVIDER = "gemini"
 DEFAULT_MODELS = {
-    "gemini": "gemini-3.5-flash",
+    "gemini": "gemini-flash-latest",
     "openai": "gpt-5.5-mini",
     "anthropic": "claude-sonnet-4-5",
     "ollama": "gemma3",
@@ -534,6 +534,11 @@ def _map_ai_provider_error(provider: str, exc: Exception) -> HTTPException:
             return HTTPException(
                 status_code=503,
                 detail="Gemini quota exceeded. Update the Gemini key/project or switch providers.",
+            )
+        if "not supported" in lower or "model family" in lower:
+            return HTTPException(
+                status_code=503,
+                detail="The configured Gemini model isn't supported. Choose a current model (e.g. gemini-flash-latest) in Family Settings → AI Quest Generation.",
             )
         if "404" in text and "no longer available" in lower:
             return HTTPException(
