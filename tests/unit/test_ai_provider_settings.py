@@ -1,3 +1,6 @@
+import io
+import urllib.error
+
 import pytest
 
 from fastapi import HTTPException
@@ -6,6 +9,7 @@ from backend.models import AppSetting, UserRole
 from backend.services.ai_provider import (
     AIProviderConfig,
     DEFAULT_MODELS,
+    _get_json,
     _map_ai_provider_error,
     ai_generation_available,
     coerce_generated_quest,
@@ -183,6 +187,39 @@ def test_default_gemini_model_is_a_supported_family():
 def test_default_anthropic_model_is_current():
     # claude-sonnet-4-5 is older; default should be a current model.
     assert DEFAULT_MODELS["anthropic"] == "claude-haiku-4-5"
+
+
+
+
+def test_get_json_redacts_query_in_error_logs(monkeypatch):
+    from backend.services import ai_provider
+
+    captured_log = {}
+
+    def fake_urlopen(request, **kwargs):
+        raise urllib.error.HTTPError(
+            request.full_url,
+            403,
+            "forbidden",
+            hdrs=None,
+            fp=io.BytesIO(b'{"error":"bad key"}'),
+        )
+
+    def fake_warning(message, *args):
+        captured_log["message"] = message
+        captured_log["args"] = args
+
+    monkeypatch.setattr(ai_provider.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(ai_provider.logger, "warning", fake_warning)
+
+    with pytest.raises(urllib.error.HTTPError):
+        _get_json(
+            "https://example.test/v1/models?pageSize=1000&key=super-secret",
+            {"Content-Type": "application/json"},
+        )
+
+    assert captured_log["message"] == "AI provider HTTP GET error %s"
+    assert captured_log["args"][0] == 403
 
 
 @pytest.mark.asyncio
