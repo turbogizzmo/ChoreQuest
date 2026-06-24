@@ -390,18 +390,22 @@ export default function Settings() {
     setAiModelsLoading(true);
     setAiModelsMsg('');
     try {
+      const body = {
+        provider: aiSettings.provider,
+        openai_organization: aiSettings.openai_organization || null,
+        openai_project: aiSettings.openai_project || null,
+        ollama_base_url: aiSettings.ollama_base_url || null,
+      };
+      if (aiSettings.provider === 'gemini') {
+        body.gemini_api_key = aiSecretInputs.gemini_api_key || null;
+      } else if (aiSettings.provider === 'openai') {
+        body.openai_api_key = aiSecretInputs.openai_api_key || null;
+      } else if (aiSettings.provider === 'anthropic') {
+        body.anthropic_api_key = aiSecretInputs.anthropic_api_key || null;
+      }
       const data = await api('/api/admin/settings/ai/models', {
         method: 'POST',
-        body: {
-          provider: aiSettings.provider,
-          // Send freshly-typed (unsaved) keys so models load before saving.
-          gemini_api_key: aiSecretInputs.gemini_api_key || null,
-          openai_api_key: aiSecretInputs.openai_api_key || null,
-          anthropic_api_key: aiSecretInputs.anthropic_api_key || null,
-          openai_organization: aiSettings.openai_organization || null,
-          openai_project: aiSettings.openai_project || null,
-          ollama_base_url: aiSettings.ollama_base_url || null,
-        },
+        body,
       });
       const models = Array.isArray(data.models) ? data.models : [];
       setAiModels(models);

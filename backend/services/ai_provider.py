@@ -543,8 +543,8 @@ def _get_json(url: str, headers: dict[str, str]) -> dict:
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="ignore")
-        logger.warning("AI provider HTTP error %s for %s: %s", exc.code, url, body)
+        _ = exc.read()
+        logger.warning("AI provider HTTP GET error %s", exc.code)
         raise
 
 
