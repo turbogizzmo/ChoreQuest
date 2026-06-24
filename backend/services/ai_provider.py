@@ -537,6 +537,13 @@ def _post_json(url: str, payload: dict, headers: dict[str, str]) -> dict:
         raise
 
 
+def _safe_url_for_log(url: str) -> str:
+    parts = urllib.parse.urlsplit(url)
+    if not parts.query:
+        return url
+    return urllib.parse.urlunsplit((parts.scheme, parts.netloc, parts.path, "", parts.fragment))
+
+
 def _get_json(url: str, headers: dict[str, str]) -> dict:
     request = urllib.request.Request(url, headers=headers, method="GET")
     try:
@@ -544,7 +551,12 @@ def _get_json(url: str, headers: dict[str, str]) -> dict:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="ignore")
-        logger.warning("AI provider HTTP error %s for %s: %s", exc.code, url, body)
+        logger.warning(
+            "AI provider HTTP error %s for %s: %s",
+            exc.code,
+            _safe_url_for_log(url),
+            body,
+        )
         raise
 
 
