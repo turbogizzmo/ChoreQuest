@@ -69,7 +69,13 @@ export default function QuestCreateModal({
       setFormError('');
       setShowTemplates(false);
       setShowAi(false);
-      setAiPrompt('');
+      setAiPrompt(
+        editingChore
+          ? [editingChore.title, editingChore.description]
+              .filter(Boolean)
+              .join(' — ')
+          : ''
+      );
       setAiError('');
     }
   }, [isOpen, editingChore]);
@@ -212,8 +218,8 @@ export default function QuestCreateModal({
           </div>
         )}
 
-        {/* AI generate panel (only when creating + an AI provider is configured) */}
-        {!editingChore && aiEnabled && (
+        {/* AI generate panel */}
+        {aiEnabled && (
           <div>
             <button
               type="button"
@@ -221,14 +227,19 @@ export default function QuestCreateModal({
               className="flex items-center gap-2 text-accent text-sm hover:text-accent/80 transition-colors"
             >
               <Sparkles size={14} />
-              {showAi ? 'Hide AI helper' : 'Generate with AI'}
+              {showAi
+                ? 'Hide AI helper'
+                : editingChore
+                  ? 'Rewrite with AI'
+                  : 'Generate with AI'}
             </button>
 
             {showAi && (
               <div className="mt-3 space-y-2 border border-border rounded-lg p-3 bg-surface-raised/30">
                 <p className="text-muted text-xs">
-                  Describe a chore in plain words and avoid names or private details.
-                  Uses your configured AI provider to style it as a quest.
+                  {editingChore
+                    ? 'Describe how you want this quest improved, or edit the current text before rewriting it with your configured AI provider.'
+                    : 'Describe a chore in plain words and avoid names or private details. Uses your configured AI provider to style it as a quest.'}
                 </p>
                 <p className="text-muted text-xs">
                   Up to 5 generations every 5 minutes. Suggested XP is capped for balance.
@@ -236,7 +247,11 @@ export default function QuestCreateModal({
                 <textarea
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="e.g. clean the garage"
+                  placeholder={
+                    editingChore
+                      ? 'e.g. make this sound more adventurous but keep the task clear'
+                      : 'e.g. clean the garage'
+                  }
                   rows={2}
                   maxLength={300}
                   className="field-input resize-none"
@@ -251,7 +266,11 @@ export default function QuestCreateModal({
                   className="game-btn game-btn-gold flex items-center gap-2"
                 >
                   <Sparkles size={14} />
-                  {aiLoading ? 'Consulting the oracle...' : 'Generate Quest'}
+                  {aiLoading
+                    ? 'Consulting the oracle...'
+                    : editingChore
+                      ? 'Rewrite Quest'
+                      : 'Generate Quest'}
                 </button>
               </div>
             )}
