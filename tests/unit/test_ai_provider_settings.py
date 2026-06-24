@@ -189,10 +189,10 @@ def test_default_anthropic_model_is_current():
     assert DEFAULT_MODELS["anthropic"] == "claude-haiku-4-5"
 
 
-def test_get_json_redacts_query_string_in_http_error_logs(monkeypatch):
+def test_get_json_redacts_query_in_error_logs(monkeypatch):
     from backend.services import ai_provider
 
-    captured = {}
+    captured_log = {}
 
     def fake_urlopen(request, timeout=30):
         raise urllib.error.HTTPError(
@@ -204,8 +204,8 @@ def test_get_json_redacts_query_string_in_http_error_logs(monkeypatch):
         )
 
     def fake_warning(message, *args):
-        captured["message"] = message
-        captured["args"] = args
+        captured_log["message"] = message
+        captured_log["args"] = args
 
     monkeypatch.setattr(ai_provider.urllib.request, "urlopen", fake_urlopen)
     monkeypatch.setattr(ai_provider.logger, "warning", fake_warning)
@@ -216,11 +216,10 @@ def test_get_json_redacts_query_string_in_http_error_logs(monkeypatch):
             {"Content-Type": "application/json"},
         )
 
-    assert captured["message"] == "AI provider HTTP error %s for %s: %s"
-    assert captured["args"][0] == 403
-    assert captured["args"][1] == "https://example.test/v1/models"
-    assert "super-secret" not in captured["args"][1]
-    assert captured["args"][2] == '{"error":"bad key"}'
+    assert captured_log["message"] == "AI provider HTTP error %s for %s"
+    assert captured_log["args"][0] == 403
+    assert captured_log["args"][1] == "https://example.test/v1/models"
+    assert "super-secret" not in captured_log["args"][1]
 
 
 @pytest.mark.asyncio

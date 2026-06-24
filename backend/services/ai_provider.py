@@ -538,6 +538,12 @@ def _post_json(url: str, payload: dict, headers: dict[str, str]) -> dict:
 
 
 def _safe_url_for_log(url: str) -> str:
+    """Strip query parameters before logging provider URLs.
+
+    Some providers, such as Gemini model discovery, place API keys in the query
+    string. Logging only the base URL avoids leaking secrets while still
+    preserving enough context to identify the failing endpoint.
+    """
     parts = urllib.parse.urlsplit(url)
     if not parts.query:
         return url
@@ -550,13 +556,8 @@ def _get_json(url: str, headers: dict[str, str]) -> dict:
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="ignore")
-        logger.warning(
-            "AI provider HTTP error %s for %s: %s",
-            exc.code,
-            _safe_url_for_log(url),
-            body,
-        )
+        exc.read()
+        logger.warning("AI provider HTTP error %s for %s", exc.code, _safe_url_for_log(url))
         raise
 
 
