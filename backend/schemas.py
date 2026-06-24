@@ -554,6 +554,18 @@ class AISettingsUpdate(BaseModel):
     clear_anthropic_api_key: bool = False
 
 
+class AIModelListRequest(BaseModel):
+    # Request to list available models for a provider. Optional secret/url
+    # fields let the UI load models with a freshly-typed (unsaved) key.
+    provider: str = Field(min_length=1, max_length=20)
+    gemini_api_key: str | None = None
+    openai_api_key: str | None = None
+    anthropic_api_key: str | None = None
+    openai_organization: str | None = Field(default=None, max_length=100)
+    openai_project: str | None = Field(default=None, max_length=100)
+    ollama_base_url: str | None = Field(default=None, max_length=300)
+
+
 # Shoutouts
 class ShoutoutCreate(BaseModel):
     to_user_id: int

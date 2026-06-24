@@ -23,10 +23,16 @@ from backend.schemas import (
     AuditLogResponse,
     SettingsUpdate,
     AISettingsUpdate,
+    AIModelListRequest,
 )
 from backend.auth import hash_password
 from backend.dependencies import require_admin, require_parent, get_current_user
-from backend.services.ai_provider import get_ai_settings_payload, save_ai_settings, ai_generation_available
+from backend.services.ai_provider import (
+    get_ai_settings_payload,
+    save_ai_settings,
+    ai_generation_available,
+    list_models_for_request,
+)
 from backend.services.secure_settings import SENSITIVE_SETTING_KEYS
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -348,6 +354,20 @@ async def update_ai_settings(
     _parent: User = Depends(require_parent),
 ):
     return await save_ai_settings(db, body)
+
+
+@router.post("/settings/ai/models")
+async def list_ai_models(
+    body: AIModelListRequest,
+    db: AsyncSession = Depends(get_db),
+    _parent: User = Depends(require_parent),
+):
+    """List available models for a provider (for the Settings dropdown).
+
+    Accepts an optional, not-yet-saved API key so the UI can load models right
+    after a key is typed, before it is persisted.
+    """
+    return {"models": await list_models_for_request(db, body)}
 
 
 # ---------- PUT /settings ----------
