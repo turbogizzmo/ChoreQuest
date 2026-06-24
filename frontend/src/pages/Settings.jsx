@@ -238,6 +238,9 @@ export default function Settings() {
     openai_api_key: '',
     anthropic_api_key: '',
   });
+  const [aiModels, setAiModels] = useState([]);
+  const [aiModelsLoading, setAiModelsLoading] = useState(false);
+  const [aiModelsMsg, setAiModelsMsg] = useState('');
 
   const fetchDashboardToken = useCallback(async () => {
     try {
@@ -380,6 +383,37 @@ export default function Settings() {
 
   const updateAiSecretInput = (key, value) => {
     setAiSecretInputs((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const loadAiModels = async () => {
+    if (!aiSettings) return;
+    setAiModelsLoading(true);
+    setAiModelsMsg('');
+    try {
+      const data = await api('/api/admin/settings/ai/models', {
+        method: 'POST',
+        body: {
+          provider: aiSettings.provider,
+          // Send freshly-typed (unsaved) keys so models load before saving.
+          gemini_api_key: aiSecretInputs.gemini_api_key || null,
+          openai_api_key: aiSecretInputs.openai_api_key || null,
+          anthropic_api_key: aiSecretInputs.anthropic_api_key || null,
+          openai_organization: aiSettings.openai_organization || null,
+          openai_project: aiSettings.openai_project || null,
+          ollama_base_url: aiSettings.ollama_base_url || null,
+        },
+      });
+      const models = Array.isArray(data.models) ? data.models : [];
+      setAiModels(models);
+      setAiModelsMsg(
+        models.length ? `Loaded ${models.length} models.` : 'No models returned.'
+      );
+    } catch (err) {
+      setAiModels([]);
+      setAiModelsMsg(err.message || 'Could not load models.');
+    } finally {
+      setAiModelsLoading(false);
+    }
   };
 
   const saveAiSettings = async () => {
@@ -601,6 +635,9 @@ export default function Settings() {
                           'model',
                           aiSettings.providers?.[nextProvider]?.default_model || ''
                         );
+                        // Model list is provider-specific — reset it.
+                        setAiModels([]);
+                        setAiModelsMsg('');
                       }}
                       className="field-input"
                     >
@@ -611,12 +648,34 @@ export default function Settings() {
                   </div>
                   <div>
                     <label className="block text-cream text-sm mb-1">Model</label>
-                    <input
-                      type="text"
-                      value={aiSettings.model || ''}
-                      onChange={(e) => updateAiSetting('model', e.target.value)}
-                      className="field-input"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        list="ai-model-options"
+                        value={aiSettings.model || ''}
+                        onChange={(e) => updateAiSetting('model', e.target.value)}
+                        placeholder="Pick from the list or type a model id"
+                        className="field-input flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={loadAiModels}
+                        disabled={aiModelsLoading}
+                        className="game-btn game-btn-blue whitespace-nowrap"
+                      >
+                        {aiModelsLoading ? 'Loading…' : 'Load models'}
+                      </button>
+                    </div>
+                    <datalist id="ai-model-options">
+                      {aiModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label && m.label !== m.id ? m.label : m.id}
+                        </option>
+                      ))}
+                    </datalist>
+                    {aiModelsMsg && (
+                      <p className="text-muted text-xs mt-1">{aiModelsMsg}</p>
+                    )}
                   </div>
                 </div>
 

@@ -21,7 +21,7 @@ DEFAULT_PROVIDER = "gemini"
 DEFAULT_MODELS = {
     "gemini": "gemini-flash-latest",
     "openai": "gpt-5.5-mini",
-    "anthropic": "claude-sonnet-4-5",
+    "anthropic": "claude-haiku-4-5",
     "ollama": "gemma3",
 }
 SUPPORTED_AI_PROVIDERS = tuple(DEFAULT_MODELS.keys())
@@ -278,6 +278,17 @@ async def save_ai_settings(db: AsyncSession, body) -> dict:
         else:
             db.add(AppSetting(key=setting_key, value=encrypted))
 
+    # Validate the resulting config against the live provider before persisting,
+    # so a model/key that won't work is rejected with an actionable message
+    # rather than silently saved and failing at generation time.
+    await db.flush()
+    config = await get_ai_provider_config(db)
+    try:
+        await validate_ai_config(config)
+    except HTTPException:
+        await db.rollback()
+        raise
+
     await db.commit()
     return await get_ai_settings_payload(db)
 
@@ -524,6 +535,247 @@ def _post_json(url: str, payload: dict, headers: dict[str, str]) -> dict:
         body = exc.read().decode("utf-8", errors="ignore")
         logger.warning("AI provider HTTP error %s for %s: %s", exc.code, url, body)
         raise
+
+
+def _get_json(url: str, headers: dict[str, str]) -> dict:
+    request = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="ignore")
+        logger.warning("AI provider HTTP error %s for %s: %s", exc.code, url, body)
+        raise
+
+
+# ---------------------------------------------------------------------------
+# Model discovery — list available models per provider for the Settings dropdown
+# ---------------------------------------------------------------------------
+
+def _list_gemini_models(config: AIProviderConfig) -> list[dict]:
+    # REST ListModels (consistent with the other providers, avoids SDK pager
+    # ambiguity). It reports generateContent support; the interactions API used
+    # for generation accepts a subset, so validate-on-save is the backstop.
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key="
+        + urllib.parse.quote(config.gemini_api_key, safe="")
+    )
+    data = _get_json(url, {"Content-Type": "application/json"})
+    models = []
+    for m in data.get("models", []):
+        name = m.get("name", "")
+        if not name.startswith("models/"):
+            continue
+        model_id = name[len("models/"):]
+        if "gemini" not in model_id:
+            continue
+        if "generateContent" not in (m.get("supportedGenerationMethods") or []):
+            continue
+        models.append({"id": model_id, "label": m.get("displayName") or model_id})
+    return models
+
+
+def _list_openai_models(config: AIProviderConfig) -> list[dict]:
+    headers = {"Authorization": f"Bearer {config.openai_api_key}"}
+    if config.openai_organization:
+        headers["OpenAI-Organization"] = config.openai_organization
+    if config.openai_project:
+        headers["OpenAI-Project"] = config.openai_project
+    data = _get_json("https://api.openai.com/v1/models", headers)
+    skip = (
+        "embedding", "whisper", "tts", "dall-e", "audio",
+        "image", "moderation", "realtime", "transcribe",
+    )
+    models = []
+    for m in data.get("data", []):
+        model_id = m.get("id", "")
+        if not model_id or any(tok in model_id for tok in skip):
+            continue
+        if not (
+            model_id.startswith("gpt")
+            or model_id.startswith("o")
+            or model_id.startswith("chatgpt")
+        ):
+            continue
+        models.append({"id": model_id, "label": model_id})
+    return models
+
+
+def _list_anthropic_models(config: AIProviderConfig) -> list[dict]:
+    headers = {
+        "x-api-key": config.anthropic_api_key,
+        "anthropic-version": "2023-06-01",
+    }
+    data = _get_json("https://api.anthropic.com/v1/models?limit=1000", headers)
+    models = []
+    for m in data.get("data", []):
+        model_id = m.get("id", "")
+        if model_id:
+            models.append({"id": model_id, "label": m.get("display_name") or model_id})
+    return models
+
+
+def _list_ollama_models(config: AIProviderConfig) -> list[dict]:
+    base_url = _validate_ollama_base_url(config.ollama_base_url).rstrip("/")
+    data = _get_json(f"{base_url}/api/tags", {"Content-Type": "application/json"})
+    models = []
+    for m in data.get("models", []):
+        name = m.get("name") or m.get("model")
+        if name:
+            models.append({"id": name, "label": name})
+    return models
+
+
+async def list_provider_models(config: AIProviderConfig) -> list[dict]:
+    provider = config.provider
+    secret_field = _PROVIDER_REQUIRED_SECRET_FIELD.get(provider)
+    if secret_field and not getattr(config, secret_field, "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Enter or save an API key first to load available models.",
+        )
+    try:
+        if provider == "gemini":
+            models = await asyncio.to_thread(_list_gemini_models, config)
+        elif provider == "openai":
+            models = await asyncio.to_thread(_list_openai_models, config)
+        elif provider == "anthropic":
+            models = await asyncio.to_thread(_list_anthropic_models, config)
+        elif provider == "ollama":
+            models = await asyncio.to_thread(_list_ollama_models, config)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported AI provider")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Listing models failed for provider %s", provider)
+        raise _map_ai_provider_error(provider, exc)
+    models.sort(key=lambda m: m["id"])
+    return models
+
+
+async def list_models_for_request(db: AsyncSession, body) -> list[dict]:
+    """List models for a provider, using a request-supplied (possibly unsaved)
+    key when present, else the saved/env key. Lets the Settings UI load models
+    with a freshly-typed key before it's persisted."""
+    provider = body.provider.strip().lower()
+    if provider not in SUPPORTED_AI_PROVIDERS:
+        raise HTTPException(status_code=400, detail="Unsupported AI provider")
+    base = await get_ai_provider_config(db)
+    config = AIProviderConfig(
+        provider=provider,
+        model=base.model,
+        gemini_api_key=(body.gemini_api_key or base.gemini_api_key or "").strip(),
+        openai_api_key=(body.openai_api_key or base.openai_api_key or "").strip(),
+        anthropic_api_key=(body.anthropic_api_key or base.anthropic_api_key or "").strip(),
+        openai_organization=(
+            body.openai_organization
+            if body.openai_organization is not None
+            else base.openai_organization
+        ),
+        openai_project=(
+            body.openai_project
+            if body.openai_project is not None
+            else base.openai_project
+        ),
+        ollama_base_url=(body.ollama_base_url or base.ollama_base_url or DEFAULT_OLLAMA_BASE_URL),
+    )
+    return await list_provider_models(config)
+
+
+# ---------------------------------------------------------------------------
+# Validate-on-save — probe the chosen provider+model so a broken config is
+# never persisted (the only reliable check that a model works with the API).
+# ---------------------------------------------------------------------------
+
+async def _probe_gemini(config: AIProviderConfig) -> None:
+    from google import genai
+
+    client = genai.Client(api_key=config.gemini_api_key)
+    # Mirror the generation call shape (interactions API) with a tiny request.
+    await client.aio.interactions.create(
+        model=config.model,
+        input="ping",
+        system_instruction="Reply with a short JSON object.",
+        response_format={
+            "type": "text",
+            "mime_type": "application/json",
+            "schema": {
+                "type": "object",
+                "properties": {"ok": {"type": "string"}},
+                "required": ["ok"],
+            },
+        },
+        generation_config={"max_output_tokens": 64, "thinking_level": "low"},
+    )
+
+
+def _probe_openai(config: AIProviderConfig) -> None:
+    headers = {
+        "Authorization": f"Bearer {config.openai_api_key}",
+        "Content-Type": "application/json",
+    }
+    if config.openai_organization:
+        headers["OpenAI-Organization"] = config.openai_organization
+    if config.openai_project:
+        headers["OpenAI-Project"] = config.openai_project
+    _post_json(
+        "https://api.openai.com/v1/responses",
+        {"model": config.model, "input": "ping", "max_output_tokens": 16},
+        headers,
+    )
+
+
+def _probe_anthropic(config: AIProviderConfig) -> None:
+    _post_json(
+        "https://api.anthropic.com/v1/messages",
+        {
+            "model": config.model,
+            "max_tokens": 16,
+            "messages": [{"role": "user", "content": "ping"}],
+        },
+        {
+            "x-api-key": config.anthropic_api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+    )
+
+
+def _probe_ollama(config: AIProviderConfig) -> None:
+    base_url = _validate_ollama_base_url(config.ollama_base_url).rstrip("/")
+    _post_json(
+        f"{base_url}/api/chat",
+        {
+            "model": config.model,
+            "stream": False,
+            "messages": [{"role": "user", "content": "ping"}],
+        },
+        {"Content-Type": "application/json"},
+    )
+
+
+async def validate_ai_config(config: AIProviderConfig) -> None:
+    """Probe the configured provider+model; raise a mapped HTTPException on
+    failure so we never persist a config that will 502 at generation time."""
+    if not config.is_configured:
+        return
+    try:
+        if config.provider == "gemini":
+            await _probe_gemini(config)
+        elif config.provider == "openai":
+            await asyncio.to_thread(_probe_openai, config)
+        elif config.provider == "anthropic":
+            await asyncio.to_thread(_probe_anthropic, config)
+        elif config.provider == "ollama":
+            await asyncio.to_thread(_probe_ollama, config)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning(
+            "AI config validation failed for provider %s: %s", config.provider, exc
+        )
+        raise _map_ai_provider_error(config.provider, exc)
 
 
 def _map_ai_provider_error(provider: str, exc: Exception) -> HTTPException:
