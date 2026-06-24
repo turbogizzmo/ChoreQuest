@@ -74,6 +74,7 @@ export default function QuestCreateModal({
           ? [editingChore.title, editingChore.description]
               .filter(Boolean)
               .join(' — ')
+              .slice(0, 300)
           : ''
       );
       setAiError('');
