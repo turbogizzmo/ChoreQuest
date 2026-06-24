@@ -18,6 +18,7 @@ const DIFFICULTY_OPTIONS = [
   { value: 'hard', label: 'Hard', level: 3 },
   { value: 'expert', label: 'Expert', level: 4 },
 ];
+const AI_PROMPT_MAX_LENGTH = 300;
 
 const selectClass =
   'bg-navy-light border border-border text-cream p-2 rounded text-sm ' +
@@ -74,7 +75,7 @@ export default function QuestCreateModal({
           ? [editingChore.title, editingChore.description]
               .filter(Boolean)
               .join(' — ')
-              .slice(0, 300)
+              .slice(0, AI_PROMPT_MAX_LENGTH)
           : ''
       );
       setAiError('');
@@ -254,7 +255,7 @@ export default function QuestCreateModal({
                       : 'e.g. clean the garage'
                   }
                   rows={2}
-                  maxLength={300}
+                  maxLength={AI_PROMPT_MAX_LENGTH}
                   className="field-input resize-none"
                 />
                 {aiError && (
