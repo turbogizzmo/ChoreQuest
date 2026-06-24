@@ -194,7 +194,7 @@ def test_get_json_redacts_query_in_error_logs(monkeypatch):
 
     captured_log = {}
 
-    def fake_urlopen(request, timeout=30):
+    def fake_urlopen(request, **kwargs):
         raise urllib.error.HTTPError(
             request.full_url,
             403,
@@ -216,10 +216,8 @@ def test_get_json_redacts_query_in_error_logs(monkeypatch):
             {"Content-Type": "application/json"},
         )
 
-    assert captured_log["message"] == "AI provider HTTP error %s for %s"
+    assert captured_log["message"] == "AI provider HTTP GET error %s"
     assert captured_log["args"][0] == 403
-    assert captured_log["args"][1] == "https://example.test/v1/models"
-    assert "super-secret" not in captured_log["args"][1]
 
 
 @pytest.mark.asyncio
