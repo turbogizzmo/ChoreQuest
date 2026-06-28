@@ -219,13 +219,13 @@ export default function Rewards() {
       });
       setForm((prev) => ({
         ...prev,
-        title: draft.title || prev.title,
-        description: draft.description || '',
+        title: draft.title ?? prev.title,
+        description: draft.description ?? prev.description,
         point_cost: draft.point_cost ?? prev.point_cost,
-        icon: draft.icon || '',
-        category: draft.category || '',
+        icon: draft.icon ?? prev.icon,
+        category: draft.category ?? prev.category,
       }));
-      setAiCostBasis(draft.cost_basis || '');
+      setAiCostBasis(draft.cost_basis ?? '');
     } catch (err) {
       setAiError(err.message || 'The oracle could not draft this reward.');
     } finally {
