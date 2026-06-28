@@ -460,13 +460,12 @@ async def generate_reward_draft(
     )
 
     try:
-        response_schema = _reward_response_schema()
         if config.provider == "gemini":
             data = await _generate_with_gemini(
                 config,
                 system_instruction,
                 contents,
-                response_schema=response_schema,
+                response_schema=_reward_response_schema(),
             )
         elif config.provider == "openai":
             data = await asyncio.to_thread(
@@ -474,7 +473,6 @@ async def generate_reward_draft(
                 config,
                 system_instruction,
                 contents,
-                response_schema,
             )
         elif config.provider == "anthropic":
             data = await asyncio.to_thread(
@@ -482,7 +480,6 @@ async def generate_reward_draft(
                 config,
                 system_instruction,
                 contents,
-                response_schema,
             )
         elif config.provider == "ollama":
             data = await asyncio.to_thread(
@@ -490,7 +487,6 @@ async def generate_reward_draft(
                 config,
                 system_instruction,
                 contents,
-                response_schema,
             )
         else:
             raise HTTPException(status_code=400, detail="Unsupported AI provider")
@@ -597,9 +593,7 @@ def _generate_with_openai(
     config: AIProviderConfig,
     system_instruction: str,
     contents: str,
-    response_schema: dict | None = None,
 ) -> dict:
-    response_schema = response_schema or _quest_response_schema()
     headers = {
         "Authorization": f"Bearer {config.openai_api_key}",
         "Content-Type": "application/json",
@@ -612,17 +606,6 @@ def _generate_with_openai(
         "model": config.model,
         "instructions": system_instruction,
         "input": contents,
-        "text": {
-            "format": {
-                "type": "json_schema",
-                "name": "ai_draft",
-                "strict": True,
-                "schema": {
-                    **response_schema,
-                    "additionalProperties": False,
-                },
-            }
-        },
     }
     data = _post_json("https://api.openai.com/v1/responses", payload, headers)
     text = data.get("output_text")
@@ -640,21 +623,11 @@ def _generate_with_anthropic(
     config: AIProviderConfig,
     system_instruction: str,
     contents: str,
-    response_schema: dict | None = None,
 ) -> dict:
-    response_schema = response_schema or _quest_response_schema()
     payload = {
         "model": config.model,
         "max_tokens": 600,
         "system": system_instruction,
-        "tools": [
-            {
-                "name": "emit_ai_draft",
-                "description": "Return the structured draft.",
-                "input_schema": response_schema,
-            }
-        ],
-        "tool_choice": {"type": "tool", "name": "emit_ai_draft"},
         "messages": [{"role": "user", "content": contents}],
     }
     headers = {
@@ -663,9 +636,6 @@ def _generate_with_anthropic(
         "content-type": "application/json",
     }
     data = _post_json("https://api.anthropic.com/v1/messages", payload, headers)
-    for part in data.get("content", []):
-        if isinstance(part, dict) and part.get("type") == "tool_use":
-            return part.get("input") or {}
     text = "\n".join(
         part.get("text", "")
         for part in data.get("content", [])
@@ -678,16 +648,11 @@ def _generate_with_ollama(
     config: AIProviderConfig,
     system_instruction: str,
     contents: str,
-    response_schema: dict | None = None,
 ) -> dict:
-    response_schema = response_schema or _quest_response_schema()
     payload = {
         "model": config.model,
         "stream": False,
-        "format": {
-            **response_schema,
-            "additionalProperties": False,
-        },
+        "format": "json",
         "messages": [
             {"role": "system", "content": system_instruction},
             {"role": "user", "content": contents},
