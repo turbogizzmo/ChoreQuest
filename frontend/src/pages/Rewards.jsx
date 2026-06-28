@@ -182,12 +182,12 @@ export default function Rewards() {
       description: form.description.trim(),
       point_cost: Number(form.point_cost),
       icon: form.icon || undefined,
-        category: form.category.trim() || undefined,
-      };
+      category: form.category.trim() || undefined,
+    };
 
-      if (form.stock !== '') {
-        body.stock = Number(form.stock);
-      }
+    if (form.stock !== '') {
+      body.stock = Number(form.stock);
+    }
 
     try {
       if (editingReward) {

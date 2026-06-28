@@ -29,6 +29,7 @@ AI_QUEST_RATE_LIMIT_MAX_REQUESTS = 5
 AI_QUEST_RATE_LIMIT_WINDOW_SECONDS = 300
 AI_QUEST_MAX_POINTS = 50
 AI_REWARD_MAX_POINT_COST = 5000
+AI_REWARD_XP_PER_DOLLAR = 10
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 
 _SETTING_DEFAULTS = {
@@ -447,8 +448,9 @@ async def generate_reward_draft(
         "short inviting title and a clear 1-2 sentence description. If the idea "
         "looks like a real-world item or paid experience, estimate a reasonable "
         "current USD cost from general market knowledge, then convert that to a "
-        "point_cost using roughly 10 XP per US dollar and round to a tidy whole "
-        "number. If the reward is non-monetary, suggest a fair point_cost based "
+        f"point_cost using roughly {AI_REWARD_XP_PER_DOLLAR} XP per US dollar "
+        "and round to a tidy whole number. If the reward is non-monetary, "
+        "suggest a fair point_cost based "
         "on desirability, exclusivity, and how often it can be redeemed. Suggest "
         "a short category label and a single emoji icon. Respond with JSON only "
         "using keys title, description, point_cost, category, icon, and cost_basis."
@@ -461,6 +463,10 @@ async def generate_reward_draft(
 
     try:
         if config.provider == "gemini":
+            # Gemini already has a stable schema-aware path in this codebase, so
+            # reward drafts use that for extra structure while the other
+            # providers continue using the existing prompt-plus-JSON parsing
+            # behavior to avoid changing their transport contracts here.
             data = await _generate_with_gemini(
                 config,
                 system_instruction,
