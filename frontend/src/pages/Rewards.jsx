@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import { useSettings } from '../hooks/useSettings';
 import Modal from '../components/Modal';
 import Inventory from './Inventory';
 import Wishlist from './Wishlist';
@@ -14,7 +15,6 @@ import {
   Coins,
   Package,
   Sparkles,
-  Gift,
   Star,
   Palette,
   Filter,
@@ -38,9 +38,9 @@ const TABS = [
 ];
 
 export default function Rewards() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, updateUser } = useAuth();
+  const { ai_quest_generation: aiEnabled } = useSettings();
   const isParent = user?.role === 'parent' || user?.role === 'admin';
   const isKid = user?.role === 'kid';
 
@@ -56,6 +56,11 @@ export default function Rewards() {
   const [form, setForm] = useState({ ...emptyForm });
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showAi, setShowAi] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [aiCostBasis, setAiCostBasis] = useState('');
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -115,6 +120,10 @@ export default function Rewards() {
     setEditingReward(null);
     setForm({ ...emptyForm });
     setFormError('');
+    setShowAi(false);
+    setAiPrompt('');
+    setAiError('');
+    setAiCostBasis('');
     setShowModal(true);
   };
 
@@ -129,6 +138,15 @@ export default function Rewards() {
       category: reward.category || '',
     });
     setFormError('');
+    setShowAi(false);
+    setAiPrompt(
+      [reward.title, reward.description, reward.category]
+        .filter(Boolean)
+        .join(' — ')
+        .slice(0, 500)
+    );
+    setAiError('');
+    setAiCostBasis('');
     setShowModal(true);
   };
 
@@ -136,6 +154,10 @@ export default function Rewards() {
     setShowModal(false);
     setEditingReward(null);
     setFormError('');
+    setShowAi(false);
+    setAiLoading(false);
+    setAiError('');
+    setAiCostBasis('');
   };
 
   const updateForm = (field, value) => {
@@ -160,12 +182,12 @@ export default function Rewards() {
       description: form.description.trim(),
       point_cost: Number(form.point_cost),
       icon: form.icon || undefined,
-      category: form.category.trim() || undefined,
-    };
+        category: form.category.trim() || undefined,
+      };
 
-    if (form.stock !== '') {
-      body.stock = Number(form.stock);
-    }
+      if (form.stock !== '') {
+        body.stock = Number(form.stock);
+      }
 
     try {
       if (editingReward) {
@@ -179,6 +201,35 @@ export default function Rewards() {
       setFormError(err.message || 'Could not save the reward.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    const prompt = aiPrompt.trim();
+    if (prompt.length < 3) {
+      setAiError('Describe the reward idea in a few words first.');
+      return;
+    }
+    setAiLoading(true);
+    setAiError('');
+    try {
+      const draft = await api('/api/rewards/generate', {
+        method: 'POST',
+        body: { prompt },
+      });
+      setForm((prev) => ({
+        ...prev,
+        title: draft.title || prev.title,
+        description: draft.description || '',
+        point_cost: draft.point_cost ?? prev.point_cost,
+        icon: draft.icon || '',
+        category: draft.category || '',
+      }));
+      setAiCostBasis(draft.cost_basis || '');
+    } catch (err) {
+      setAiError(err.message || 'The oracle could not draft this reward.');
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -458,6 +509,57 @@ export default function Rewards() {
         <div className="space-y-3">
           {formError && (
             <div className="p-2 rounded-md border border-crimson/40 bg-crimson/10 text-crimson text-sm">{formError}</div>
+          )}
+          {isParent && aiEnabled && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowAi(!showAi)}
+                className="flex items-center gap-2 text-accent text-sm hover:text-accent/80 transition-colors"
+              >
+                <Sparkles size={14} />
+                {showAi
+                  ? 'Hide AI helper'
+                  : editingReward
+                    ? 'Rewrite with AI'
+                    : 'Research with AI'}
+              </button>
+              {showAi && (
+                <div className="mt-3 space-y-2 border border-border rounded-lg p-3 bg-surface-raised/30">
+                  <p className="text-muted text-xs">
+                    Paste a kid&apos;s wish, product idea, expected price, or reward notes. The AI will draft the copy and suggest XP from an estimated real-world cost when it applies.
+                  </p>
+                  <p className="text-muted text-xs">
+                    Up to 5 generations every 5 minutes. Avoid names or private family details.
+                  </p>
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="e.g. LEGO Minecraft wolf set from Sam's wish list, around $18, make it sound exciting"
+                    rows={3}
+                    maxLength={500}
+                    className="field-input resize-none"
+                  />
+                  {aiError && (
+                    <p className="text-crimson text-xs">{aiError}</p>
+                  )}
+                  {aiCostBasis && !aiError && (
+                    <p className="text-muted text-xs">
+                      AI cost check: {aiCostBasis}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleGenerate}
+                    disabled={aiLoading}
+                    className="game-btn game-btn-gold flex items-center gap-2"
+                  >
+                    <Sparkles size={14} />
+                    {aiLoading ? 'Consulting the oracle...' : editingReward ? 'Rewrite Reward' : 'Draft Reward'}
+                  </button>
+                </div>
+              )}
+            </div>
           )}
           <div>
             <label className="block text-cream text-sm font-medium mb-1">Name</label>
