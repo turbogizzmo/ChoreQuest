@@ -47,7 +47,7 @@ Recent additions around AI-assisted drafting:
 - **Privacy guardrails**: static style examples only, so existing family chore text is not sent upstream
 - **Safety limits**: 5 generations every 5 minutes per parent, plus capped AI-suggested quest XP
 
-For setup and day-to-day usage, see [AI-Assisted Quest & Reward Drafting](#-ai-assisted-quest--reward-drafting) below or the wiki page: [AI-Assisted Quest Creation](https://github.com/turbogizzmo/ChoreQuest/wiki/AI-Assisted-Quest-Creation).
+For setup and day-to-day usage, see [AI-Assisted Quest & Reward Drafting](#-ai-assisted-quest--reward-drafting) below or the quest-focused wiki page: [AI-Assisted Quest Creation](https://github.com/turbogizzmo/ChoreQuest/wiki/AI-Assisted-Quest-Creation).
 
 ---
 

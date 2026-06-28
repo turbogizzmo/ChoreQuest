@@ -463,10 +463,10 @@ async def generate_reward_draft(
 
     try:
         if config.provider == "gemini":
-            # Gemini already has a stable schema-aware path in this codebase, so
-            # reward drafts use that for extra structure while the other
-            # providers continue using the existing prompt-plus-JSON parsing
-            # behavior to avoid changing their transport contracts here.
+            # Gemini uses schema-aware structured output for consistency with the
+            # existing quest generation path, while the other providers keep the
+            # existing prompt-plus-JSON parsing behavior to avoid changing their
+            # transport contracts here.
             data = await _generate_with_gemini(
                 config,
                 system_instruction,
