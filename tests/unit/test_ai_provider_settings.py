@@ -12,6 +12,7 @@ from backend.services.ai_provider import (
     _get_json,
     _map_ai_provider_error,
     ai_generation_available,
+    coerce_generated_reward,
     coerce_generated_quest,
     get_ai_provider_config,
     get_ai_settings_payload,
@@ -140,6 +141,44 @@ async def test_coerce_generated_quest_requires_non_empty_title(db):
                 "category_name": "",
             },
             [],
+        )
+
+    assert exc_info.value.status_code == 502
+
+
+def test_coerce_generated_reward_caps_points_and_trims_fields():
+    data = coerce_generated_reward(
+        {
+            "title": "  Mega Reward  ",
+            "description": "  Great reward.  ",
+            "point_cost": 999999,
+            "category": " Toys ",
+            "icon": " 🎁 ",
+            "cost_basis": "  Based on a $25 estimate.  ",
+        }
+    )
+
+    assert data == {
+        "title": "Mega Reward",
+        "description": "Great reward.",
+        "point_cost": 5000,
+        "category": "Toys",
+        "icon": "🎁",
+        "cost_basis": "Based on a $25 estimate.",
+    }
+
+
+def test_coerce_generated_reward_requires_non_empty_title():
+    with pytest.raises(HTTPException) as exc_info:
+        coerce_generated_reward(
+            {
+                "title": "",
+                "description": "desc",
+                "point_cost": 10,
+                "category": "Treats",
+                "icon": "🍪",
+                "cost_basis": "Based on snack price.",
+            }
         )
 
     assert exc_info.value.status_code == 502

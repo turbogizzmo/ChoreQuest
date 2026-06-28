@@ -21,11 +21,18 @@ from backend.schemas import (
     RewardCreate,
     RewardUpdate,
     RewardResponse,
+    RewardGenerateRequest,
+    RewardGenerateResponse,
     RedemptionResponse,
 )
 from backend.dependencies import get_current_user, require_parent
 from backend.achievements import check_achievements
 from backend.websocket_manager import ws_manager
+from backend.services.ai_provider import (
+    check_ai_generation_rate_limit,
+    generate_reward_draft,
+    get_ai_provider_config,
+)
 
 router = APIRouter(prefix="/api/rewards", tags=["rewards"])
 
@@ -244,6 +251,19 @@ async def fulfill_redemption(
 
 
 # ── Reward CRUD endpoints ────────────────────────────────────────────────
+
+
+@router.post("/generate", response_model=RewardGenerateResponse)
+async def generate_reward(
+    body: RewardGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_parent),
+):
+    """Draft a reward title/description/XP cost from parent notes or a kid wish."""
+    check_ai_generation_rate_limit(current_user.id)
+    config = await get_ai_provider_config(db)
+    data = await generate_reward_draft(prompt=body.prompt, config=config)
+    return RewardGenerateResponse(**data)
 
 
 @router.get("", response_model=list[RewardResponse])

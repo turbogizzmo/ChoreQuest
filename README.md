@@ -38,15 +38,16 @@ A gamified family chore management app with full RPG theming. Parents create que
 
 ## 🆕 What's New
 
-Recent additions around AI-assisted chore creation:
+Recent additions around AI-assisted drafting:
 
 - **AI quest drafting** in the quest create modal for parents
+- **AI reward drafting** in the rewards modal to turn kid wish ideas into polished rewards with suggested XP
 - **Configurable AI providers**: Google Gemini, OpenAI, Anthropic Claude, and Ollama
 - **Provider settings in-app** under **Settings → AI Quest Generation**
 - **Privacy guardrails**: static style examples only, so existing family chore text is not sent upstream
-- **Safety limits**: 5 generations every 5 minutes per parent, plus capped AI-suggested XP
+- **Safety limits**: 5 generations every 5 minutes per parent, plus capped AI-suggested quest XP and reward XP cost
 
-For setup and day-to-day usage, see [AI-Assisted Quest Creation](#-ai-assisted-quest-creation) below or the wiki page: [AI-Assisted Quest Creation](https://github.com/turbogizzmo/ChoreQuest/wiki/AI-Assisted-Quest-Creation).
+For setup and day-to-day usage, see [AI-Assisted Quest & Reward Drafting](#-ai-assisted-quest--reward-drafting) below or the quest-focused wiki page: [AI-Assisted Quest Creation](https://github.com/turbogizzmo/ChoreQuest/wiki/AI-Assisted-Quest-Creation).
 
 ---
 
@@ -139,7 +140,7 @@ Back up this directory to preserve everything.
 
 ---
 
-## 🤖 AI-Assisted Quest Creation
+## 🤖 AI-Assisted Quest & Reward Drafting
 
 Parents can turn a plain chore idea like `clean the garage` into a fantasy-styled quest draft directly from the quest creation modal.
 
@@ -148,6 +149,8 @@ Parents can turn a plain chore idea like `clean the garage` into a fantasy-style
 - Rewrites a plain chore into a quest-style **title** and **description**
 - Suggests **XP**, **difficulty**, and the best-fit **category**
 - Prefills the normal quest form so the parent can review and edit before saving
+- Drafts reward **title**, **description**, **category**, **icon**, and **XP cost**
+- Uses the same helper in the rewards modal to polish kid wish ideas and suggest XP from an estimated real-world cost when relevant
 
 ### How to set it up
 
@@ -209,12 +212,21 @@ OLLAMA_BASE_URL=http://localhost:11434
 4. Review the generated draft
 5. Edit anything you want, then save it like a normal quest
 
+For rewards:
+
+1. Open **Rewards → Add Reward**
+2. Click **Research with AI**
+3. Paste a kid wish, product idea, expected price, or reward notes
+4. Review the suggested copy and XP cost
+5. Edit anything you want, then save it like a normal reward
+
 ### Privacy and safety behavior
 
 - Do **not** include names or private family details in the prompt
 - The app uses static style examples and does **not** send your saved family chore text as prompt context
 - Generation is limited to **5 requests every 5 minutes per parent**
 - AI-suggested XP is capped before it reaches the save flow
+- Reward drafts may estimate a retail price from the prompt, but parents should still sanity-check the suggested XP before saving
 - Saved provider secrets are handled separately from normal settings and are not returned to the browser in plain text
 
 ### If the button does not appear

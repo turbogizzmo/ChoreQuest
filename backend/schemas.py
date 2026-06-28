@@ -222,6 +222,19 @@ class RewardResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class RewardGenerateRequest(BaseModel):
+    prompt: str = Field(min_length=3, max_length=500)
+
+
+class RewardGenerateResponse(BaseModel):
+    title: str
+    description: str | None
+    point_cost: int
+    category: str | None
+    icon: str | None
+    cost_basis: str | None = None
+
+
 class RedemptionResponse(BaseModel):
     id: int
     reward_id: int

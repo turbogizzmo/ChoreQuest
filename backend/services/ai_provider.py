@@ -28,6 +28,8 @@ SUPPORTED_AI_PROVIDERS = tuple(DEFAULT_MODELS.keys())
 AI_QUEST_RATE_LIMIT_MAX_REQUESTS = 5
 AI_QUEST_RATE_LIMIT_WINDOW_SECONDS = 300
 AI_QUEST_MAX_POINTS = 50
+AI_REWARD_MAX_POINT_COST = 5000
+AI_REWARD_XP_PER_DOLLAR = 10
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 
 _SETTING_DEFAULTS = {
@@ -68,6 +70,26 @@ _SEED_STYLE_EXAMPLES = [
         "Beast Keeper's Round",
         "The loyal creatures of the realm hunger for sustenance and care. Fill "
         "their bowls, refresh their water, and tend to their domain.",
+    ),
+]
+_REWARD_STYLE_EXAMPLES = [
+    (
+        "Extra Screen Time",
+        "Unlock 30 extra minutes of screen time after dinner for your next free evening.",
+        50,
+        "Treats",
+    ),
+    (
+        "Pick Dessert",
+        "Choose the dessert for one family meal this week and claim first pick when it is served.",
+        75,
+        "Experiences",
+    ),
+    (
+        "Lego Surprise Pack",
+        "Claim a small surprise Lego set or minifigure pack to add to your collection.",
+        180,
+        "Toys",
     ),
 ]
 
@@ -139,6 +161,57 @@ def _build_ai_example_block() -> str:
         f"Title: {title}\nDescription: {desc}"
         for title, desc in _SEED_STYLE_EXAMPLES
     )
+
+
+def _build_reward_example_block() -> str:
+    return "\n\n".join(
+        "Title: {title}\nDescription: {desc}\nPoint Cost: {point_cost}\nCategory: {category}".format(
+            title=title,
+            desc=desc,
+            point_cost=point_cost,
+            category=category,
+        )
+        for title, desc, point_cost, category in _REWARD_STYLE_EXAMPLES
+    )
+
+
+def _quest_response_schema() -> dict:
+    return {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "description": {"type": "string"},
+            "points": {"type": "integer"},
+            "difficulty": {
+                "type": "string",
+                "enum": [d.value for d in Difficulty],
+            },
+            "category_name": {"type": "string"},
+        },
+        "required": ["title", "description", "points", "difficulty", "category_name"],
+    }
+
+
+def _reward_response_schema() -> dict:
+    return {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "description": {"type": "string"},
+            "point_cost": {"type": "integer"},
+            "category": {"type": "string"},
+            "icon": {"type": "string"},
+            "cost_basis": {"type": "string"},
+        },
+        "required": [
+            "title",
+            "description",
+            "point_cost",
+            "category",
+            "icon",
+            "cost_basis",
+        ],
+    }
 
 
 async def _load_settings_map(db: AsyncSession) -> dict[str, str]:
@@ -358,6 +431,80 @@ async def generate_quest_draft(
     return coerce_generated_quest(data, categories)
 
 
+async def generate_reward_draft(
+    *,
+    prompt: str,
+    config: AIProviderConfig,
+) -> dict:
+    if not config.is_configured:
+        raise HTTPException(
+            status_code=503,
+            detail="AI reward generation is not configured.",
+        )
+
+    system_instruction = (
+        "You help parents turn kid reward ideas into polished, family-friendly "
+        "reward drafts for a chore app. Match the examples' writing style: a "
+        "short inviting title and a clear 1-2 sentence description. If the idea "
+        "looks like a real-world item or paid experience, estimate a reasonable "
+        "current USD cost from general market knowledge, then convert that to a "
+        f"point_cost using roughly {AI_REWARD_XP_PER_DOLLAR} XP per US dollar "
+        "and round to a tidy whole number. If the reward is non-monetary, "
+        "suggest a fair point_cost based "
+        "on desirability, exclusivity, and how often it can be redeemed. Suggest "
+        "a short category label and a single emoji icon. Respond with JSON only "
+        "using keys title, description, point_cost, category, icon, and cost_basis."
+    )
+    contents = (
+        f"Examples of the desired style:\n\n{_build_reward_example_block()}\n\n"
+        "Parent notes: this may include a kid's wishlist submission, notes, "
+        f"or product details.\n\nReward idea: {prompt}"
+    )
+
+    try:
+        if config.provider == "gemini":
+            # Gemini uses schema-aware structured output for consistency with the
+            # existing quest generation path, while the other providers keep the
+            # existing prompt-plus-JSON parsing behavior to avoid changing their
+            # transport contracts here.
+            data = await _generate_with_gemini(
+                config,
+                system_instruction,
+                contents,
+                response_schema=_reward_response_schema(),
+            )
+        elif config.provider == "openai":
+            data = await asyncio.to_thread(
+                _generate_with_openai,
+                config,
+                system_instruction,
+                contents,
+            )
+        elif config.provider == "anthropic":
+            data = await asyncio.to_thread(
+                _generate_with_anthropic,
+                config,
+                system_instruction,
+                contents,
+            )
+        elif config.provider == "ollama":
+            data = await asyncio.to_thread(
+                _generate_with_ollama,
+                config,
+                system_instruction,
+                contents,
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported AI provider")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("AI reward generation failed for provider %s", config.provider)
+        raise _map_ai_provider_error(config.provider, exc)
+
+    return coerce_generated_reward(data)
+
+
 def coerce_generated_quest(data: dict, categories: list[ChoreCategory]) -> dict:
     title = str(data.get("title") or "").strip()[:200]
     description = str(data.get("description") or "").strip() or None
@@ -395,27 +542,40 @@ def coerce_generated_quest(data: dict, categories: list[ChoreCategory]) -> dict:
     }
 
 
+def coerce_generated_reward(data: dict) -> dict:
+    title = str(data.get("title") or "").strip()[:200]
+    description = str(data.get("description") or "").strip() or None
+    category = str(data.get("category") or "").strip()[:50] or None
+    icon = str(data.get("icon") or "").strip()[:50] or None
+    cost_basis = str(data.get("cost_basis") or "").strip() or None
+    if not title:
+        raise HTTPException(status_code=502, detail="The oracle returned an empty reward.")
+
+    try:
+        point_cost = int(data.get("point_cost") or 50)
+    except (TypeError, ValueError):
+        point_cost = 50
+    point_cost = min(AI_REWARD_MAX_POINT_COST, max(1, point_cost))
+
+    return {
+        "title": title,
+        "description": description,
+        "point_cost": point_cost,
+        "category": category,
+        "icon": icon,
+        "cost_basis": cost_basis,
+    }
+
+
 async def _generate_with_gemini(
     config: AIProviderConfig,
     system_instruction: str,
     contents: str,
+    response_schema: dict | None = None,
 ) -> dict:
     from google import genai
 
-    response_schema = {
-        "type": "object",
-        "properties": {
-            "title": {"type": "string"},
-            "description": {"type": "string"},
-            "points": {"type": "integer"},
-            "difficulty": {
-                "type": "string",
-                "enum": [d.value for d in Difficulty],
-            },
-            "category_name": {"type": "string"},
-        },
-        "required": ["title", "description", "points", "difficulty", "category_name"],
-    }
+    response_schema = response_schema or _quest_response_schema()
     client = genai.Client(api_key=config.gemini_api_key)
     interaction = await client.aio.interactions.create(
         model=config.model,
