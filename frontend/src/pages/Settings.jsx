@@ -439,6 +439,7 @@ export default function Settings() {
           clear_gemini_api_key: aiSettings.clear_gemini_api_key || false,
           clear_openai_api_key: aiSettings.clear_openai_api_key || false,
           clear_anthropic_api_key: aiSettings.clear_anthropic_api_key || false,
+          xp_per_dollar: Number(aiSettings.xp_per_dollar) || 10,
         },
       });
       setAiSettings({
@@ -759,6 +760,21 @@ export default function Settings() {
                     </p>
                   </div>
                 )}
+
+                <div className="space-y-1">
+                  <label className="block text-cream text-sm">XP per US Dollar (reward pricing)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={1000}
+                    value={aiSettings.xp_per_dollar ?? 10}
+                    onChange={(e) => updateAiSetting('xp_per_dollar', Number(e.target.value) || 10)}
+                    className="field-input w-32"
+                  />
+                  <p className="text-muted text-xs">
+                    When AI estimates a real-world price, it converts to XP using this ratio. Adjust to match your family&apos;s typical XP earnings so suggested costs feel fair.
+                  </p>
+                </div>
 
                 <button
                   onClick={saveAiSettings}
