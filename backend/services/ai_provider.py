@@ -105,6 +105,7 @@ class AIProviderConfig:
     openai_organization: str = ""
     openai_project: str = ""
     ollama_base_url: str = DEFAULT_OLLAMA_BASE_URL
+    # Reward pricing uses a whole-number ratio constrained to 1..1000.
     xp_per_dollar: int = AI_REWARD_XP_PER_DOLLAR
 
     @property
@@ -216,6 +217,16 @@ def _reward_response_schema() -> dict:
     }
 
 
+def _normalize_xp_per_dollar(value: int | str | None) -> int:
+    try:
+        xp_per_dollar = int(value)
+    except (TypeError, ValueError):
+        return AI_REWARD_XP_PER_DOLLAR
+    if not (1 <= xp_per_dollar <= 1000):
+        return AI_REWARD_XP_PER_DOLLAR
+    return xp_per_dollar
+
+
 async def _load_settings_map(db: AsyncSession) -> dict[str, str]:
     keys = list(_SETTING_DEFAULTS.keys()) + list(_SECRET_SETTING_KEYS.values())
     result = await db.execute(select(AppSetting).where(AppSetting.key.in_(keys)))
@@ -246,12 +257,9 @@ async def get_ai_provider_config(db: AsyncSession) -> AIProviderConfig:
     if provider not in SUPPORTED_AI_PROVIDERS:
         provider = DEFAULT_PROVIDER
     model = stored.get("ai_model", "").strip() or _default_model_for(provider)
-    try:
-        xp_per_dollar = int(stored.get("ai_reward_xp_per_dollar", str(AI_REWARD_XP_PER_DOLLAR)))
-        if xp_per_dollar < 1:
-            xp_per_dollar = AI_REWARD_XP_PER_DOLLAR
-    except (TypeError, ValueError):
-        xp_per_dollar = AI_REWARD_XP_PER_DOLLAR
+    xp_per_dollar = _normalize_xp_per_dollar(
+        stored.get("ai_reward_xp_per_dollar", str(AI_REWARD_XP_PER_DOLLAR))
+    )
     return AIProviderConfig(
         provider=provider,
         model=model,
@@ -324,7 +332,7 @@ async def save_ai_settings(db: AsyncSession, body) -> dict:
         "ai_openai_organization": (body.openai_organization or "").strip(),
         "ai_openai_project": (body.openai_project or "").strip(),
         "ai_ollama_base_url": _validate_ollama_base_url(body.ollama_base_url or DEFAULT_OLLAMA_BASE_URL),
-        "ai_reward_xp_per_dollar": str(max(1, body.xp_per_dollar)),
+        "ai_reward_xp_per_dollar": str(_normalize_xp_per_dollar(body.xp_per_dollar)),
     }
 
     for key, value in values_to_write.items():
