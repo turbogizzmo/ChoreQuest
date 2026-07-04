@@ -1,6 +1,5 @@
 import io
 import urllib.error
-from types import SimpleNamespace
 
 import pytest
 
@@ -100,7 +99,7 @@ async def test_ai_generation_available_reflects_selected_provider(db):
 async def test_save_ai_settings_normalizes_out_of_range_xp_ratio(db):
     payload = await save_ai_settings(
         db,
-        SimpleNamespace(
+        AISettingsUpdate.model_construct(
             provider="ollama",
             model="llama3.1",
             ollama_base_url="http://127.0.0.1:11434",
