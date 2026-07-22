@@ -60,7 +60,6 @@ export class WorldScene extends Phaser.Scene {
     // double sounds) and double-queues scene.restart, which orphans a looping
     // SoundSystem (music playing over itself).
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this._cleanup());
-    this.events.once(Phaser.Scenes.Events.DESTROY,  () => this._cleanup());
 
     // ── Tilemap ────────────────────────────────────────────────────────
     const { map, layer } = buildWorldTilemap(this);
@@ -870,7 +869,7 @@ export class WorldScene extends Phaser.Scene {
     this.onExit();
   }
 
-  // Runs on the scene SHUTDOWN event (fired by scene.restart and scene.stop).
+  // Runs on the scene SHUTDOWN event (fired before restart/stop/destroy).
   // A method literally named `shutdown` is NOT called automatically by Phaser —
   // it must be wired to the event, which create() does.
   _cleanup() {
