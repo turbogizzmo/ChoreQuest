@@ -55,6 +55,13 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create() {
+    // Phaser does NOT clear scene.events listeners on restart — without this,
+    // every death/respawn stacks a second set of gameplay listeners (double XP,
+    // double sounds) and double-queues scene.restart, which orphans a looping
+    // SoundSystem (music playing over itself).
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this._cleanup());
+    this.events.once(Phaser.Scenes.Events.DESTROY,  () => this._cleanup());
+
     // ── Tilemap ────────────────────────────────────────────────────────
     const { map, layer } = buildWorldTilemap(this);
     this.worldLayer = layer;
@@ -206,14 +213,6 @@ export class WorldScene extends Phaser.Scene {
         stroke: '#000000', strokeThickness: 3, resolution: 2 }
     ).setScrollFactor(0).setDepth(50).setOrigin(0.5);
     this.tweens.add({ targets: banner, alpha: 0, delay: 3000, duration: 1000 });
-
-    // ── Exit button ───────────────────────────────────────────────────
-    const exitBtn = this.add.text(
-      this.scale.width - 8, 8, '[EXIT]',
-      { fontSize: '8px', fontFamily: 'monospace', color: '#ff6644',
-        stroke: '#000', strokeThickness: 2, resolution: 2 }
-    ).setScrollFactor(0).setDepth(HUD_DEPTH + 5).setOrigin(1, 0).setInteractive({ useHandCursor: true });
-    exitBtn.on('pointerdown', () => this._exitGame());
 
     // ── Phase 5-A: Chest loot system ──────────────────────────────────
     this.chestSystem = new ChestSystem(this);
@@ -473,6 +472,7 @@ export class WorldScene extends Phaser.Scene {
   }
 
   _handlePlayerDeath() {
+    if (this.player.isAlive === false) return; // already dying — don't queue a second restart
     this.player.isAlive = false;
     this.player.body.setVelocity(0, 0);
     this.physics.pause();
@@ -870,10 +870,18 @@ export class WorldScene extends Phaser.Scene {
     this.onExit();
   }
 
-  shutdown() {
+  // Runs on the scene SHUTDOWN event (fired by scene.restart and scene.stop).
+  // A method literally named `shutdown` is NOT called automatically by Phaser —
+  // it must be wired to the event, which create() does.
+  _cleanup() {
+    ['enemyHurt', 'enemyDefeated', 'comboHit', 'playerHurt', 'portalEnter', 'chestCollect']
+      .forEach((evt) => this.events.off(evt));
     this.sfx?.destroy();
+    this.sfx = null;
     this.chestSystem?.destroy();
+    this.chestSystem = null;
     this.npc?.destroy();
+    this.npc = null;
   }
 
   isRespawnInvulnerable() {
