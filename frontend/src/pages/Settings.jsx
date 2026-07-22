@@ -30,6 +30,13 @@ const AI_PROVIDER_LABELS = {
   ollama: 'Ollama',
 };
 
+const clampXpPerDollar = (value) => {
+  if (value === '' || value === null || value === undefined) return 10;
+  const parsed = Math.trunc(Number(value));
+  if (!Number.isFinite(parsed)) return 10;
+  return Math.min(1000, Math.max(1, parsed));
+};
+
 function UpdatePanel({ isAdmin }) {
   const [version, setVersion] = useState(null);
   const [checking, setChecking] = useState(false);
@@ -439,6 +446,7 @@ export default function Settings() {
           clear_gemini_api_key: aiSettings.clear_gemini_api_key || false,
           clear_openai_api_key: aiSettings.clear_openai_api_key || false,
           clear_anthropic_api_key: aiSettings.clear_anthropic_api_key || false,
+          xp_per_dollar: clampXpPerDollar(aiSettings.xp_per_dollar),
         },
       });
       setAiSettings({
@@ -759,6 +767,22 @@ export default function Settings() {
                     </p>
                   </div>
                 )}
+
+                <div className="space-y-1">
+                  <label className="block text-cream text-sm">XP per US Dollar (reward pricing)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={1000}
+                    step={1}
+                    value={aiSettings.xp_per_dollar ?? 10}
+                    onChange={(e) => updateAiSetting('xp_per_dollar', clampXpPerDollar(e.target.value))}
+                    className="field-input w-32"
+                  />
+                  <p className="text-muted text-xs">
+                    When AI estimates a real-world price, it converts to XP using this ratio. Adjust to match your family&apos;s typical XP earnings so suggested costs feel fair.
+                  </p>
+                </div>
 
                 <button
                   onClick={saveAiSettings}
