@@ -39,8 +39,10 @@ export class HUD {
       BAR_W * 1.25 + 50,                        // xp bar + level badge: 210px
     );
     const bgLeft = scene.add.graphics();
-    bgLeft.fillStyle(0x000000, 0.55);
-    bgLeft.fillRoundedRect(2, 2, PADDING + HUD_BG_CONTENT + 6, HUD_BG_H, 5);
+    bgLeft.fillStyle(0x0d0d14, 0.62);
+    bgLeft.fillRoundedRect(4, 4, PADDING + HUD_BG_CONTENT + 6, HUD_BG_H, 8);
+    bgLeft.lineStyle(1, 0xffffff, 0.10);
+    bgLeft.strokeRoundedRect(4, 4, PADDING + HUD_BG_CONTENT + 6, HUD_BG_H, 8);
     bgLeft.setScrollFactor(0).setDepth(HUD_DEPTH - 1);
 
     // ── Hearts (top-left) ────────────────────────────────────────────
@@ -86,8 +88,10 @@ export class HUD {
     // ── Coin counter (top-right) ──────────────────────────────────────
     const coinX = W - PADDING - 48;
     const bgRight = scene.add.graphics();
-    bgRight.fillStyle(0x000000, 0.55);
-    bgRight.fillRoundedRect(coinX - 4, 2, 60, 28, 5);
+    bgRight.fillStyle(0x0d0d14, 0.62);
+    bgRight.fillRoundedRect(coinX - 6, 4, 62, 28, 8);
+    bgRight.lineStyle(1, 0xffffff, 0.10);
+    bgRight.strokeRoundedRect(coinX - 6, 4, 62, 28, 8);
     bgRight.setScrollFactor(0).setDepth(HUD_DEPTH - 1);
 
     // Coin animation
@@ -139,14 +143,14 @@ export class HUD {
     const scene   = this.scene;
     const MM_SIZE = 80;
     const MM_X    = W - MM_SIZE - PADDING;
-    const MM_Y    = 36; // below coin counter
+    const MM_Y    = 44; // below coin counter
 
     // Background
     const mmBg = scene.add.graphics();
-    mmBg.fillStyle(0x000000, 0.65);
-    mmBg.fillRoundedRect(MM_X - 2, MM_Y - 2, MM_SIZE + 4, MM_SIZE + 4, 3);
-    mmBg.lineStyle(1, 0x335533, 1);
-    mmBg.strokeRoundedRect(MM_X - 2, MM_Y - 2, MM_SIZE + 4, MM_SIZE + 4, 3);
+    mmBg.fillStyle(0x0d0d14, 0.70);
+    mmBg.fillRoundedRect(MM_X - 4, MM_Y - 4, MM_SIZE + 8, MM_SIZE + 8, 6);
+    mmBg.lineStyle(1, 0xffffff, 0.12);
+    mmBg.strokeRoundedRect(MM_X - 4, MM_Y - 4, MM_SIZE + 8, MM_SIZE + 8, 6);
     mmBg.setScrollFactor(0).setDepth(HUD_DEPTH - 1);
 
     // Dark green fill
@@ -163,7 +167,7 @@ export class HUD {
 
     // Water border trace — gives the map geographic context
     const mmBorder = scene.add.graphics();
-    mmBorder.lineStyle(1, 0x0028f8, 0.55);
+    mmBorder.lineStyle(1, 0x4880e8, 0.45);
     mmBorder.strokeRect(MM_X, MM_Y, MM_SIZE, MM_SIZE);
     mmBorder.setScrollFactor(0).setDepth(HUD_DEPTH + 1);
 

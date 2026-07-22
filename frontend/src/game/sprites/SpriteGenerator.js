@@ -77,11 +77,41 @@ function drawGrid(ctx, grid, palette, scale = 1) {
   );
 }
 
+// Character sprites get a 1px dark outline around their silhouette so they
+// read clearly against any tile. Transparent cells 4-adjacent to a filled
+// cell become outline pixels, then the sprite is drawn on top.
+const OUTLINE_COLOR = '#181820';
+
+function drawGridOutlined(ctx, grid, palette, scale = 1, outline = OUTLINE_COLOR) {
+  const w = grid[0]?.length ?? 0;
+  const h = grid.length;
+  const filled = grid.map((row) =>
+    [...row].slice(0, w).map((code) => !!palette[code])
+  );
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (filled[y][x]) continue;
+      const touches =
+        (y > 0     && filled[y - 1][x]) ||
+        (y < h - 1 && filled[y + 1][x]) ||
+        (x > 0     && filled[y][x - 1]) ||
+        (x < w - 1 && filled[y][x + 1]);
+      if (touches) drawPixel(ctx, x, y, outline, scale);
+    }
+  }
+  drawGrid(ctx, grid, palette, scale);
+}
+
 // ─── TILESET (16×16 each, 4 cols wide) ────────────────────────────────────────
 
 const TILE_SCALE = 2; // render at 32×32 display
 const TILE_SRC   = 16;
 const TILES_PER_ROW = 8;
+
+// Shared ground colours — every tile that shows grass must use the same base
+// or visible seams appear between grass and tree/flower tiles.
+const GRASS_BASE  = '#63c74d';
+const GRASS_FLECK = '#3ca336';
 
 const TILE_DEFS = {
   grass: {
@@ -104,7 +134,7 @@ const TILE_DEFS = {
       'gggggggggggggggg',
       'ggGggggggggggggg',
     ],
-    p: { g: NES.lgreen, G: NES.green },
+    p: { g: GRASS_BASE, G: GRASS_FLECK },
   },
   dirt: {
     grid: [
@@ -147,10 +177,10 @@ const TILE_DEFS = {
       'bbbbbbwwwbbbbbww',
       'wwwbbbbbbbbwwbbb',
     ],
-    p: { b: NES.blue, w: NES.sky },
+    p: { b: '#2860d8', w: '#4880e8' },
   },
   path: {
-    // Stone/sandy path — light gray-tan, clearly distinct from green grass
+    // Sandy road — warm tan with slightly darker speckles, distinct from grass
     grid: [
       'pppppppppppppppp',
       'pPppppppPppppppp',
@@ -169,7 +199,7 @@ const TILE_DEFS = {
       'ppppppppPppppppp',
       'ppPppppppppppppp',
     ],
-    p: { p: NES.lgray, P: NES.white },
+    p: { p: '#e0cfa0', P: '#c8b184' },
   },
   tree_top: {
     // '.' is mapped to grass so no transparent black corners appear
@@ -191,7 +221,7 @@ const TILE_DEFS = {
       'gggggBBBBBBggggg',
       'ggggggBBBBgggggg',
     ],
-    p: { G: NES.lgreen, t: NES.green, B: NES.brown, g: NES.lgreen },
+    p: { G: '#2e8f3c', t: '#1e6b2c', B: NES.brown, g: GRASS_BASE },
   },
   tree_bot: {
     // grass fill so trunk blends into the map
@@ -213,7 +243,7 @@ const TILE_DEFS = {
       'gggggggggggggggg',
       'gggggggggggggggg',
     ],
-    p: { B: NES.brown, b: NES.lbrown, g: NES.lgreen },
+    p: { B: NES.brown, b: NES.lbrown, g: GRASS_BASE },
   },
   wall: {
     grid: [
@@ -255,7 +285,7 @@ const TILE_DEFS = {
       'gggggggggggggggg',
       'gggggggggggggggg',
     ],
-    p: { g: NES.lgreen, G: NES.green, r: NES.red },
+    p: { g: GRASS_BASE, G: GRASS_FLECK, r: NES.lred },
   },
 };
 
@@ -583,7 +613,7 @@ export function generatePlayerSheet(scene, options = {}) {
         ctx.translate(FS * SCALE, 0);
         ctx.scale(-1, 1);
       }
-      drawGrid(ctx, src, palettes[dir], SCALE);
+      drawGridOutlined(ctx, src, palettes[dir], SCALE);
       ctx.restore();
     }
   }
@@ -599,7 +629,7 @@ export function generatePlayerSheet(scene, options = {}) {
     const ox = (WALK_FRAMES + i) * FS * SCALE;
     ctx.save();
     ctx.translate(ox, 0);
-    drawGrid(ctx, grid, avatarPalette, SCALE);
+    drawGridOutlined(ctx, grid, avatarPalette, SCALE);
     ctx.restore();
   });
 
@@ -648,7 +678,7 @@ const ENEMY_DEFS = {
         '................',
       ],
     ],
-    p: { W: NES.lgray, w: NES.white, b: NES.black, R: NES.lred, E: NES.lbrown, '.': null },
+    p: { W: NES.lgray, w: NES.white, b: NES.black, R: NES.lred, E: NES.mgray, '.': null },
   },
   sock_goblin: {
     frames: [
@@ -689,7 +719,7 @@ const ENEMY_DEFS = {
         '................',
       ],
     ],
-    p: { P: NES.lpurple, p: NES.purple, B: NES.black, b: NES.mgray, S: NES.lgray, '.': null },
+    p: { P: NES.lpurple, p: NES.purple, B: NES.black, b: NES.mgray, S: NES.white, '.': null },
   },
   crumb_slime: {
     frames: [
@@ -834,7 +864,7 @@ export function generateEnemySheets(scene) {
     def.frames.forEach((grid, i) => {
       ctx.save();
       ctx.translate(i * FS * SCALE, 0);
-      drawGrid(ctx, grid, def.p, SCALE);
+      drawGridOutlined(ctx, grid, def.p, SCALE);
       ctx.restore();
     });
     addCanvasSpriteSheet(scene, `enemy_${key}`, c, FS * SCALE, FS * SCALE);
@@ -1023,7 +1053,7 @@ export function generateBossSheets(scene) {
     def.frames.forEach((grid, i) => {
       ctx.save();
       ctx.translate(i * FS * SCALE, 0);
-      drawGrid(ctx, grid, def.p, SCALE);
+      drawGridOutlined(ctx, grid, def.p, SCALE);
       ctx.restore();
     });
     addCanvasSpriteSheet(scene, `enemy_${key}`, c, FS * SCALE, FS * SCALE);

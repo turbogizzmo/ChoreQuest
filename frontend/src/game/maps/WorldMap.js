@@ -7,11 +7,10 @@ const TILE_NAMES = ['grass','dirt','water','path','tree_top','tree_bot','wall','
 export function buildWorldTilemap(scene) {
   const grid = buildBaseMap();
 
-  // Convert enum grid to Phaser tilemap data (1-indexed, 0=empty)
-  const mapData = grid.map(row => row.map(t => t + 1));
-
+  // TILE enum values are used directly as tile indices: the tileset is added
+  // with the default firstgid of 0, so data value N renders tileset frame N.
   const map = scene.make.tilemap({
-    data:       mapData,
+    data:       grid,
     tileWidth:  TILE_SIZE,
     tileHeight: TILE_SIZE,
     width:      MAP_COLS,
@@ -22,8 +21,8 @@ export function buildWorldTilemap(scene) {
   const layer = map.createLayer(0, tiles, 0, 0);
   layer.setDepth(0);
 
-  // Collision tiles: water (3), tree_top (5), wall (7) — 1-indexed
-  map.setCollision([TILE.WATER + 1, TILE.TREE_TOP + 1, TILE.WALL + 1]);
+  // Collision tiles: water, tree_top, wall
+  map.setCollision([TILE.WATER, TILE.TREE_TOP, TILE.WALL]);
 
   // World bounds
   scene.physics.world.setBounds(0, 0, MAP_COLS * TILE_SIZE, MAP_ROWS * TILE_SIZE);

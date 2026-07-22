@@ -190,8 +190,8 @@ test.describe('Adventure mode preview', () => {
     await page.getByRole('button', { name: 'Try Adventure' }).click();
 
     await expect(page).toHaveURL(/\/adventure/);
-    await expect(page.getByText("PREVIEW — XP won't count on leaderboard")).toBeVisible();
-    await expect(page.getByText('Loading Adventure Mode...')).toBeHidden();
+    await expect(page.getByText("Preview — XP won't count on leaderboard")).toBeVisible();
+    await expect(page.getByText('Building your world…')).toBeHidden();
     await expect(page.locator('#adventure-game-container canvas').first()).toBeVisible();
     await page.waitForLoadState('networkidle');
 
@@ -204,13 +204,15 @@ test.describe('Adventure portal behavior', () => {
   test('portal does not re-trigger until the player leaves it', async ({ loginAsKid: page }) => {
     await page.goto('/adventure');
     await expect(page).toHaveURL(/\/adventure/);
-    await expect(page.getByText('Loading Adventure Mode...')).toBeHidden();
+    await expect(page.getByText('Building your world…')).toBeHidden();
     await expect(page.locator('#adventure-game-container canvas').first()).toBeVisible();
 
     await page.waitForFunction(() => {
       const game = window.__CHOREQUEST_ACTIVE_GAME;
       const scene = game?.scene?.getScene?.('WorldScene');
-      return !!scene?.events;
+      // player is set at the top of create() — its presence means the scene
+      // is actually built, not merely booted (events exists pre-create).
+      return !!scene?.player;
     });
 
     const result = await page.evaluate(() => {
@@ -289,7 +291,7 @@ test.describe('Adventure avatar sync', () => {
 
       await page.goto('/adventure');
       await expect(page).toHaveURL(/\/adventure/);
-      await expect(page.getByText('Loading Adventure Mode...')).toBeHidden();
+      await expect(page.getByText('Building your world…')).toBeHidden();
       await expect(page.locator('#adventure-game-container canvas').first()).toBeVisible();
       await page.screenshot({ path: '/tmp/adventure-avatar-updated.png', fullPage: true });
 
