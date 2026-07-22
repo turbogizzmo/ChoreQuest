@@ -61,6 +61,10 @@ DEFAULT_SETTINGS = {
     "spin_requires_verification": "true",
     # Expose /api/chores/{id}/debug endpoint (parent auth still required).
     "enable_debug_endpoints": "false",
+    # XP awarded per US dollar of real-world cost when the AI generates a
+    # reward point_cost from a product price.  Parents can adjust this to
+    # match their family's actual XP earning rate.
+    "ai_reward_xp_per_dollar": "10",
 }
 
 # Template quests with RPG-flavoured descriptions

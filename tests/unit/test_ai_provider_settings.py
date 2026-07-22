@@ -70,6 +70,16 @@ async def test_ai_settings_loads_env_override_for_gemini(db, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_ai_settings_loads_default_xp_ratio_when_stored_value_is_too_high(db):
+    db.add(AppSetting(key="ai_reward_xp_per_dollar", value="1001"))
+    await db.commit()
+
+    config = await get_ai_provider_config(db)
+
+    assert config.xp_per_dollar == 10
+
+
+@pytest.mark.asyncio
 async def test_ai_generation_available_reflects_selected_provider(db):
     assert await ai_generation_available(db) is False
 
@@ -83,6 +93,31 @@ async def test_ai_generation_available_reflects_selected_provider(db):
     )
 
     assert await ai_generation_available(db) is True
+
+
+@pytest.mark.asyncio
+async def test_save_ai_settings_normalizes_out_of_range_xp_ratio(db):
+    payload = await save_ai_settings(
+        db,
+        AISettingsUpdate.model_construct(
+            provider="ollama",
+            model="llama3.1",
+            ollama_base_url="http://127.0.0.1:11434",
+            xp_per_dollar=1001,
+            openai_organization="",
+            openai_project="",
+            gemini_api_key=None,
+            openai_api_key=None,
+            anthropic_api_key=None,
+            clear_gemini_api_key=False,
+            clear_openai_api_key=False,
+            clear_anthropic_api_key=False,
+        ),
+    )
+
+    stored = await db.get(AppSetting, "ai_reward_xp_per_dollar")
+    assert stored.value == "10"
+    assert payload["xp_per_dollar"] == 10
 
 
 @pytest.mark.asyncio

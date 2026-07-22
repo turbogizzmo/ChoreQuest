@@ -565,6 +565,7 @@ class AISettingsUpdate(BaseModel):
     clear_gemini_api_key: bool = False
     clear_openai_api_key: bool = False
     clear_anthropic_api_key: bool = False
+    xp_per_dollar: int = Field(default=10, ge=1, le=1000)
 
 
 class AIModelListRequest(BaseModel):

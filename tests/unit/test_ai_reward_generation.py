@@ -5,7 +5,7 @@ import types
 import pytest
 from fastapi import HTTPException
 
-from backend.models import UserRole
+from backend.models import AppSetting, UserRole
 from backend.rate_limit import rate_limiter
 from backend.routers.rewards import generate_reward
 from backend.schemas import RewardGenerateRequest
@@ -149,3 +149,38 @@ async def test_generate_reward_rate_limits_per_parent(db, monkeypatch):
         )
 
     assert exc_info.value.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_generate_reward_uses_configured_xp_per_dollar(db, monkeypatch):
+    """AI system prompt uses the xp_per_dollar from DB, not the hardcoded default."""
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+    rate_limiter._windows.clear()
+
+    # Store a custom XP-per-dollar ratio in the DB.
+    db.add(AppSetting(key="ai_reward_xp_per_dollar", value="25"))
+    await db.commit()
+
+    parent = await make_user(db, "reward_xp_rate", role=UserRole.parent)
+    captured = {}
+    _install_fake_google(
+        monkeypatch,
+        {
+            "title": "Movie Night Pick",
+            "description": "Choose the movie for family movie night.",
+            "point_cost": 500,
+            "category": "Experiences",
+            "icon": "🎬",
+            "cost_basis": "Non-monetary experience.",
+        },
+        captured,
+    )
+
+    await generate_reward(
+        RewardGenerateRequest(prompt="pick the family movie"),
+        db=db,
+        current_user=parent,
+    )
+
+    assert "25 XP per US dollar" in captured["system_instruction"]
+    assert "10 XP per US dollar" not in captured["system_instruction"]
