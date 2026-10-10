@@ -1199,30 +1199,39 @@ export function generateUISprites(scene) {
   chctx.restore();
   addCanvasSpriteSheet(scene, 'chest', chc, chW * SCALE, chH * SCALE);
 
-  // ── NPC shopkeeper sprite (8×8 source × SCALE, 2 idle frames) ─────────────
-  const nW = 8, nH = 8;
-  const nc = createCanvas(2 * nW * SCALE, nH * SCALE);
+  // ── NPC shopkeeper: 16×16 wizard (same pixel density as the hero), 2 idle frames
+  const NPC_GRID = [
+    '......OOOO......',
+    '.....OhhhHO.....',
+    '....OhhHHHHO....',
+    '....OHHSHHHO....',
+    '...OHHHHHHHHO...',
+    '..OOOOOOOOOOOO..',
+    '...OKKKKKKKKO...',
+    '...OKEKKKKEKO...',
+    '...OKKKkkKKKO...',
+    '...OBBBMMBBBO...',
+    '..ORBBBBBBBBRO..',
+    '.ORrRBBBBBBRrRO.',
+    '.ORrRRBBBBRRrRO.',
+    '.ORrRRRGRRRRrRO.',
+    '..ORRRRGRRRRRO..',
+    '...OOO....OOO...',
+  ];
+  const NPC_PAL = {
+    O: '#1c1a2e', H: '#6a4cd8', h: '#9a82f0', S: '#ffd246', K: '#f6c9a0', k: '#e2a882',
+    E: '#2b1d14', B: '#f4f4f4', M: '#d26a6a', R: '#2f5fd0', r: '#5f8ef0', G: '#ffd246', '.': null,
+  };
+  const nc = createCanvas(2 * 16 * SCALE, 16 * SCALE);
   const nctx = nc.getContext('2d');
-  [[0, false], [1, true]].forEach(([frame, blink]) => {
+  [false, true].forEach((blink, frame) => {
+    const grid = blink ? NPC_GRID.map((row, y) => (y === 7 ? row.replace(/E/g, 'k') : row)) : NPC_GRID;
     nctx.save();
-    nctx.translate(frame * nW * SCALE, 0);
-    // Hat (purple wizard hat)
-    nctx.fillStyle = NES.purple;   nctx.fillRect(2*SCALE,0*SCALE,4*SCALE,1*SCALE);
-    nctx.fillStyle = NES.lpurple;  nctx.fillRect(2*SCALE,1*SCALE,4*SCALE,2*SCALE);
-    nctx.fillStyle = NES.lpurple;  nctx.fillRect(1*SCALE,2*SCALE,6*SCALE,1*SCALE);
-    // Face
-    nctx.fillStyle = NES.skin;     nctx.fillRect(1*SCALE,3*SCALE,6*SCALE,2*SCALE);
-    if (!blink) {
-      nctx.fillStyle = NES.brown;  nctx.fillRect(2*SCALE,3*SCALE,1*SCALE,1*SCALE); // left eye
-      nctx.fillStyle = NES.brown;  nctx.fillRect(5*SCALE,3*SCALE,1*SCALE,1*SCALE); // right eye
-    }
-    nctx.fillStyle = NES.lred;     nctx.fillRect(3*SCALE,4*SCALE,2*SCALE,1*SCALE); // mouth
-    // Robe (blue)
-    nctx.fillStyle = NES.blue;     nctx.fillRect(0*SCALE,5*SCALE,8*SCALE,3*SCALE);
-    nctx.fillStyle = NES.lblue;    nctx.fillRect(1*SCALE,5*SCALE,6*SCALE,1*SCALE); // collar
+    nctx.translate(frame * 16 * SCALE, 0);
+    drawGrid(nctx, grid, NPC_PAL, SCALE);
     nctx.restore();
   });
-  addCanvasSpriteSheet(scene, 'npc_shopkeeper', nc, nW * SCALE, nH * SCALE);
+  addCanvasSpriteSheet(scene, 'npc_shopkeeper', nc, 16 * SCALE, 16 * SCALE);
 }
 
 export function generateAllSprites(scene, options = {}) {

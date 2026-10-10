@@ -540,17 +540,21 @@ export class WorldScene extends Phaser.Scene {
     const py = this.player.y + oy;
 
     if (weapon === 'broom') {
-      // Diagonal slash arc: two crossing rectangles in NES yellow
-      const ang = isHoriz ? 0 : Math.PI / 2;
-      const vfx1 = this.add.rectangle(px, py, 40, 8, 0xfcd860, 0.9)
-        .setDepth(DEPTH.VFX).setRotation(ang + Math.PI / 4);
-      const vfx2 = this.add.rectangle(px, py, 40, 8, 0xfcd860, 0.9)
-        .setDepth(DEPTH.VFX).setRotation(ang - Math.PI / 4);
-      [vfx1, vfx2].forEach((v) => {
-        this.tweens.add({
-          targets: v, alpha: 0, scaleX: 1.6, scaleY: 1.6,
-          duration: 180, ease: 'Power2', onComplete: () => v.destroy(),
-        });
+      // Crescent swoosh sweeping across the facing direction
+      const facingAngle = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 }[facing] ?? Math.PI / 2;
+      const g = this.add.graphics({ x: this.player.x, y: this.player.y }).setDepth(DEPTH.VFX);
+      const R = 30;
+      const span = Math.PI * 0.75;
+      for (let i = 0; i < 4; i++) {
+        g.lineStyle(7 - i * 1.5, i === 0 ? 0xfff2b0 : 0xfcd860, 0.95 - i * 0.2);
+        g.beginPath();
+        g.arc(0, 0, R - i * 3, facingAngle - span / 2, facingAngle + span / 2, false);
+        g.strokePath();
+      }
+      g.setScale(0.7).setAngle(-25);
+      this.tweens.add({
+        targets: g, scale: 1.15, angle: 25, alpha: 0,
+        duration: 200, ease: 'Cubic.easeOut', onComplete: () => g.destroy(),
       });
       return;
     }
@@ -770,18 +774,33 @@ export class WorldScene extends Phaser.Scene {
   }
 
   _makePauseBtn(x, y, width, text, cb, primary) {
+    return this._makeButton(x, y, width, 40, text, cb, primary);
+  }
+
+  // Rounded HUD button: Graphics for the look, a Zone for the hit area.
+  _makeButton(x, y, width, height, text, cb, primary) {
     const fill  = primary ? COLORS.goldHex : 0x232a3a;
     const hover = primary ? 0xffe28a : 0x2f384c;
-    const bg = this.add.rectangle(x, y, width, 38, fill, 1)
+    const g = this.add.graphics().setScrollFactor(0);
+    const draw = (color) => {
+      g.clear();
+      g.fillStyle(color, 1);
+      g.fillRoundedRect(x - width / 2, y - height / 2, width, height, height / 2);
+      if (!primary) {
+        g.lineStyle(1, 0xffffff, 0.14);
+        g.strokeRoundedRect(x - width / 2 + 0.5, y - height / 2 + 0.5, width - 1, height - 1, height / 2);
+      }
+    };
+    draw(fill);
+    const hit = this.add.zone(x, y, width, height)
       .setScrollFactor(0)                   // must precede setInteractive so hit area aligns
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', cb)
-      .on('pointerover',  () => bg.setFillStyle(hover))
-      .on('pointerout',   () => bg.setFillStyle(fill));
-    if (!primary) bg.setStrokeStyle(1, 0xffffff, 0.14);
-    const label = this.add.text(x, y, text, textStyle(14, primary ? COLORS.ink : COLORS.text, { stroke: 0 }))
+      .on('pointerover', () => draw(hover))
+      .on('pointerout',  () => draw(fill));
+    const label = this.add.text(x, y, text, textStyle(15, primary ? COLORS.ink : COLORS.text, { weight: 800, stroke: 0 }))
       .setOrigin(0.5).setScrollFactor(0);
-    return [bg, label];
+    return [g, hit, label];
   }
 
   _showTutorial() {
@@ -846,14 +865,13 @@ export class WorldScene extends Phaser.Scene {
     });
 
     const btnY  = top + panelH - FOOT_H / 2 - 6;
-    const btnBg = this.add.rectangle(cx, btnY, Math.min(panelW - 48, 280), 42, COLORS.goldHex)
-      .setInteractive({ useHandCursor: true });
-    const btnTxt = this.add.text(cx, btnY, "Let's go!", textStyle(15, COLORS.ink, { weight: 800, stroke: 0 })).setOrigin(0.5);
+    let dismiss = () => {};
+    const startBtn = this._makeButton(cx, btnY, Math.min(panelW - 48, 280), 44, "Let's go!", () => dismiss(), true);
     const btnSub = this.add.text(cx, btnY + 32, isTouch ? 'Tap the button to start' : 'or press any key', textStyle(11, COLORS.muted, { weight: 500, stroke: 0 })).setOrigin(0.5);
-    container.add([btnBg, btnTxt, btnSub]);
+    container.add([...startBtn, btnSub]);
 
     // ── Dismiss logic ─────────────────────────────────────────────────
-    const dismiss = () => {
+    dismiss = () => {
       container.destroy();
       this._paused = false;
       this.physics.resume();
@@ -863,9 +881,6 @@ export class WorldScene extends Phaser.Scene {
       this.input.keyboard.off('keydown', dismiss);
     };
 
-    btnBg.on('pointerdown', dismiss);
-    btnBg.on('pointerover',  () => btnBg.setFillStyle(0xffe28a));
-    btnBg.on('pointerout',   () => btnBg.setFillStyle(COLORS.goldHex));
     this.input.keyboard.once('keydown', dismiss);
 
     // Panel slides in from below for a polished entrance

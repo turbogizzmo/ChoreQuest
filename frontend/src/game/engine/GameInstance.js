@@ -57,6 +57,22 @@ export function createGame(containerId, options = {}) {
     game.scene.start('BootScene', { userId, userName, avatarConfig, isKid, onExit, onComplete });
   });
 
+  // Phaser caches where the canvas sits on the page to map clicks/taps. The
+  // React shell can shift it after boot (header, splash, mobile chrome), which
+  // left on-canvas buttons unclickable — re-measure whenever the container moves.
+  if (container && typeof ResizeObserver !== 'undefined') {
+    const remeasure = () => { if (!game.isDestroyed) game.scale.updateBounds(); };
+    const ro = new ResizeObserver(remeasure);
+    ro.observe(container);
+    window.addEventListener('scroll', remeasure, true);
+    const timer = setTimeout(remeasure, 500);
+    game.events.once('destroy', () => {
+      ro.disconnect();
+      window.removeEventListener('scroll', remeasure, true);
+      clearTimeout(timer);
+    });
+  }
+
   return game;
 }
 

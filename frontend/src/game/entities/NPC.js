@@ -6,6 +6,7 @@
 
 import { TILE_SIZE } from '../data/WorldData.js';
 import { DEPTH, ySort } from '../engine/depth.js';
+import { textStyle, COLORS } from '../ui/theme.js';
 
 const PROX_TILES = 3;      // tile radius for dialogue trigger
 const PROX_PX    = PROX_TILES * TILE_SIZE;
@@ -30,7 +31,7 @@ export class NPC {
 
     // ── Sprite ────────────────────────────────────────────────────────────
     this.sprite = scene.add.sprite(px, py, 'npc_shopkeeper', 0)
-      .setScale(2).setDepth(ySort(py)).setOrigin(0.5, 1);
+      .setDepth(ySort(py)).setOrigin(0.5, 1);
 
     if (!scene.anims.exists('npc_idle')) {
       scene.anims.create({
@@ -51,10 +52,7 @@ export class NPC {
     this._nameTag = scene.add.text(
       px, py - this.sprite.displayHeight - 2,
       'Keeper',
-      {
-        fontSize: '7px', fontFamily: 'monospace', color: '#fcd860',
-        stroke: '#000', strokeThickness: 2, resolution: 2,
-      },
+      textStyle(11, COLORS.gold, { weight: 800, stroke: 3 }),
     ).setDepth(DEPTH.LABEL).setOrigin(0.5, 1);
 
     // ── Dialogue state ────────────────────────────────────────────────────
@@ -91,11 +89,10 @@ export class NPC {
     this._lineIdx++;
 
     // Text element
-    const textEl = scene.add.text(sx, sy - 20, line, {
-      fontSize: '7px', fontFamily: 'monospace', color: '#ffffff',
-      stroke: '#000', strokeThickness: 2, resolution: 2,
-      wordWrap: { width: 96, useAdvancedWrap: true },
-    }).setDepth(DEPTH.BUBBLE + 0.1).setOrigin(0.5, 1);
+    const pad = 8;
+    const textEl = scene.add.text(sx, sy - 22 - pad, line, textStyle(11, COLORS.text, {
+      weight: 600, stroke: 0, wordWrap: { width: 150, useAdvancedWrap: true },
+    })).setDepth(DEPTH.BUBBLE + 0.1).setOrigin(0.5, 1);
 
     const bubble = scene.add.graphics().setDepth(DEPTH.BUBBLE);
 
@@ -109,19 +106,18 @@ export class NPC {
     this._metricsTimer = scene.time.delayedCall(TEXT_METRICS_READY_DELAY_MS, () => {
       this._metricsTimer = null;
       if (this._bubble !== bubble || !textEl.active) return;
-      const pad = 6;
       const bw  = textEl.width  + pad * 2;
       const bh  = textEl.height + pad * 2;
       const bx  = sx - bw / 2;
       const by  = sy - 22 - bh;
 
       bubble.clear();
-      bubble.fillStyle(0x0d0d1e, 0.88);
-      bubble.fillRoundedRect(bx, by, bw, bh, 4);
-      bubble.lineStyle(1, 0xfcd860, 0.9);
-      bubble.strokeRoundedRect(bx, by, bw, bh, 4);
+      bubble.fillStyle(0x0f1420, 0.92);
+      bubble.fillRoundedRect(bx, by, bw, bh, 10);
+      bubble.lineStyle(1, COLORS.goldHex, 0.9);
+      bubble.strokeRoundedRect(bx, by, bw, bh, 10);
       // Tail pointing down toward NPC head
-      bubble.fillStyle(0x0d0d1e, 0.88);
+      bubble.fillStyle(0x0f1420, 0.92);
       bubble.fillTriangle(sx - 5, sy - 22, sx + 5, sy - 22, sx, sy - 14);
       bubble.lineStyle(0, 0, 0); // clear line style for fill
 
