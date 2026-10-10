@@ -165,11 +165,9 @@ function UpdatePanel({ isAdmin }) {
     setUpdateInfo(null);
     setTriggerMsg('');
     try {
-      const res = await fetch('/api/admin/update/check', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('chorequest_access_token')}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Check failed');
+      // api() refreshes an expired access token and retries; a raw fetch
+      // with the stored token showed "Invalid or expired token" instead.
+      const data = await api('/api/admin/update/check');
       setUpdateInfo(data);
       if (data.watchdog) setWatchdog(data.watchdog);
     } catch (err) {
@@ -183,12 +181,7 @@ function UpdatePanel({ isAdmin }) {
     setTriggering(true);
     setTriggerMsg('');
     try {
-      const res = await fetch('/api/admin/update/trigger', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('chorequest_access_token')}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || 'Trigger failed');
+      await api('/api/admin/update/trigger', { method: 'POST' });
       // Dispatch event to show the full-screen update overlay
       window.dispatchEvent(new CustomEvent('app:update-triggered', {
         detail: { currentVersion: version?.version ?? null },
