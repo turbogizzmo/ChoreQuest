@@ -9,6 +9,7 @@ Covers:
 
 from datetime import date, datetime
 import asyncio
+import threading
 
 import pytest
 
@@ -240,8 +241,9 @@ async def test_excluded_slot_is_not_recreated(db):
 async def test_concurrent_create_if_missing_ignores_unique_conflict(tmp_path):
     """Concurrent inserts for the same slot must not raise or duplicate rows."""
     db_path = tmp_path / "assignments-concurrency.db"
+    db_url = f"sqlite+aiosqlite:///{db_path}"
     engine = create_async_engine(
-        f"sqlite+aiosqlite:///{db_path}",
+        db_url,
         echo=False,
         connect_args={"check_same_thread": False, "timeout": 30},
     )
@@ -257,22 +259,31 @@ async def test_concurrent_create_if_missing_ignores_unique_conflict(tmp_path):
         await setup_db.commit()
 
     target_day = date(2024, 4, 8)
-    start = asyncio.Event()
-    entrants = 0
-    entrants_lock = asyncio.Lock()
+    start_barrier = threading.Barrier(2)
 
-    async def concurrent_create():
-        nonlocal entrants
-        async with session_factory() as session:
-            async with entrants_lock:
-                entrants += 1
-                if entrants == 2:
-                    start.set()
-            await start.wait()
-            await _create_if_missing(session, chore.id, kid.id, target_day)
-            await session.commit()
+    def concurrent_create():
+        async def _run():
+            worker_engine = create_async_engine(
+                db_url,
+                echo=False,
+                connect_args={"check_same_thread": False, "timeout": 30},
+            )
+            worker_factory = async_sessionmaker(
+                worker_engine, class_=AsyncSession, expire_on_commit=False
+            )
+            try:
+                async with worker_factory() as session:
+                    await asyncio.to_thread(start_barrier.wait, timeout=10)
+                    await _create_if_missing(session, chore.id, kid.id, target_day)
+                    await session.commit()
+            finally:
+                await worker_engine.dispose()
+        asyncio.run(_run())
 
-    await asyncio.gather(concurrent_create(), concurrent_create())
+    await asyncio.gather(
+        asyncio.to_thread(concurrent_create),
+        asyncio.to_thread(concurrent_create),
+    )
 
     async with session_factory() as verify_db:
         assignments = (

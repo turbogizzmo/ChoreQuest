@@ -288,7 +288,7 @@ async def _create_if_missing(
         index_elements=["chore_id", "user_id", "date"]
     )
     result = await db.execute(stmt)
-    created = (result.rowcount or 0) > 0
+    created = result.rowcount == 1
     if created:
         logger.debug("Created assignment: chore=%d user=%d day=%s", chore_id, user_id, day)
     return created
