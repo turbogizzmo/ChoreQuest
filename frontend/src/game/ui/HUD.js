@@ -33,6 +33,10 @@ const MINIMAP_TILE_COLORS = {
   [TILE.TREE_TOP]: '#1f5e2c',
   [TILE.TREE_BOT]: '#1f5e2c',
   [TILE.WALL]:     '#8b8478',
+  [TILE.SAND]:     '#e6d29a',
+  [TILE.STONE]:    '#b3ada2',
+  [TILE.BUSH]:     '#3f8f45',
+  [TILE.ROCK]:     '#8e8a86',
 };
 
 export class HUD {
