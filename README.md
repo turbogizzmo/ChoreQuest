@@ -91,17 +91,27 @@ Your data (`./data`) is preserved across rebuilds. The Admin Dashboard shows a b
 
 ChoreQuest has a built-in one-click update flow. When a new version is available, an admin clicks **Apply Update** in Settings — the app writes a flag file to `./data/.update_requested`, and a lightweight host-side script picks it up and handles the rest.
 
-Run `watchdog.sh` once on the host (outside Docker):
+**Recommended:** run it every minute from cron. Cron mode survives reboots and always runs the newest copy of the script:
+
+```cron
+* * * * * /bin/bash /path/to/ChoreQuest/watchdog.sh --cron >> /path/to/ChoreQuest/data/watchdog.log 2>&1
+```
+
+On **Synology**: Control Panel → Task Scheduler → Create → Scheduled Task → User-defined script. Run it as `root`, repeat every minute, and use the command above (without the `* * * * *`).
+
+Alternatively, run it as a long-lived daemon. It has to be restarted after every reboot or DSM update:
 
 ```bash
 nohup bash /path/to/ChoreQuest/watchdog.sh >> /path/to/ChoreQuest/data/watchdog.log 2>&1 &
 ```
 
-Or add it as a cron job that checks every minute:
+The watchdog writes a heartbeat and the result of each deploy into `./data/`. **Settings → Version** shows whether it's online and, if an update failed, the last lines of `data/deploy.log`.
 
-```cron
-* * * * * /bin/bash /path/to/ChoreQuest/watchdog.sh --cron >> /path/to/ChoreQuest/data/watchdog.log 2>&1
-```
+**Troubleshooting "Update available" that never applies**
+
+- *Watchdog offline / status unknown*: it isn't running. Set up the cron task above.
+- *"git pull failed"*: the NAS copy has local edits or commits. Run `git status` in the repo folder, then stash or discard the changes.
+- *Stuck after a reboot mid-update*: older watchdog versions left `data/.update_in_progress` behind and skipped every update after that. The current version clears stale locks automatically. On an old version, delete that file by hand.
 
 When triggered, `watchdog.sh` runs `deploy.sh` which does `git pull` + `docker compose build --no-cache` + `docker compose up -d`. The app shows a full-screen update overlay to all connected users during the rebuild and auto-reloads when the new container is ready.
 
