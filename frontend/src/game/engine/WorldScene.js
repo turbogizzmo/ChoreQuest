@@ -95,6 +95,8 @@ export class WorldScene extends Phaser.Scene {
     }
     this._addShadow(this.player, 0.85, 14);
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
+    this.cameras.main.fadeIn(450, 11, 22, 64);
+    this._nextDustAt = 0;
 
     // Collision: player <-> world tiles
     this.physics.add.collider(this.player, layer);
@@ -300,6 +302,7 @@ export class WorldScene extends Phaser.Scene {
     updatePlayer(this.player, cursors, this.wasd, PLAYER_SPEED, delta);
     this.player.setDepth(ySort(this.player.y + 14));
     this.portalMgr?.update(this.player);
+    this._kickUpDust(time);
 
     if (this.isRespawnInvulnerable()) {
       const now = Date.now();
@@ -511,6 +514,19 @@ export class WorldScene extends Phaser.Scene {
   _isBlockedAt(x, y) {
     const tile = this.worldLayer?.getTileAtWorldXY(x, y);
     return !!tile?.collides;
+  }
+
+  // Little dust puffs at the hero's feet while walking
+  _kickUpDust(time) {
+    const body = this.player?.body;
+    if (!body || (Math.abs(body.velocity.x) + Math.abs(body.velocity.y)) < 20 || time < this._nextDustAt) return;
+    this._nextDustAt = time + 200;
+    const puff = this.add.circle(this.player.x + Phaser.Math.Between(-4, 4), this.player.y + 14, 3, 0xe9dcc0, 0.7)
+      .setDepth(DEPTH.SHADOW + 0.5);
+    this.tweens.add({
+      targets: puff, y: puff.y - 6, scale: 1.8, alpha: 0,
+      duration: 380, ease: 'Sine.easeOut', onComplete: () => puff.destroy(),
+    });
   }
 
   // Soft ground shadow that follows a character
