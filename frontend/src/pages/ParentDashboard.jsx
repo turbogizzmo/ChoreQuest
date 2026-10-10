@@ -16,11 +16,13 @@ import {
   Send,
   CalendarDays,
   Swords,
+  Timer,
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { themedTitle } from '../utils/questThemeText';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import { useSettings } from '../hooks/useSettings';
 import AvatarDisplay from '../components/AvatarDisplay';
 import Modal from '../components/Modal';
 
@@ -49,10 +51,50 @@ function utcToLocalDateISO(dtStr) {
   return d ? toLocalISO(d) : '';
 }
 
+/** Hours left before an unreviewed submission is auto-approved (null if off). */
+function autoApproveHoursLeft(completedAt, windowHours, nowMs) {
+  if (!windowHours || !completedAt) return null;
+  const submitted = parseUtcDate(completedAt);
+  if (!submitted) return null;
+  const msLeft = submitted.getTime() + windowHours * 3600000 - nowMs;
+  return Math.max(0, msLeft / 3600000);
+}
+
+function AutoApproveChip({ hoursLeft }) {
+  if (hoursLeft == null) return null;
+  const urgent = hoursLeft < 6;
+  const label = hoursLeft < 1
+    ? 'Auto-approves soon'
+    : hoursLeft < 24
+      ? `Auto-approves in ${Math.ceil(hoursLeft)}h`
+      : `Auto-approves in ${Math.round(hoursLeft / 24)}d`;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${
+        urgent
+          ? 'text-amber-400 bg-amber-500/10 border-amber-500/30'
+          : 'text-muted bg-navy border-border'
+      }`}
+      title="Approve or reject before then, or it will be approved automatically"
+    >
+      <Timer size={10} />
+      {label}
+    </span>
+  );
+}
+
 export default function ParentDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { colorTheme } = useTheme();
+  const { auto_approve_hours: autoApproveHours } = useSettings();
+  // Re-render the auto-approve countdowns once a minute
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!autoApproveHours) return undefined;
+    const id = setInterval(() => setNowMs(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, [autoApproveHours]);
 
   const [familyStats, setFamilyStats] = useState([]);
   const [pendingVerifications, setPendingVerifications] = useState([]);
@@ -113,11 +155,13 @@ export default function ParentDashboard() {
     setActionLoading((prev) => ({ ...prev, [key]: busy }));
   };
 
-  const handleVerifyChore = async (choreId) => {
-    const key = `verify-${choreId}`;
+  // Always pass kid_id: without it the backend verifies the latest completed
+  // assignment for the chore, which may belong to a different kid.
+  const handleVerifyChore = async (assignment) => {
+    const key = `verify-${assignment.id}`;
     setActionBusy(key, true);
     try {
-      await api(`/api/chores/${choreId}/verify`, { method: 'POST' });
+      await api(`/api/chores/${assignment.chore_id}/verify?kid_id=${assignment.user_id}`, { method: 'POST' });
       await fetchData();
     } catch (err) {
       setError(err.message || 'Failed to verify chore');
@@ -126,11 +170,11 @@ export default function ParentDashboard() {
     }
   };
 
-  const handleRejectChore = async (choreId) => {
-    const key = `reject-${choreId}`;
+  const handleRejectChore = async (assignment) => {
+    const key = `reject-${assignment.id}`;
     setActionBusy(key, true);
     try {
-      await api(`/api/chores/${choreId}/uncomplete`, { method: 'POST' });
+      await api(`/api/chores/${assignment.chore_id}/uncomplete?kid_id=${assignment.user_id}`, { method: 'POST' });
       await fetchData();
     } catch (err) {
       setError(err.message || 'Failed to reject chore');
@@ -318,14 +362,18 @@ export default function ParentDashboard() {
       {/* Pending Verifications */}
       {hasPendingItems && (
         <section>
-          <h2 className="text-cream text-sm font-semibold mb-2">
+          <h2 className="flex items-center gap-2 text-cream text-sm font-semibold mb-2">
             Pending Verifications
+            <span className="px-1.5 py-0.5 rounded-full bg-accent/15 text-accent-light text-[10px] font-semibold leading-none">
+              {pendingVerifications.length + pendingBountyClaims.length}
+            </span>
           </h2>
 
           <div className="space-y-2">
             {pendingVerifications.map((assignment) => {
-              const verifyKey = `verify-${assignment.chore_id}`;
-              const rejectKey = `reject-${assignment.chore_id}`;
+              const verifyKey = `verify-${assignment.id}`;
+              const rejectKey = `reject-${assignment.id}`;
+              const hoursLeft = autoApproveHoursLeft(assignment.completed_at, autoApproveHours, nowMs);
               const isVerifying = actionLoading[verifyKey];
               const isRejecting = actionLoading[rejectKey];
               const isBusy = isVerifying || isRejecting;
@@ -360,8 +408,11 @@ export default function ParentDashboard() {
                           </span>
                           {assignment.completed_at && (
                             <span className="text-muted ml-1">
-                              · submitted {new Date(assignment.completed_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                              · submitted {parseUtcDate(assignment.completed_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                             </span>
+                          )}
+                          {hoursLeft != null && (
+                            <span className="ml-1.5"><AutoApproveChip hoursLeft={hoursLeft} /></span>
                           )}
                         </p>
                       )}
@@ -370,7 +421,7 @@ export default function ParentDashboard() {
                       <button
                         className="game-btn game-btn-blue !px-2.5 !py-1.5"
                         disabled={isBusy}
-                        onClick={() => handleVerifyChore(assignment.chore_id)}
+                        onClick={() => handleVerifyChore(assignment)}
                         title="Approve"
                       >
                         {isVerifying ? (
@@ -382,7 +433,7 @@ export default function ParentDashboard() {
                       <button
                         className="game-btn game-btn-red !px-2.5 !py-1.5"
                         disabled={isBusy}
-                        onClick={() => handleRejectChore(assignment.chore_id)}
+                        onClick={() => handleRejectChore(assignment)}
                         title="Reject"
                       >
                         {isRejecting ? (

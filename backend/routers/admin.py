@@ -318,6 +318,7 @@ async def get_feature_settings(
         "chore_trading_enabled",
         "grace_period_days",
         "enable_debug_endpoints",
+        "auto_approve_hours",
     ]
     result = await db.execute(
         select(AppSetting).where(AppSetting.key.in_(feature_keys))
@@ -328,6 +329,7 @@ async def get_feature_settings(
     features = {k: "true" for k in feature_keys if k in bool_keys}
     features["enable_debug_endpoints"] = "false"  # off by default
     features["grace_period_days"] = "1"
+    features["auto_approve_hours"] = "0"  # off by default
     for s in settings_list:
         features[s.key] = s.value
     # Env-derived capability (not a DB setting): AI quest generation is

@@ -20,8 +20,16 @@ import {
   Trash2,
   LayoutDashboard,
   Sparkles,
+  Timer,
 } from 'lucide-react';
 import VacationSettings from '../components/VacationSettings';
+
+const AUTO_APPROVE_PRESETS = [
+  { hours: 24, label: '1 day' },
+  { hours: 48, label: '2 days' },
+  { hours: 72, label: '3 days' },
+  { hours: 168, label: '1 week' },
+];
 
 const AI_PROVIDER_LABELS = {
   gemini: 'Google Gemini',
@@ -37,12 +45,102 @@ const clampXpPerDollar = (value) => {
   return Math.min(1000, Math.max(1, parsed));
 };
 
+function timeAgo(iso) {
+  if (!iso) return '';
+  const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return 'just now';
+  if (secs < 3600) return `${Math.round(secs / 60)} min ago`;
+  if (secs < 86400) return `${Math.round(secs / 3600)} h ago`;
+  return `${Math.round(secs / 86400)} days ago`;
+}
+
+const WATCHDOG_CRON = '* * * * * /bin/bash /path/to/ChoreQuest/watchdog.sh --cron >> /path/to/ChoreQuest/data/watchdog.log 2>&1';
+
+// Host watchdog health + last deploy result, so a stuck "Apply Update" can be
+// diagnosed from the app instead of SSHing into the NAS.
+function WatchdogStatus({ status }) {
+  if (!status) return null;
+  const { alive, last_seen: lastSeen, update_pending_since: pendingSince, deploy_in_progress: deploying, last_update: last } = status;
+
+  const dot = alive === true ? 'bg-emerald' : alive === false ? 'bg-crimson' : 'bg-muted/60';
+  const label = alive === true
+    ? `Watchdog online · checked ${timeAgo(lastSeen)}`
+    : alive === false
+      ? `Watchdog offline · last seen ${timeAgo(lastSeen)}`
+      : 'Watchdog status unknown';
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-xs">
+        <span className="relative flex h-2 w-2">
+          {alive === true && <span className="absolute inline-flex h-full w-full rounded-full bg-emerald opacity-60 animate-ping" />}
+          <span className={`relative inline-flex h-2 w-2 rounded-full ${dot}`} />
+        </span>
+        <span className={alive === false ? 'text-crimson' : 'text-cream/80'}>{label}</span>
+      </div>
+
+      {alive == null && (
+        <p className="text-muted text-[11px] leading-relaxed">
+          No heartbeat found. The watchdog may not be running, or it's an older version that doesn't report status. Set it up as a cron job (below), then reload this page.
+        </p>
+      )}
+
+      {deploying && (
+        <div className="flex items-center gap-1.5 text-xs text-accent">
+          <Loader2 size={12} className="animate-spin" /> Update in progress on the host…
+        </div>
+      )}
+
+      {pendingSince && !deploying && (
+        <div className="flex items-start gap-1.5 text-xs p-2 rounded-md border text-amber-400 border-amber-500/30 bg-amber-500/10">
+          <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+          Update requested {timeAgo(pendingSince)} but the watchdog hasn't picked it up yet.
+          {alive !== true && ' Check that watchdog.sh is running on the host.'}
+        </div>
+      )}
+
+      {last?.state === 'failed' && (
+        <div className="rounded-md border border-crimson/30 bg-crimson/10 p-2 space-y-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-crimson">
+            <AlertTriangle size={12} /> Last update failed {timeAgo(last.updated_at)}
+          </div>
+          <pre className="max-h-28 overflow-auto whitespace-pre-wrap break-words rounded bg-navy/70 p-2 font-mono text-[10px] leading-relaxed text-cream/70">
+            {last.message}
+          </pre>
+          <p className="text-muted text-[11px]">Full output: <span className="font-mono text-cream/60">data/deploy.log</span> on the host.</p>
+        </div>
+      )}
+      {last?.state === 'success' && (
+        <p className="flex items-center gap-1.5 text-[11px] text-muted">
+          <CheckCircle2 size={11} className="text-emerald" /> Last update succeeded {timeAgo(last.updated_at)}
+        </p>
+      )}
+
+      {alive !== true && (
+        <details className="group text-[11px] text-muted">
+          <summary className="cursor-pointer select-none hover:text-cream">How to run the watchdog</summary>
+          <div className="mt-1.5 space-y-1.5 leading-relaxed">
+            <p>Add this as a scheduled task that runs every minute (on Synology: Control Panel → Task Scheduler → User-defined script, user <span className="font-mono">root</span>):</p>
+            <pre className="overflow-x-auto rounded bg-navy/70 p-2 font-mono text-[10px] text-cream/70">{WATCHDOG_CRON}</pre>
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
 function UpdatePanel({ isAdmin }) {
   const [version, setVersion] = useState(null);
   const [checking, setChecking] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null); // null = not checked yet
   const [triggering, setTriggering] = useState(false);
   const [triggerMsg, setTriggerMsg] = useState('');
+  const [watchdog, setWatchdog] = useState(null);
+
+  // Watchdog status is local-only (no GitHub call), so load it right away
+  useEffect(() => {
+    api('/api/admin/update/status').then(setWatchdog).catch(() => {});
+  }, []);
 
   // Load current version from health endpoint on mount
   useEffect(() => {
@@ -73,6 +171,7 @@ function UpdatePanel({ isAdmin }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Check failed');
       setUpdateInfo(data);
+      if (data.watchdog) setWatchdog(data.watchdog);
     } catch (err) {
       setUpdateInfo({ error: err.message });
     } finally {
@@ -205,11 +304,7 @@ function UpdatePanel({ isAdmin }) {
           </div>
         )}
 
-        {isAdmin && (
-          <p className="text-muted text-[11px] leading-relaxed">
-            Requires <span className="font-mono text-cream/60">watchdog.sh</span> running on the host. See the repo for setup.
-          </p>
-        )}
+        {isAdmin && <WatchdogStatus status={watchdog} />}
       </div>
     </div>
   );
@@ -846,6 +941,70 @@ export default function Settings() {
               className="field-input max-w-[120px]"
             />
           </div>
+
+          {/* Auto-approve */}
+          {(() => {
+            const autoHours = Number(settings.auto_approve_hours) || 0;
+            const autoOn = autoHours > 0;
+            return (
+              <div className="game-panel p-4">
+                <div className="flex items-center gap-2">
+                  <Timer size={16} className="text-accent" />
+                  <h2 className="text-cream text-sm font-semibold">Auto-Approve Quests</h2>
+                </div>
+                <ToggleSwitch
+                  enabled={autoOn}
+                  onChange={(v) => updateSetting('auto_approve_hours', v ? 48 : 0)}
+                  label="Approve automatically if nobody reviews"
+                  description="Busy week? Quests waiting for approval longer than the window below are approved for you, so kids still get their XP. Rejecting before then works as usual."
+                />
+                {autoOn && (
+                  <div className="pl-4 border-l-2 border-border/50 space-y-3">
+                    <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Auto-approve after">
+                      {AUTO_APPROVE_PRESETS.map((p) => {
+                        const active = autoHours === p.hours;
+                        return (
+                          <button
+                            key={p.hours}
+                            type="button"
+                            role="radio"
+                            aria-checked={active}
+                            onClick={() => updateSetting('auto_approve_hours', p.hours)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                              active
+                                ? 'bg-accent/20 border-accent/50 text-accent-light'
+                                : 'bg-navy border-border text-muted hover:text-cream hover:border-border-light'
+                            }`}
+                          >
+                            {p.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-muted">
+                      Custom
+                      <input
+                        type="number"
+                        min={1}
+                        max={720}
+                        value={autoHours}
+                        onChange={(e) => {
+                          const val = Math.min(720, Math.max(1, parseInt(e.target.value, 10) || 1));
+                          updateSetting('auto_approve_hours', val);
+                        }}
+                        className="field-input max-w-[90px]"
+                      />
+                      hours
+                    </label>
+                    <p className="flex items-start gap-1.5 text-xs text-muted/80 leading-relaxed">
+                      <CheckCircle2 size={12} className="text-emerald mt-0.5 shrink-0" />
+                      Quests left unreviewed for {autoHours} hours are approved automatically. You'll get a notification each time.
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Save button */}
           <button

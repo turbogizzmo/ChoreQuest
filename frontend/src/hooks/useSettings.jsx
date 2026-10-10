@@ -9,6 +9,7 @@ const SettingsContext = createContext({
   grace_period_days: 1,
   enable_debug_endpoints: false,
   ai_quest_generation: false,
+  auto_approve_hours: 0,
 });
 
 export function SettingsProvider({ children }) {
@@ -20,6 +21,7 @@ export function SettingsProvider({ children }) {
     grace_period_days: 1,
     enable_debug_endpoints: false,
     ai_quest_generation: false,
+    auto_approve_hours: 0,
   });
 
   const fetchFeatures = useCallback(async () => {
@@ -33,6 +35,7 @@ export function SettingsProvider({ children }) {
         grace_period_days: parseInt(data.grace_period_days ?? '1', 10),
         enable_debug_endpoints: data.enable_debug_endpoints === 'true',
         ai_quest_generation: data.ai_quest_generation === 'true',
+        auto_approve_hours: parseInt(data.auto_approve_hours ?? '0', 10) || 0,
       });
     } catch {
       // If fetch fails, keep defaults (all enabled)

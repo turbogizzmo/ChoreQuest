@@ -59,6 +59,7 @@ export class WorldScene extends Phaser.Scene {
     // every death/respawn stacks a second set of gameplay listeners (double XP,
     // double sounds) and double-queues scene.restart, which orphans a looping
     // SoundSystem (music playing over itself).
+    this._gameplayListeners = [];
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this._cleanup());
 
     // ── Tilemap ────────────────────────────────────────────────────────
@@ -123,12 +124,12 @@ export class WorldScene extends Phaser.Scene {
 
     // ── Battle system ──────────────────────────────────────────────────
     this.battle = new BattleSystem(this);
-    this.events.on('enemyHurt', ({ enemy, damage }) => {
+    this._onGameplay('enemyHurt', ({ enemy, damage }) => {
       // Show damage number over every hit — makes attacks feel responsive
       this.hud.showFloatingText(enemy.x, enemy.y - 16, `-${damage}`, '#ff4444');
     });
 
-    this.events.on('enemyDefeated', ({ enemy, xpDrop, coinDrop }) => {
+    this._onGameplay('enemyDefeated', ({ enemy, xpDrop, coinDrop }) => {
       // Phase 5-A: apply 2× XP multiplier during a Chore Surge
       const surgeXp = this._surgeActive ? Math.round(xpDrop * SURGE_XP_MULT) : xpDrop;
 
@@ -154,7 +155,7 @@ export class WorldScene extends Phaser.Scene {
       this.chestSystem?.trySpawn(enemy.x, enemy.y);
     });
 
-    this.events.on('comboHit', ({ multiplier }) => {
+    this._onGameplay('comboHit', ({ multiplier }) => {
       this.hud.showCombo(multiplier);    // persistent HUD counter
       this.hud.showFloatingText(         // floating pop for immediate impact
         this.player.x, this.player.y - 48,
@@ -163,14 +164,14 @@ export class WorldScene extends Phaser.Scene {
       );
       this.sfx.playCombo(multiplier);
     });
-    this.events.on('playerHurt', ({ damage }) => {
+    this._onGameplay('playerHurt', ({ damage }) => {
       this.gameData.hp = Math.max(0, this.gameData.hp - damage);
       this.sfx.playPlayerHurt();
       if (this.gameData.hp <= 0) this._handlePlayerDeath();
     });
 
     // ── Portal entry ───────────────────────────────────────────────────
-    this.events.on('portalEnter', (zoneData) => {
+    this._onGameplay('portalEnter', (zoneData) => {
       if (!zoneData?.id) return;
       if (this._portalLockId === zoneData.id) return;
       const now = Date.now();
@@ -215,7 +216,7 @@ export class WorldScene extends Phaser.Scene {
 
     // ── Phase 5-A: Chest loot system ──────────────────────────────────
     this.chestSystem = new ChestSystem(this);
-    this.events.on('chestCollect', ({ coins, xp }) => {
+    this._onGameplay('chestCollect', ({ coins, xp }) => {
       this.gameData.coins += coins;
       this.gameData.xp    += xp;
       this.sfx.playCoinPickup();
@@ -540,7 +541,7 @@ export class WorldScene extends Phaser.Scene {
 
       // Explicitly stop and destroy the SoundSystem before restarting the
       // scene.  scene.restart() queues a shutdown+start pair that executes on
-      // the next frame; by the time Phaser's own shutdown() fires the Web
+      // the next frame; by the time the SHUTDOWN event runs _cleanup() the Web
       // Audio scheduler may have already pre-queued another 16-second music
       // loop.  Destroying here (with gain ramped to 0) guarantees the old
       // music stops immediately, regardless of Phaser's lifecycle timing.
@@ -873,14 +874,23 @@ export class WorldScene extends Phaser.Scene {
   // A method literally named `shutdown` is NOT called automatically by Phaser —
   // it must be wired to the event, which create() does.
   _cleanup() {
-    ['enemyHurt', 'enemyDefeated', 'comboHit', 'playerHurt', 'portalEnter', 'chestCollect']
-      .forEach((evt) => this.events.off(evt));
+    // Remove only the handlers this scene instance registered, so listeners
+    // other systems add on the same event names are left alone.
+    (this._gameplayListeners ?? []).forEach(([evt, fn]) => this.events.off(evt, fn));
+    this._gameplayListeners = [];
     this.sfx?.destroy();
     this.sfx = null;
     this.chestSystem?.destroy();
     this.chestSystem = null;
     this.npc?.destroy();
     this.npc = null;
+  }
+
+  // scene.events.on() wrapper that records the handler so _cleanup() can
+  // remove exactly it (Phaser keeps scene.events listeners across restarts).
+  _onGameplay(evt, fn) {
+    this.events.on(evt, fn);
+    this._gameplayListeners.push([evt, fn]);
   }
 
   isRespawnInvulnerable() {

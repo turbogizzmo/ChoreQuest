@@ -5,8 +5,12 @@ import Phaser from 'phaser';
 import { BootScene }  from './BootScene.js';
 import { WorldScene } from './WorldScene.js';
 
+// Height of the React header bar above the canvas (desktop only). Single
+// source of truth — AdventureMode renders the header at this height.
+export const ADVENTURE_HEADER_H = 44;
+
 export function createGame(containerId, options = {}) {
-  const { userId, userName, avatarConfig = null, isKid = false, headerH = 34, onExit, onComplete } = options;
+  const { userId, userName, avatarConfig = null, isKid = false, headerH = ADVENTURE_HEADER_H, onExit, onComplete } = options;
 
   const container = document.getElementById(containerId);
   const availW = container ? container.clientWidth  : window.innerWidth;
