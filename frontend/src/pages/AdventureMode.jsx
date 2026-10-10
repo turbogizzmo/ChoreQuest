@@ -12,9 +12,7 @@ import { levelFromXp } from '../game/data/WorldData.js';
 // Eager import so destroyGame is available synchronously in the effect cleanup,
 // eliminating the dynamic-import race that could leave a game instance un-destroyed
 // when React StrictMode unmounts+remounts before the lazy import resolves.
-import { createGame, destroyGame } from '../game/engine/GameInstance.js';
-
-const HEADER_H = 44; // px — keep in sync with GameInstance height calc
+import { createGame, destroyGame, ADVENTURE_HEADER_H as HEADER_H } from '../game/engine/GameInstance.js';
 
 export default function AdventureMode() {
   const { user }     = useAuth();
@@ -237,7 +235,11 @@ export default function AdventureMode() {
         )}
 
         {!gameReady && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-navy">
+          <div
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-navy"
+            role="status"
+            aria-live="polite"
+          >
             <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-accent/10 border border-accent/25 text-2xl">
               ⚔
             </div>
@@ -245,7 +247,7 @@ export default function AdventureMode() {
               <div className="text-base font-semibold text-cream">Adventure Mode</div>
               <div className="mt-1 text-xs text-muted">Building your world…</div>
             </div>
-            <div className="w-40 h-1 rounded-full bg-surface-raised overflow-hidden">
+            <div className="w-40 h-1 rounded-full bg-surface-raised overflow-hidden" role="progressbar" aria-label="Loading Adventure Mode">
               <div className="h-full w-1/3 rounded-full bg-accent animate-[advloader_1.1s_ease-in-out_infinite]" />
             </div>
             <style>{`

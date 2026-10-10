@@ -2,6 +2,7 @@
 In-app update management.
 
 GET  /api/admin/update/check   — compare current build vs latest GitHub commit
+GET  /api/admin/update/status  — host watchdog heartbeat + last deploy result
 POST /api/admin/update/trigger — write a flag file that the host watchdog picks up
 
 Architecture note: the container cannot rebuild itself (the frontend is baked in at
@@ -14,6 +15,7 @@ import json
 import os
 import urllib.request
 import urllib.error
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -25,7 +27,52 @@ from backend.websocket_manager import ws_manager
 router = APIRouter(prefix="/api/admin/update", tags=["update"])
 
 GITHUB_REPO = os.environ.get("GITHUB_REPO", "turbogizzmo/ChoreQuest")
-FLAG_FILE = Path("/app/data/.update_requested")
+DATA_DIR = Path("/app/data")
+FLAG_FILE = DATA_DIR / ".update_requested"
+HEARTBEAT_FILE = DATA_DIR / ".watchdog_heartbeat"
+LOCK_FILE = DATA_DIR / ".update_in_progress"
+STATUS_FILE = DATA_DIR / ".update_status.json"
+# watchdog.sh beats every 30s (daemon) or 60s (cron); allow a few misses.
+HEARTBEAT_STALE_SECONDS = 5 * 60
+
+
+def _watchdog_status(data_dir: Path | None = None) -> dict:
+    """Report what the host watchdog has written to the shared data volume.
+
+    ``alive`` is None when no heartbeat file exists — older watchdog.sh
+    versions don't write one, so "unknown" rather than "down".
+    """
+    d = data_dir or DATA_DIR
+    now = datetime.now(timezone.utc)
+
+    last_seen = None
+    alive = None
+    heartbeat = d / HEARTBEAT_FILE.name
+    if heartbeat.exists():
+        mtime = datetime.fromtimestamp(heartbeat.stat().st_mtime, tz=timezone.utc)
+        last_seen = mtime.isoformat()
+        alive = (now - mtime).total_seconds() < HEARTBEAT_STALE_SECONDS
+
+    last_update = None
+    status_file = d / STATUS_FILE.name
+    if status_file.exists():
+        try:
+            last_update = json.loads(status_file.read_text())
+        except (OSError, ValueError):
+            last_update = None
+
+    flag = d / FLAG_FILE.name
+    pending_since = None
+    if flag.exists():
+        pending_since = datetime.fromtimestamp(flag.stat().st_mtime, tz=timezone.utc).isoformat()
+
+    return {
+        "alive": alive,
+        "last_seen": last_seen,
+        "update_pending_since": pending_since,
+        "deploy_in_progress": (d / LOCK_FILE.name).exists(),
+        "last_update": last_update,
+    }
 
 
 def _fetch_latest_commit() -> dict:
@@ -61,6 +108,7 @@ async def check_for_updates(_: User = Depends(require_parent)):
             "latest": None,
             "update_available": False,
             "message": "Version tracking not available (dev/local build)",
+            "watchdog": _watchdog_status(),
         }
 
     try:
@@ -86,7 +134,14 @@ async def check_for_updates(_: User = Depends(require_parent)):
         "commit_message": commit_msg,
         "commit_date": commit_date,
         "commit_author": author,
+        "watchdog": _watchdog_status(),
     }
+
+
+@router.get("/status")
+async def watchdog_status(_: User = Depends(require_parent)):
+    """Host watchdog health + last deploy result (local files only, no GitHub call)."""
+    return _watchdog_status()
 
 
 @router.post("/trigger")

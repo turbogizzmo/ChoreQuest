@@ -20,6 +20,7 @@ from backend.models import RefreshToken, User, UserRole
 from backend.services.assignment_generator import generate_daily_assignments, expire_stale_assignments
 from backend.routers.bounty import expire_stale_bounty_claims
 from backend.services.push_hook import install_push_hooks
+from backend.services.verification import auto_approve_stale_completions
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,26 @@ async def daily_reset_task():
             logger.exception("Daily reset error")
 
 
+AUTO_APPROVE_INTERVAL_SECONDS = 15 * 60
+
+
+async def auto_approve_task():
+    """Periodically auto-approve quests parents haven't reviewed in time.
+
+    Disabled unless the ``auto_approve_hours`` setting is > 0. Runs on its own
+    short interval (not the daily reset) so a 48h window means ~48h, not up
+    to 72h. Compares UTC ``completed_at`` timestamps — no day boundaries.
+    """
+    await asyncio.sleep(60)  # let startup/seed finish first
+    while True:
+        try:
+            async with async_session() as db:
+                await auto_approve_stale_completions(db)
+        except Exception:
+            logger.exception("Auto-approve error")
+        await asyncio.sleep(AUTO_APPROVE_INTERVAL_SECONDS)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
@@ -135,8 +156,10 @@ async def lifespan(app: FastAPI):
     async with async_session() as db:
         await seed_database(db)
     task = asyncio.create_task(daily_reset_task())
+    approve_task = asyncio.create_task(auto_approve_task())
     yield
     task.cancel()
+    approve_task.cancel()
 
 
 app = FastAPI(title="ChoreQuest", lifespan=lifespan)
