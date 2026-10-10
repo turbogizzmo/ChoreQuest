@@ -8,6 +8,7 @@ import logging
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select, update
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import (
@@ -278,25 +279,19 @@ async def _create_if_missing(
 
     Returns True if a new assignment was created.
     """
-    existing = await db.execute(
-        select(ChoreAssignment).where(
-            ChoreAssignment.chore_id == chore_id,
-            ChoreAssignment.user_id == user_id,
-            ChoreAssignment.date == day,
-        )
+    stmt = sqlite_insert(ChoreAssignment).values(
+        chore_id=chore_id,
+        user_id=user_id,
+        date=day,
+        status=AssignmentStatus.pending,
+    ).on_conflict_do_nothing(
+        index_elements=["chore_id", "user_id", "date"]
     )
-    if existing.scalar_one_or_none() is None:
-        db.add(
-            ChoreAssignment(
-                chore_id=chore_id,
-                user_id=user_id,
-                date=day,
-                status=AssignmentStatus.pending,
-            )
-        )
+    result = await db.execute(stmt)
+    created = (result.rowcount or 0) > 0
+    if created:
         logger.debug("Created assignment: chore=%d user=%d day=%s", chore_id, user_id, day)
-        return True
-    return False
+    return created
 
 
 async def _generate_from_rules(

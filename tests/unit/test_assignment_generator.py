@@ -8,13 +8,19 @@ Covers:
 """
 
 from datetime import date, datetime
+import asyncio
 
 import pytest
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from backend.database import Base
 from backend.models import ChoreAssignment, RotationCadence, Recurrence, UserRole
-from backend.services.assignment_generator import auto_generate_week_assignments
+from backend.services.assignment_generator import (
+    _create_if_missing,
+    auto_generate_week_assignments,
+)
 
 from tests.unit.conftest import (
     make_category,
@@ -228,3 +234,56 @@ async def test_excluded_slot_is_not_recreated(db):
     assigned_dates = {a.date for a in assignments}
     assert excluded_day not in assigned_dates
     assert len(assignments) == 6  # 7 days minus the excluded Monday
+
+
+@pytest.mark.asyncio
+async def test_concurrent_create_if_missing_ignores_unique_conflict(tmp_path):
+    """Concurrent inserts for the same slot must not raise or duplicate rows."""
+    db_path = tmp_path / "assignments-concurrency.db"
+    engine = create_async_engine(
+        f"sqlite+aiosqlite:///{db_path}",
+        echo=False,
+        connect_args={"check_same_thread": False, "timeout": 30},
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with session_factory() as setup_db:
+        cat = await make_category(setup_db)
+        parent = await make_user(setup_db, "parent7", role=UserRole.parent)
+        kid = await make_user(setup_db, "kid_f")
+        chore = await make_chore(setup_db, parent.id, cat.id, recurrence=Recurrence.daily)
+        await setup_db.commit()
+
+    target_day = date(2024, 4, 8)
+    start = asyncio.Event()
+    entrants = 0
+    entrants_lock = asyncio.Lock()
+
+    async def concurrent_create():
+        nonlocal entrants
+        async with session_factory() as session:
+            async with entrants_lock:
+                entrants += 1
+                if entrants == 2:
+                    start.set()
+            await start.wait()
+            await _create_if_missing(session, chore.id, kid.id, target_day)
+            await session.commit()
+
+    await asyncio.gather(concurrent_create(), concurrent_create())
+
+    async with session_factory() as verify_db:
+        assignments = (
+            await verify_db.execute(
+                select(ChoreAssignment).where(
+                    ChoreAssignment.chore_id == chore.id,
+                    ChoreAssignment.user_id == kid.id,
+                    ChoreAssignment.date == target_day,
+                )
+            )
+        ).scalars().all()
+        assert len(assignments) == 1
+
+    await engine.dispose()
