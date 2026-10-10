@@ -164,11 +164,26 @@ async def trigger_update(admin: User = Depends(require_admin)):
     # watchdog picks up the flag file and begins the container restart.
     await asyncio.sleep(1.5)
 
+    # A flag that already exists means an update is already queued (possibly
+    # created by root on the host, which the container user can't touch) —
+    # that's success, not an error.
+    if FLAG_FILE.exists():
+        return {
+            "status": "ok",
+            "message": "An update is already queued. The watchdog will pick it up shortly.",
+        }
+
     try:
         FLAG_FILE.parent.mkdir(parents=True, exist_ok=True)
         FLAG_FILE.touch(exist_ok=True)
     except OSError as e:
-        raise HTTPException(500, detail=f"Could not write update flag: {e}")
+        raise HTTPException(
+            500,
+            detail=(
+                f"Could not write update flag: {e}. Check that the host's data/ folder "
+                "is writable by the container user."
+            ),
+        )
 
     return {
         "status": "ok",
