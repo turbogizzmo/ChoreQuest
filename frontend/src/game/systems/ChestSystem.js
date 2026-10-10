@@ -6,6 +6,7 @@
 // Emits 'chestCollect' event with { coins, xp } on pickup.
 
 import { CHEST_DROP_CHANCE, CHEST_REWARDS } from '../data/WorldData.js';
+import { DEPTH, ySort } from '../engine/depth.js';
 
 const DESPAWN_MS = 10_000; // ms until an uncollected chest fades out
 
@@ -27,7 +28,7 @@ export class ChestSystem {
 
     // Static physics sprite so collision detection is cheap
     const sprite = scene.physics.add.staticSprite(x, y - 8, 'chest', 0)
-      .setScale(1.5).setDepth(9);
+      .setScale(1.5).setDepth(ySort(y));
     sprite.refreshBody();
     // Keep the body disabled until the pop-in animation reaches its final size.
     if (sprite.body) sprite.body.enable = false;
@@ -90,7 +91,7 @@ export class ChestSystem {
     // Coin sparkle burst — 6 yellow pixels radiate outward
     for (let i = 0; i < 6; i++) {
       const angle = (Math.PI * 2 * i) / 6;
-      const sq = this.scene.add.rectangle(sprite.x, sprite.y, 5, 5, 0xfcd860, 1).setDepth(13);
+      const sq = this.scene.add.rectangle(sprite.x, sprite.y, 5, 5, 0xfcd860, 1).setDepth(DEPTH.VFX);
       this.scene.tweens.add({
         targets: sq,
         x: sprite.x + Math.cos(angle) * 30,

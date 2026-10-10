@@ -1,6 +1,8 @@
 // Procedural pixel-art sprite generator using canvas.
 // All sprites are generated at runtime — no external image files required.
 
+import { generateBuildings, generateProps } from './WorldArt.js';
+
 const NES = {
   black:      '#000000',
   white:      '#fcfcfc',
@@ -1062,145 +1064,6 @@ export function generateBossSheets(scene) {
 
 // ─── BUILDING SPRITES (32×32) ─────────────────────────────────────────────────
 
-const BUILDING_DEFS = {
-  kitchen: {
-    grid: [
-      '................RRRRRRRRRRRRRRRR',
-      '...............RRRRRRRRRRRRRRRRRR',
-      '..............RRRRRRRRRRRRRRRRRRRR',
-      '.............RRRRRRRRRRRRRRRRRRRRRR',
-      '............RRRRRRrRRRRRRrRRRRRRRR',
-      '...........RRRRRRRrRRRRRRrRRRRRRRRR',
-      '...........RRRRRRRRRRRRRRRRRRRRRRRR.',
-      '...........WWWWWWWWWWWWWWWWWWWWWWW.',
-      '...........WbbWWWWWbbbbbbbWWWWbbW..',
-      '...........WbbWWWWWbbbbbbbWWWWbbW..',
-      '...........WbbWWWWWbbbbbbbWWWWbbW..',
-      '...........WWWWWWWWWWWWWWWWWWWWWW..',
-      '...........WWWWWWWWWWWWWWWWWWWWWW..',
-      '...........WWDDDWWWWWWWWWWWWWWWWW..',
-      '...........WWDDDWWWWWWWWWWWWWWWWW..',
-      '...........WWDDDWWWWWWWWWWWWWWWWW..',
-      '...........WWWWWWWWWWWWWWWWWWWWWW..',
-      '...........WWWWWWWWWWWWWWWWWWWWWW..',
-      '...........WWWWWWWWWWWWWWWWWWWWWW..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '..........GGGGGGGGGGGGGGGGGGGGGGG..',
-      '..........GGGGGGGGGGGGGGGGGGGGGGG..',
-      '..........GGGGGGGGGGGGGGGGGGGGGGG..',
-    ],
-    p: {
-      R: NES.red, r: NES.lred,
-      W: NES.lgray, w: NES.white,
-      b: NES.sky, D: NES.brown,
-      G: NES.lgreen, '.': null,
-    },
-  },
-  laundry: {
-    grid: [
-      '................BBBBBBBBBBBBBBBB',
-      '...............BBBBBBBBBBBBBBBBBB',
-      '..............BBBBBBbBBBBBbBBBBBBB',
-      '.............BBBBBBBbBBBBBbBBBBBBBB',
-      '............BBBBBBBBbBBBBBbBBBBBBBBB',
-      '...........BBBBBBBBBBBBBBBBBBBBBBBBB.',
-      '...........WWWWWWWWWWWWWWWWWWWWWWWW.',
-      '...........WrrrrrrWWrrrrrrWWrrrrrrrW.',
-      '...........WrCCCCrWWrCCCCrWWrCCCCrW.',
-      '...........WrCCCCrWWrCCCCrWWrCCCCrW.',
-      '...........WrCCCCrWWrCCCCrWWrCCCCrW.',
-      '...........WrrrrrrWWrrrrrrWWrrrrrrrW.',
-      '...........WWWWWWWWWWWWWWWWWWWWWWWW.',
-      '...........WWDDDWWWWWWWWWWWWWWWWWWW.',
-      '...........WWDDDWWWWWWWWWWWWWWWWWWW.',
-      '...........WWDDDWWWWWWWWWWWWWWWWWWW.',
-      '...........WWWWWWWWWWWWWWWWWWWWWWWW.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '..........GGGGGGGGGGGGGGGGGGGGGGGGG.',
-      '..........GGGGGGGGGGGGGGGGGGGGGGGGG.',
-      '..........GGGGGGGGGGGGGGGGGGGGGGGGG.',
-      '..........GGGGGGGGGGGGGGGGGGGGGGGGG.',
-      '..........GGGGGGGGGGGGGGGGGGGGGGGGG.',
-    ],
-    p: {
-      B: NES.lblue, b: NES.blue,
-      W: NES.lgray, r: NES.lred, C: NES.sky,
-      D: NES.brown, G: NES.lgreen, '.': null,
-    },
-  },
-  reward_castle: {
-    grid: [
-      'YYYY..YYYYYY..YYYY......YYYY..YYYYYY..YYYY',
-      'YYYY..YYYYYY..YYYY......YYYY..YYYYYY..YYYY',
-      'YYYYYYYYYYYYYYYYYY......YYYYYYYYYYYYYYYYYY',
-      'YYYYYYYYYYYYYYYYYY......YYYYYYYYYYYYYYYYYY',
-      'YYYYYYYYYYYYYYYYYYyyyyyYYYYYYYYYYYYYYYYYY',
-      'YYYYYYYYYYYYYYYYYYyyyyyYYYYYYYYYYYYYYYYYY',
-      'YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY',
-      'YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WbbWWWWWWbbbbbbbbbbbbbbbbbbbbbWWWWWWWbbW',
-      'WbbWWWWWWbbbbbbbbbbbbbbbbbbbbbWWWWWWWbbW',
-      'WbbWWWWWWbbbbbbbbbbbbbbbbbbbbbWWWWWWWbbW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWDDDDDDDWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWDDDDDDDWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWDDDDDDDWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWDDDDDDDWWWWWWWWWWWWWWWWWW',
-      'GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
-      'GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
-      'GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
-    ],
-    p: {
-      Y: NES.yellow, y: NES.lyellow,
-      W: NES.lgray, b: NES.sky,
-      D: NES.brown, G: NES.lgreen, '.': null,
-    },
-  },
-};
-
-export function generateBuildingSprites(scene) {
-  Object.entries(BUILDING_DEFS).forEach(([key, def]) => {
-    const rows = def.grid.length;
-    const cols = def.grid[0].length;
-    const SCALE = 3; // 3× so buildings stand ~3 tiles tall — clearly visible in the world
-    const c = createCanvas(cols * SCALE, rows * SCALE);
-    const ctx = c.getContext('2d');
-    drawGrid(ctx, def.grid, def.p, SCALE);
-    addCanvasTexture(scene, `building_${key}`, c);
-  });
-}
-
 // ─── UI SPRITES ───────────────────────────────────────────────────────────────
 
 export function generateUISprites(scene) {
@@ -1265,7 +1128,8 @@ export function generateUISprites(scene) {
   //   row 7: 2px (pointed tip)
   const hc = createCanvas(2 * 8 * SCALE, 8 * SCALE);
   const hctx = hc.getContext('2d');
-  [[NES.red, NES.lred], [NES.dgray, NES.mgray]].forEach(([fg, hi], f) => {
+  // Empty hearts are a light slate so they stay visible on the dark HUD panel
+  [[NES.red, NES.lred], ['#4f586d', '#737d93']].forEach(([fg, hi], f) => {
     hctx.save();
     hctx.translate(f * 8 * SCALE, 0);
     hctx.fillStyle = fg;
@@ -1365,7 +1229,8 @@ export function generateAllSprites(scene, options = {}) {
   generatePlayerSheet(scene, options);
   generateEnemySheets(scene);
   generateBossSheets(scene);
-  generateBuildingSprites(scene);
+  generateBuildings(scene);
+  generateProps(scene);
   generateUISprites(scene);
   return generateTileset(scene);
 }

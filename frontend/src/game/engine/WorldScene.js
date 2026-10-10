@@ -10,10 +10,14 @@ import { HUD }                   from '../ui/HUD.js';
 import { writeSave }             from '../systems/SaveSystem.js';
 import { SoundSystem }           from '../systems/SoundSystem.js';
 import { pickRespawnPoint }      from '../systems/RespawnSystem.js';
-import { PORTAL_ZONES, ENEMY_ZONES, BOSS_ZONES, BOSS_STATS, TILE_SIZE, MAP_COLS, levelFromXp, SURGE_INTERVAL, SURGE_DURATION, SURGE_XP_MULT } from '../data/WorldData.js';
+import { PORTAL_ZONES, ENEMY_ZONES, BOSS_ZONES, BOSS_STATS, BUILDINGS, TILE, TILE_SIZE, MAP_COLS, levelFromXp, tileHash, SURGE_INTERVAL, SURGE_DURATION, SURGE_XP_MULT } from '../data/WorldData.js';
+import { paintGround } from '../sprites/WorldArt.js';
 import { ChestSystem } from '../systems/ChestSystem.js';
 import { NPC }         from '../entities/NPC.js';
 import { api } from '../../api/client.js';
+import { setupCameras, uiSize } from './view.js';
+import { textStyle, drawPanel, COLORS } from '../ui/theme.js';
+import { DEPTH, ySort } from './depth.js';
 
 const HUD_DEPTH = 100;
 
@@ -21,6 +25,9 @@ const SAVE_INTERVAL = 15000; // ms
 const RESPAWN_INVULNERABILITY_MS = 3000;
 const RESPAWN_BLINK_ALPHA = 0.65;
 const RESPAWN_BLINK_INTERVAL_MS = 120;
+
+// Road tile just south of the castle gate
+const SAFE_SPAWN = { x: 20 * TILE_SIZE + TILE_SIZE / 2, y: 20 * TILE_SIZE + TILE_SIZE / 2 };
 
 export class WorldScene extends Phaser.Scene {
   constructor() {
@@ -32,6 +39,9 @@ export class WorldScene extends Phaser.Scene {
     this.userName  = data.userName;
     this.isKid     = data.isKid ?? false;  // gates backend progress-sync; parents get local-only saves
     this.gameData  = { ...data.gameData };
+    // A save written mid-faint (tab closed during the respawn animation) has
+    // hp 0 on a living hero — start them with the respawn hearts instead.
+    if (!(this.gameData.hp > 0)) this.gameData.hp = Math.min(3, this.gameData.maxHp ?? 5);
     this.tileMap   = data.tileMap;
     this.onExit    = data.onExit    ?? (() => {});
     this.onComplete = data.onComplete ?? (() => {});
@@ -55,6 +65,9 @@ export class WorldScene extends Phaser.Scene {
   }
 
   create() {
+    // Device-resolution canvas: world camera + separate HUD camera (view.js)
+    setupCameras(this);
+
     // Phaser does NOT clear scene.events listeners on restart — without this,
     // every death/respawn stacks a second set of gameplay listeners (double XP,
     // double sounds) and double-queues scene.restart, which orphans a looping
@@ -66,12 +79,21 @@ export class WorldScene extends Phaser.Scene {
     const { map, layer } = buildWorldTilemap(this);
     this.worldLayer = layer;
 
+    // ── Painted ground, scenery and buildings ──────────────────────────
+    this._buildScenery();
+    this._shadows = [];
+
     // ── Player ─────────────────────────────────────────────────────────
     this.player = createPlayer(
       this,
       this.gameData.playerX,
       this.gameData.playerY,
     );
+    // Old saves may place the hero where a building or tree now stands
+    if (this._isBlockedAt(this.player.x, this.player.y)) {
+      this.player.setPosition(SAFE_SPAWN.x, SAFE_SPAWN.y);
+    }
+    this._addShadow(this.player, 0.85, 14);
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
 
     // Collision: player <-> world tiles
@@ -82,9 +104,11 @@ export class WorldScene extends Phaser.Scene {
     this.enemies = this.physics.add.group();
     ENEMY_ZONES.forEach((zone) => {
       for (let i = 0; i < zone.count; i++) {
-        const jx = zone.x * TILE_SIZE + (Math.random() - 0.5) * TILE_SIZE * 2;
-        const jy = zone.y * TILE_SIZE + (Math.random() - 0.5) * TILE_SIZE * 2;
+        let jx = zone.x * TILE_SIZE + (Math.random() - 0.5) * TILE_SIZE * 2;
+        let jy = zone.y * TILE_SIZE + (Math.random() - 0.5) * TILE_SIZE * 2;
+        if (this._isBlockedAt(jx, jy)) { jx = zone.x * TILE_SIZE; jy = zone.y * TILE_SIZE; }
         const enemy = spawnEnemy(this, zone.type, jx, jy);
+        this._addShadow(enemy, 0.6, 12);
         this.enemies.add(enemy);
         this.physics.add.collider(enemy, layer);
       }
@@ -99,6 +123,7 @@ export class WorldScene extends Phaser.Scene {
       const bx = bz.x * TILE_SIZE;
       const by = bz.y * TILE_SIZE;
       const boss = spawnEnemy(this, bz.type, bx, by, true);
+      this._addShadow(boss, 1.5, 28);
       this.enemies.add(boss);
       this.physics.add.collider(boss, layer);
     });
@@ -184,11 +209,13 @@ export class WorldScene extends Phaser.Scene {
 
     // ── Day/night cycle overlay ────────────────────────────────────────
     // Cycles from clear (day) to dark blue (night) over 10 real minutes.
-    // Depth 8: above tiles but below sprites (player is depth 10).
+    // Above the whole world (sprites included); labels/HUD stay readable on top.
     const worldPx = MAP_COLS * TILE_SIZE;
+    // Fill must be opaque: the cycle drives the object's alpha, and a 0 fill
+    // alpha multiplied by it kept the night invisible.
     this._nightOverlay = this.add.rectangle(
-      worldPx / 2, worldPx / 2, worldPx, worldPx, 0x000033, 0,
-    ).setDepth(8);
+      worldPx / 2, worldPx / 2, worldPx, worldPx, 0x0b1640, 1,
+    ).setDepth(DEPTH.NIGHT).setAlpha(0);
     this._cycleStart = this.time.now;
 
     // ── Keyboard ──────────────────────────────────────────────────────
@@ -206,13 +233,13 @@ export class WorldScene extends Phaser.Scene {
     this.escKey.on('down', () => this._togglePause());
 
     // ── World name banner ─────────────────────────────────────────────
-    const banner = this.add.text(
-      this.scale.width / 2, 20,
-      'Home Realm — Broken Village',
-      { fontSize: '10px', fontFamily: 'monospace', color: '#fcd860',
-        stroke: '#000000', strokeThickness: 3, resolution: 2 }
-    ).setScrollFactor(0).setDepth(50).setOrigin(0.5);
-    this.tweens.add({ targets: banner, alpha: 0, delay: 3000, duration: 1000 });
+    const { w: uiW, h: uiH } = uiSize(this);
+    const banner = this.add.text(uiW / 2, uiH * 0.24, 'Home Realm', textStyle(26, COLORS.gold, { weight: 900, stroke: 6 }))
+      .setScrollFactor(0).setDepth(50).setOrigin(0.5);
+    const bannerSub = this.add.text(uiW / 2, uiH * 0.24 + 28, 'The Broken Village', textStyle(14, COLORS.text, { stroke: 4 }))
+      .setScrollFactor(0).setDepth(50).setOrigin(0.5);
+    this.tweens.add({ targets: [banner, bannerSub], alpha: 0, delay: 2600, duration: 900,
+      onComplete: () => { banner.destroy(); bannerSub.destroy(); } });
 
     // ── Phase 5-A: Chest loot system ──────────────────────────────────
     this.chestSystem = new ChestSystem(this);
@@ -226,9 +253,8 @@ export class WorldScene extends Phaser.Scene {
       );
     });
 
-    // ── Phase 5-A: NPC shopkeeper (2 tiles right + 1 tile above castle portal)
-    // Castle is at tile (19, 18); place NPC at (22, 16) — visible but not blocking
-    this.npc = new NPC(this, 22, 16);
+    // ── Phase 5-A: NPC shopkeeper, on the plaza just east of the castle
+    this.npc = new NPC(this, 23, 17);
 
     // ── Phase 5-A: Chore Surge world event ────────────────────────────
     // First surge fires SURGE_INTERVAL ms after scene start.
@@ -272,6 +298,8 @@ export class WorldScene extends Phaser.Scene {
     };
 
     updatePlayer(this.player, cursors, this.wasd, PLAYER_SPEED, delta);
+    this.player.setDepth(ySort(this.player.y + 14));
+    this.portalMgr?.update(this.player);
 
     if (this.isRespawnInvulnerable()) {
       const now = Date.now();
@@ -313,13 +341,17 @@ export class WorldScene extends Phaser.Scene {
     const nightAlpha = 0.55 * 0.5 * (1 - Math.cos(2 * Math.PI * phase));
     this._nightAlpha = nightAlpha; // stored for ambient tick callback
     this._nightOverlay.setAlpha(nightAlpha);
+    this._updateNightLights(nightAlpha / 0.55);
     this.hud.updateNightCycle(nightAlpha);
     // Enemies get up to 30% faster at peak night
     const nightBoost = 1 + nightAlpha * 0.55;
 
     // Update enemies (pass night speed boost via enemy.speed)
     this.enemies.getChildren().forEach((e) => {
-      if (e.active) e.speed = (e.baseSpeed ?? e.speed) * nightBoost;
+      if (e.active) {
+        e.speed = (e.baseSpeed ?? e.speed) * nightBoost;
+        e.setDepth(ySort(e.y + e.displayHeight / 2 - 2));
+      }
       updateEnemy(e, this.player, delta);
     });
 
@@ -335,10 +367,11 @@ export class WorldScene extends Phaser.Scene {
       // Sync to backend leaderboard — kids only (parents/admins in preview get 403, so skip)
       if (this.isKid) {
         const lvl = levelFromXp(this.gameData.xp);
+        // api() JSON-encodes the body itself — passing a pre-stringified body
+        // double-encoded it and the server rejected every sync with a 422.
         api('/api/progress/adventure/progress', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ xp: this.gameData.xp, coins: this.gameData.coins, level: lvl }),
+          body: { xp: this.gameData.xp, coins: this.gameData.coins, level: lvl },
         }).catch(() => {});
       }
     }
@@ -353,8 +386,148 @@ export class WorldScene extends Phaser.Scene {
       this._checkBossProximity();
     }
 
+    this._updateShadows();
+
     // Update HUD
     this.hud.update(this.gameData);
+  }
+
+  // ── World dressing ──────────────────────────────────────────────────────
+
+  _buildScenery() {
+    const grid = this.worldGrid;
+    // The layout is deterministic, so the ground only needs painting once
+    if (!this.textures.exists('ground')) paintGround(this, grid);
+    this.add.image(0, 0, 'ground').setOrigin(0).setDepth(DEPTH.GROUND);
+
+    for (let r = 0; r < grid.length; r++) {
+      for (let c = 0; c < grid[r].length; c++) {
+        const t = grid[r][c];
+        const x = c * TILE_SIZE + TILE_SIZE / 2;
+        const base = (r + 1) * TILE_SIZE;
+        if (t === TILE.TREE_BOT) {
+          const roll = tileHash(r, c, 30);
+          const key = roll < 0.22 ? 'tree_pine' : `tree_${Math.floor(roll * 30) % 3}`;
+          const ox = Math.round((tileHash(r, c, 31) - 0.5) * 6);
+          this.add.image(x + ox, base - 3, 'shadow').setScale(1.15, 1).setDepth(DEPTH.SHADOW);
+          this.add.image(x + ox, base - 2, key).setOrigin(0.5, 1).setDepth(ySort(base))
+            .setFlipX(tileHash(r, c, 32) < 0.5);
+        } else if (t === TILE.BUSH) {
+          this.add.image(x, base - 5, 'shadow').setScale(0.8, 0.8).setDepth(DEPTH.SHADOW);
+          this.add.image(x, base - 4, tileHash(r, c, 33) < 0.3 ? 'bush_berry' : 'bush')
+            .setOrigin(0.5, 1).setDepth(ySort(base));
+        } else if (t === TILE.ROCK) {
+          this.add.image(x, base - 7, 'shadow').setScale(0.65, 0.7).setDepth(DEPTH.SHADOW);
+          this.add.image(x, base - 6, 'rock').setOrigin(0.5, 1).setDepth(ySort(base));
+        }
+      }
+    }
+
+    this._addAmbientLife(grid);
+
+    this.buildingFootprints = [];
+    BUILDINGS.forEach((b) => {
+      const x = (b.col + b.w / 2) * TILE_SIZE;
+      const y = (b.row + b.h) * TILE_SIZE;
+      this.add.image(x + 6, y - 2, 'shadow').setScale(b.w * 1.15, 1.3).setAlpha(0.8).setDepth(DEPTH.SHADOW);
+      this.add.image(x, y, `bld_${b.style}`).setOrigin(0.5, 1).setDepth(ySort(y));
+      this._addWindowLights(b, x, y);
+      this.buildingFootprints.push({
+        x: b.col * TILE_SIZE, y: b.row * TILE_SIZE, w: b.w * TILE_SIZE, h: b.h * TILE_SIZE,
+        color: `#${(b.color ?? 0x888888).toString(16).padStart(6, '0')}`,
+      });
+    });
+  }
+
+  // Glints on the water and smoke from chimneys — small touches that make the
+  // world feel alive. Positions are deterministic; timing is staggered.
+  _addAmbientLife(grid) {
+    let glints = 0;
+    for (let r = 0; r < grid.length && glints < 60; r++) {
+      for (let c = 0; c < grid[r].length && glints < 60; c++) {
+        if (grid[r][c] !== TILE.WATER || tileHash(r, c, 50) > 0.09) continue;
+        glints++;
+        const g = this.add.rectangle(
+          c * TILE_SIZE + 6 + tileHash(r, c, 51) * 20, r * TILE_SIZE + 8 + tileHash(r, c, 52) * 16,
+          6, 2, 0xffffff, 0.9,
+        ).setDepth(DEPTH.DECAL).setAlpha(0);
+        this.tweens.add({
+          targets: g, alpha: 0.85, scaleX: 1.6,
+          duration: 600, yoyo: true, repeat: -1,
+          delay: tileHash(r, c, 53) * 4000, repeatDelay: 1800 + tileHash(r, c, 54) * 3000,
+          ease: 'Sine.easeInOut',
+        });
+      }
+    }
+
+    // Chimney smoke (kitchen + library have chimneys; see WorldArt STYLES)
+    BUILDINGS.filter((b) => b.style === 'kitchen' || b.style === 'library').forEach((b) => {
+      const cx = (b.col + b.w / 2) * TILE_SIZE;
+      const top = (b.row + b.h) * TILE_SIZE - 128;
+      const sx = cx - 48 + 37 * 2;   // chimney centre in WorldArt design px × 2
+      const sy = top + 2;
+      this.time.addEvent({
+        delay: 700, loop: true,
+        callback: () => {
+          if (this._paused) return;
+          const puff = this.add.circle(sx + Phaser.Math.Between(-2, 2), sy, Phaser.Math.Between(3, 5), 0xe8edf2, 0.75)
+            .setDepth(DEPTH.NIGHT - 1);
+          this.tweens.add({
+            targets: puff, y: sy - 42, x: puff.x + Phaser.Math.Between(4, 14),
+            scale: 2.2, alpha: 0, duration: 2600, ease: 'Sine.easeOut',
+            onComplete: () => puff.destroy(),
+          });
+        },
+      });
+    });
+  }
+
+  // Warm window glows that fade in as night falls (drawn above the night tint)
+  _addWindowLights(b, cx, bottom) {
+    this._nightLights = this._nightLights ?? [];
+    const spots = b.style === 'castle'
+      // offsets from the sprite's bottom-centre, matching WorldArt window positions
+      ? [[-63, -90], [-63, -54], [61, -90], [61, -54], [0, -24]]
+      : [[-26, -44], [24, -44], [0, -14]];
+    spots.forEach(([dx, dy], i) => {
+      const isDoor = i === spots.length - 1;
+      const light = this.add.image(cx + dx, bottom + dy, 'soft_glow')
+        .setTint(isDoor ? (b.color ?? 0xffd27a) : 0xffc66b)
+        .setScale(isDoor ? 1.6 : 1.1)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(DEPTH.NIGHT + 1)
+        .setAlpha(0);
+      this._nightLights.push(light);
+    });
+  }
+
+  _updateNightLights(ratio) {
+    const a = Math.max(0, Math.min(1, (ratio - 0.15) / 0.6));
+    if (Math.abs(a - (this._nightLightAlpha ?? -1)) < 0.01) return;
+    this._nightLightAlpha = a;
+    this._nightLights?.forEach((l) => l.setAlpha(a * 0.85));
+  }
+
+  _isBlockedAt(x, y) {
+    const tile = this.worldLayer?.getTileAtWorldXY(x, y);
+    return !!tile?.collides;
+  }
+
+  // Soft ground shadow that follows a character
+  _addShadow(target, scale, dy) {
+    const img = this.add.image(target.x, target.y + dy, 'shadow').setScale(scale).setDepth(DEPTH.SHADOW);
+    this._shadows.push({ target, img, dy });
+  }
+
+  _updateShadows() {
+    this._shadows = this._shadows.filter(({ target, img, dy }) => {
+      if (!target.scene || !target.active) {
+        img.destroy();
+        return false;
+      }
+      img.setPosition(target.x, target.y + dy).setAlpha(target.alpha).setVisible(target.visible);
+      return true;
+    });
   }
 
   _spawnAttackVfx() {
@@ -370,9 +543,9 @@ export class WorldScene extends Phaser.Scene {
       // Diagonal slash arc: two crossing rectangles in NES yellow
       const ang = isHoriz ? 0 : Math.PI / 2;
       const vfx1 = this.add.rectangle(px, py, 40, 8, 0xfcd860, 0.9)
-        .setDepth(12).setRotation(ang + Math.PI / 4);
+        .setDepth(DEPTH.VFX).setRotation(ang + Math.PI / 4);
       const vfx2 = this.add.rectangle(px, py, 40, 8, 0xfcd860, 0.9)
-        .setDepth(12).setRotation(ang - Math.PI / 4);
+        .setDepth(DEPTH.VFX).setRotation(ang - Math.PI / 4);
       [vfx1, vfx2].forEach((v) => {
         this.tweens.add({
           targets: v, alpha: 0, scaleX: 1.6, scaleY: 1.6,
@@ -388,7 +561,7 @@ export class WorldScene extends Phaser.Scene {
         px, py,
         isHoriz ? 48 : 28, isHoriz ? 28 : 48,
         0x6888fc, 0.80
-      ).setDepth(12);
+      ).setDepth(DEPTH.VFX);
       this.tweens.add({
         targets: vfx, alpha: 0, scaleX: 2, scaleY: 2,
         duration: 220, ease: 'Power1', onComplete: () => vfx.destroy(),
@@ -404,7 +577,7 @@ export class WorldScene extends Phaser.Scene {
         const a         = baseAngle + (i - 2) * (spread / 4);
         const drop      = this.add.rectangle(
           this.player.x, this.player.y, 6, 6, 0xfc7820, 0.9,
-        ).setDepth(12);
+        ).setDepth(DEPTH.VFX);
         this.tweens.add({
           targets: drop,
           x: this.player.x + Math.cos(a) * 36,
@@ -422,7 +595,7 @@ export class WorldScene extends Phaser.Scene {
         const a    = (Math.PI * 2 * i) / 8;
         const puff = this.add.rectangle(
           this.player.x, this.player.y, 8, 8, 0xfcfcfc, 0.85,
-        ).setDepth(12);
+        ).setDepth(DEPTH.VFX);
         this.tweens.add({
           targets: puff,
           x: this.player.x + Math.cos(a) * 56,
@@ -437,7 +610,7 @@ export class WorldScene extends Phaser.Scene {
     // Fallback: original white sweep
     const vfx = this.add.rectangle(
       px, py, isHoriz ? 24 : 48, isHoriz ? 48 : 24, 0xffffff, 0.85,
-    ).setDepth(12);
+    ).setDepth(DEPTH.VFX);
     this.tweens.add({
       targets: vfx, alpha: 0, scaleX: 1.8, scaleY: 1.8,
       duration: 180, ease: 'Power2', onComplete: () => vfx.destroy(),
@@ -450,7 +623,7 @@ export class WorldScene extends Phaser.Scene {
     for (let i = 0; i < visual; i++) {
       this.time.delayedCall(i * 55, () => {
         if (!this.player?.active) return;
-        const coin = this.add.sprite(x, y, 'coin').setScale(2).setDepth(11);
+        const coin = this.add.sprite(x, y, 'coin').setDepth(DEPTH.VFX);
         if (this.anims.exists('coin_spin')) coin.play('coin_spin');
         // Arc outward briefly, then sweep to player
         const angle = (Math.PI * 2 * i) / visual;
@@ -478,8 +651,7 @@ export class WorldScene extends Phaser.Scene {
     this.physics.pause();
     this._setGameplayTimersPaused(true);
 
-    const w = this.scale.width;
-    const h = this.scale.height;
+    const { w, h } = uiSize(this);
 
     // 1. Player sprite: spin + shrink to nothing
     this.tweens.add({
@@ -500,10 +672,8 @@ export class WorldScene extends Phaser.Scene {
     });
 
     // 3. "YOU FAINTED" slides down from above with a bounce
-    const faintTxt = this.add.text(w / 2, h / 2 - h * 0.4, 'YOU FAINTED', {
-      fontSize: '22px', fontFamily: 'monospace', color: '#ff4444',
-      stroke: '#000', strokeThickness: 5, resolution: 2,
-    }).setScrollFactor(0).setDepth(201).setOrigin(0.5).setAlpha(0);
+    const faintTxt = this.add.text(w / 2, h / 2 - h * 0.4, 'You fainted!', textStyle(30, COLORS.red, { weight: 900, stroke: 6 }))
+      .setScrollFactor(0).setDepth(201).setOrigin(0.5).setAlpha(0);
     this.tweens.add({
       targets: faintTxt,
       y: h / 2 - 20,
@@ -514,10 +684,8 @@ export class WorldScene extends Phaser.Scene {
     });
 
     // 4. Respawn sub-text fades in below
-    const respawnTxt = this.add.text(w / 2, h / 2 + 20, 'Respawning with 3 hearts...', {
-      fontSize: '9px', fontFamily: 'monospace', color: '#888888',
-      stroke: '#000', strokeThickness: 2, resolution: 2,
-    }).setScrollFactor(0).setDepth(201).setOrigin(0.5).setAlpha(0);
+    const respawnTxt = this.add.text(w / 2, h / 2 + 22, 'Back on your feet with 3 hearts…', textStyle(14, COLORS.text, { weight: 600, stroke: 4 }))
+      .setScrollFactor(0).setDepth(201).setOrigin(0.5).setAlpha(0);
     this.tweens.add({
       targets: respawnTxt, alpha: 1,
       delay: 1200, duration: 300,
@@ -577,34 +745,43 @@ export class WorldScene extends Phaser.Scene {
   }
 
   _showPauseMenu() {
-    const w = this.scale.width;
-    const h = this.scale.height;
+    const { w, h } = uiSize(this);
     const container = this.add.container(0, 0).setScrollFactor(0).setDepth(300);
 
-    const bg = this.add.rectangle(w / 2, h / 2, 200, 160, 0x000000, 0.85).setScrollFactor(0);
-    const title = this.add.text(w / 2, h / 2 - 55, '— PAUSED —', {
-      fontSize: '14px', fontFamily: 'monospace', color: '#fcd860',
-      stroke: '#000', strokeThickness: 3, resolution: 2,
-    }).setOrigin(0.5).setScrollFactor(0);
+    const dim = this.add.rectangle(w / 2, h / 2, w, h, 0x05070c, 0.6);
+    const panelW = Math.min(w - 32, 280);
+    const panelH = 196;
+    const px = (w - panelW) / 2;
+    const py = (h - panelH) / 2;
+    const panel = drawPanel(this.add.graphics(), px, py, panelW, panelH, { radius: 14, alpha: 0.94 });
 
-    const resumeBtn = this._makePauseBtn(w / 2, h / 2 - 20, 'Resume', () => this._togglePause());
-    const exitBtn   = this._makePauseBtn(w / 2, h / 2 + 20, 'Exit Adventure', () => this._exitGame());
+    const title = this.add.text(w / 2, py + 34, 'Paused', textStyle(22, COLORS.text, { weight: 800, stroke: 0 }))
+      .setOrigin(0.5);
+    const hint = this.add.text(w / 2, py + panelH - 20, 'Press Esc to resume', textStyle(11, COLORS.muted, { weight: 500, stroke: 0 }))
+      .setOrigin(0.5);
 
-    container.add([bg, title, resumeBtn.bg, resumeBtn.label, exitBtn.bg, exitBtn.label]);
+    const resumeBtn = this._makePauseBtn(w / 2, py + 84, panelW - 48, 'Resume', () => this._togglePause(), true);
+    const exitBtn   = this._makePauseBtn(w / 2, py + 132, panelW - 48, 'Exit Adventure', () => this._exitGame(), false);
+
+    container.add([dim, panel, title, hint, ...resumeBtn, ...exitBtn]);
+    container.setAlpha(0);
+    this.tweens.add({ targets: container, alpha: 1, duration: 140 });
     this._pauseOverlay = container;
   }
 
-  _makePauseBtn(x, y, text, cb) {
-    const bg = this.add.rectangle(x, y, 140, 24, 0x2a2a2a, 1)
+  _makePauseBtn(x, y, width, text, cb, primary) {
+    const fill  = primary ? COLORS.goldHex : 0x232a3a;
+    const hover = primary ? 0xffe28a : 0x2f384c;
+    const bg = this.add.rectangle(x, y, width, 38, fill, 1)
       .setScrollFactor(0)                   // must precede setInteractive so hit area aligns
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', cb)
-      .on('pointerover',  () => bg.setFillStyle(0x444444))
-      .on('pointerout',   () => bg.setFillStyle(0x2a2a2a));
-    const label = this.add.text(x, y, text, {
-      fontSize: '10px', fontFamily: 'monospace', color: '#ffffff', resolution: 2,
-    }).setOrigin(0.5).setScrollFactor(0);
-    return { bg, label };
+      .on('pointerover',  () => bg.setFillStyle(hover))
+      .on('pointerout',   () => bg.setFillStyle(fill));
+    if (!primary) bg.setStrokeStyle(1, 0xffffff, 0.14);
+    const label = this.add.text(x, y, text, textStyle(14, primary ? COLORS.ink : COLORS.text, { stroke: 0 }))
+      .setOrigin(0.5).setScrollFactor(0);
+    return [bg, label];
   }
 
   _showTutorial() {
@@ -612,133 +789,68 @@ export class WorldScene extends Phaser.Scene {
     this.physics.pause();
     this._setGameplayTimersPaused(true);
 
-    const w  = this.scale.width;
-    const h  = this.scale.height;
+    const { w, h } = uiSize(this);
     const cx = w / 2;
-    const cy = h / 2;
-
-    // Panel dimensions — wider and taller than the original for legibility
-    const panelW = Math.min(w - 20, 440);
     const isTouch = this.sys.game.device.input.touch;
-    // Compute panel height from content so nothing is clipped on small screens
-    const TITLE_H   = 56;  // title + subtitle + divider
-    const GRID_ROWS = 3;
-    const ROW_H     = 54;
-    const TOUCH_H   = isTouch ? 28 : 0;
-    const BTN_H     = 54;  // divider + button + sub-label
-    const VPAD      = 20;  // top + bottom padding
-    const panelH    = Math.min(h - 16, TITLE_H + GRID_ROWS * ROW_H + TOUCH_H + BTN_H + VPAD * 2);
-    const top       = cy - panelH / 2;
+    const twoCol  = w >= 560;
+
+    const controls = [
+      ['🕹', 'Move',    isTouch ? 'Joystick, bottom left' : 'Arrow keys or W A S D', COLORS.sky],
+      ['⚔', 'Attack',  isTouch ? 'Sword button, bottom right' : 'Space bar',        COLORS.orange],
+      ['✨', 'Portals', 'Walk into a glowing doorway to see your quests',           COLORS.green],
+      ['💰', 'Coins',   'Beat enemies and finish chores to earn them',              COLORS.gold],
+      ['🏰', 'Weapons', 'Buy upgrades at the Reward Castle',                        COLORS.red],
+      ['⏸', 'Pause',   isTouch ? 'Tap Exit to leave any time' : 'Esc',             COLORS.muted],
+    ];
+
+    const panelW = Math.min(w - 24, twoCol ? 560 : 400);
+    const colW   = twoCol ? (panelW - 56) / 2 : panelW - 40;
+    const ROW_H  = twoCol ? 58 : 50;
+    const rows   = twoCol ? Math.ceil(controls.length / 2) : controls.length;
+    const HEAD_H = 78;
+    const FOOT_H = 84;
+    const panelH = Math.min(h - 16, HEAD_H + rows * ROW_H + FOOT_H);
+    const top    = (h - panelH) / 2;
+    const left   = cx - panelW / 2;
 
     const container = this.add.container(0, 0).setScrollFactor(0).setDepth(400);
+    const dim   = this.add.rectangle(cx, h / 2, w, h, 0x05070c, 0.72);
+    const panel = drawPanel(this.add.graphics(), left, top, panelW, panelH, { radius: 16, alpha: 0.96 });
+    const accent = this.add.graphics();
+    accent.fillStyle(COLORS.goldHex, 1);
+    accent.fillRoundedRect(left + panelW / 2 - 28, top + 12, 56, 4, 2);
+    container.add([dim, panel, accent]);
 
-    // ── Backdrop + panel ──────────────────────────────────────────────
-    const dim   = this.add.rectangle(cx, cy, w, h, 0x000000, 0.82);
-    const panel = this.add.rectangle(cx, cy, panelW, panelH, 0x0d0d1e, 1)
-      .setStrokeStyle(2, 0xfcd860);
-    // NES-style corner accent dots
-    const cornerOffsets = [
-      [-panelW / 2 + 5,  -panelH / 2 + 5],
-      [ panelW / 2 - 5,  -panelH / 2 + 5],
-      [-panelW / 2 + 5,   panelH / 2 - 5],
-      [ panelW / 2 - 5,   panelH / 2 - 5],
-    ];
-    const corners = cornerOffsets.map(([ox, oy]) =>
-      this.add.rectangle(cx + ox, cy + oy, 4, 4, 0xfcd860)
-    );
-    container.add([dim, panel, ...corners]);
+    container.add([
+      this.add.text(cx, top + 38, 'Welcome to Adventure Mode', textStyle(20, COLORS.text, { weight: 800, stroke: 0 })).setOrigin(0.5),
+      this.add.text(cx, top + 62, 'Do chores → earn XP & coins → level up your hero', textStyle(12, COLORS.muted, { weight: 500, stroke: 0 })).setOrigin(0.5),
+    ]);
 
-    // ── Title block ───────────────────────────────────────────────────
-    const titleY = top + VPAD + 14;
-    const titleTxt = this.add.text(cx, titleY,
-      '⚔  ADVENTURE MODE  ⚔', {
-        fontSize: '13px', fontFamily: 'monospace', color: '#fcd860',
-        stroke: '#000', strokeThickness: 3, resolution: 2,
-      }).setOrigin(0.5);
-    const subTxt = this.add.text(cx, titleY + 18,
-      'Complete chores  ›  earn XP & coins  ›  level up!', {
-        fontSize: '8px', fontFamily: 'monospace', color: '#666688',
-        stroke: '#000', strokeThickness: 2, resolution: 2,
-      }).setOrigin(0.5);
-    const divTop = this.add.rectangle(cx, titleY + 32, panelW - 28, 1, 0x2a2a4a);
-    container.add([titleTxt, subTxt, divTop]);
+    const gridTop = top + HEAD_H;
+    controls.forEach(([icon, action, desc, color], idx) => {
+      const col = twoCol ? idx % 2 : 0;
+      const row = twoCol ? Math.floor(idx / 2) : idx;
+      const x = left + 20 + col * (colW + 16);
+      const y = gridTop + row * ROW_H;
 
-    // ── Controls grid (2 columns × 3 rows) ───────────────────────────
-    // Each entry: [col, icon, action, keyHint, description, accentColor]
-    const controls = [
-      [0, '◈', 'MOVE',    '[ ↑↓←→ ]  or  [ W A S D ]', 'Walk around the Home Realm',       '#6888fc'],
-      [0, '◉', 'PORTALS', 'Walk into a glowing portal',  'Opens your chore quest list',       '#58d854'],
-      [0, '▸', 'PAUSE',   '[ ESC ]',                     'Pause or open the menu',            '#bcbcbc'],
-      [1, '✦', 'ATTACK',  '[ SPACE ]',                   'Swing your weapon at enemies',      '#fca044'],
-      [1, '◎', 'COINS',   'Defeat enemies + do chores',  'Spend at the Reward Castle  ★',    '#fcd860'],
-      [1, '⚔', 'WEAPONS', 'Visit the Reward Castle',     'Buy upgrades with your coins',      '#f87858'],
-    ];
-
-    const gridTop  = top + TITLE_H + VPAD;
-    const colLx    = cx - panelW / 2 + 16;
-    const colRx    = cx + 4;
-
-    controls.forEach(([col, icon, action, key, desc, color], idx) => {
-      const row = idx % GRID_ROWS;   // 0–2
-      const lx  = col === 0 ? colLx : colRx;
-      const ry  = gridTop + row * ROW_H;
-
-      const iconT = this.add.text(lx, ry + 10, icon, {
-        fontSize: '15px', fontFamily: 'monospace', color,
-        stroke: '#000', strokeThickness: 3, resolution: 2,
-      }).setOrigin(0, 0.5);
-
-      const actT = this.add.text(lx + 22, ry + 1, action, {
-        fontSize: '10px', fontFamily: 'monospace', color: '#e5e5e5',
-        stroke: '#000', strokeThickness: 2, resolution: 2,
-      }).setOrigin(0, 0);
-
-      const keyT = this.add.text(lx + 22, ry + 16, key, {
-        fontSize: '8px', fontFamily: 'monospace', color,
-        stroke: '#000', strokeThickness: 2, resolution: 2,
-      }).setOrigin(0, 0);
-
-      const descT = this.add.text(lx + 22, ry + 30, desc, {
-        fontSize: '7px', fontFamily: 'monospace', color: '#777799',
-        stroke: '#000', strokeThickness: 1, resolution: 2,
-      }).setOrigin(0, 0);
-
-      container.add([iconT, actT, keyT, descT]);
+      const chip = this.add.graphics();
+      chip.fillStyle(0xffffff, 0.06);
+      chip.fillRoundedRect(x, y, colW, ROW_H - 8, 10);
+      const iconT = this.add.text(x + 22, y + (ROW_H - 8) / 2, icon, textStyle(18, color, { stroke: 0, weight: 400 }))
+        .setOrigin(0.5);
+      const actT = this.add.text(x + 42, y + 8, action, textStyle(13, color, { stroke: 0 }));
+      const descT = this.add.text(x + 42, y + 26, desc, textStyle(11, COLORS.text, {
+        stroke: 0, weight: 500, align: 'left', wordWrap: { width: colW - 52, useAdvancedWrap: true },
+      }));
+      container.add([chip, iconT, actT, descT]);
     });
 
-    // Column divider line (between the two columns)
-    const colDiv = this.add.rectangle(cx - 2, gridTop + (GRID_ROWS * ROW_H) / 2,
-      1, GRID_ROWS * ROW_H - 8, 0x2a2a4a);
-    container.add([colDiv]);
-
-    // ── Touch controls hint (only on touch devices) ───────────────────
-    let touchBottom = gridTop + GRID_ROWS * ROW_H;
-    if (isTouch) {
-      const touchDivY = touchBottom + 4;
-      const touchDiv  = this.add.rectangle(cx, touchDivY, panelW - 28, 1, 0x2a2a4a);
-      const touchTxt  = this.add.text(cx, touchDivY + 14,
-        '📱  Joystick (bottom-left)   +   ⚔ button (bottom-right)', {
-          fontSize: '7px', fontFamily: 'monospace', color: '#555577',
-          stroke: '#000', strokeThickness: 2, resolution: 2,
-        }).setOrigin(0.5);
-      container.add([touchDiv, touchTxt]);
-      touchBottom += TOUCH_H;
-    }
-
-    // ── Dismiss button ────────────────────────────────────────────────
-    const btnDivY = touchBottom + 8;
-    const btnDiv  = this.add.rectangle(cx, btnDivY, panelW - 28, 1, 0x2a2a4a);
-    const btnY    = btnDivY + 22;
-    const btnBg   = this.add.rectangle(cx, btnY, panelW - 56, 28, 0xfcd860)
+    const btnY  = top + panelH - FOOT_H / 2 - 6;
+    const btnBg = this.add.rectangle(cx, btnY, Math.min(panelW - 48, 280), 42, COLORS.goldHex)
       .setInteractive({ useHandCursor: true });
-    const btnTxt  = this.add.text(cx, btnY, '►  LET\'S GO!  ◄', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#0d0d1e',
-      stroke: '#000000', strokeThickness: 1, resolution: 2,
-    }).setOrigin(0.5);
-    const btnSub  = this.add.text(cx, btnY + 20, 'or press any key', {
-      fontSize: '7px', fontFamily: 'monospace', color: '#555555', resolution: 2,
-    }).setOrigin(0.5);
-    container.add([btnDiv, btnBg, btnTxt, btnSub]);
+    const btnTxt = this.add.text(cx, btnY, "Let's go!", textStyle(15, COLORS.ink, { weight: 800, stroke: 0 })).setOrigin(0.5);
+    const btnSub = this.add.text(cx, btnY + 32, isTouch ? 'Tap the button to start' : 'or press any key', textStyle(11, COLORS.muted, { weight: 500, stroke: 0 })).setOrigin(0.5);
+    container.add([btnBg, btnTxt, btnSub]);
 
     // ── Dismiss logic ─────────────────────────────────────────────────
     const dismiss = () => {
@@ -752,46 +864,40 @@ export class WorldScene extends Phaser.Scene {
     };
 
     btnBg.on('pointerdown', dismiss);
-    btnBg.on('pointerover',  () => btnBg.setFillStyle(0xffe080));
-    btnBg.on('pointerout',   () => btnBg.setFillStyle(0xfcd860));
+    btnBg.on('pointerover',  () => btnBg.setFillStyle(0xffe28a));
+    btnBg.on('pointerout',   () => btnBg.setFillStyle(COLORS.goldHex));
     this.input.keyboard.once('keydown', dismiss);
 
     // Panel slides in from below for a polished entrance
-    container.setAlpha(0).setY(30);
-    this.tweens.add({
-      targets: container, alpha: 1, y: 0,
-      duration: 280, ease: 'Power2',
-    });
+    container.setAlpha(0).setY(24);
+    this.tweens.add({ targets: container, alpha: 1, y: 0, duration: 260, ease: 'Power2' });
   }
 
   _showLevelUpBanner(level) {
-    const w = this.scale.width;
-    const h = this.scale.height;
+    const { w, h } = uiSize(this);
 
     // Screen flash
-    const cam   = this.cameras.main;
-    const flash = this.add.rectangle(cam.width / 2, cam.height / 2, cam.width, cam.height, 0xffffff, 0)
+    const flash = this.add.rectangle(w / 2, h / 2, w, h, 0xffffff, 0)
       .setScrollFactor(0).setDepth(200);
     this.tweens.add({
-      targets: flash, alpha: 0.45,
+      targets: flash, alpha: 0.35,
       yoyo: true, duration: 100, repeat: 1,
       onComplete: () => flash.destroy(),
     });
 
-    // Big golden "LEVEL UP!" text that rises and fades
-    const txt = this.add.text(w / 2, h / 2 + 10, `✦  LEVEL UP!  LV ${level}  ✦`, {
-      fontSize: '16px', fontFamily: 'monospace', color: '#fcd860',
-      stroke: '#000000', strokeThickness: 5, resolution: 2,
-    }).setScrollFactor(0).setDepth(201).setOrigin(0.5).setAlpha(0);
+    const title = this.add.text(w / 2, h * 0.36 + 10, 'LEVEL UP!', textStyle(30, COLORS.gold, { weight: 900, stroke: 6 }))
+      .setScrollFactor(0).setDepth(201).setOrigin(0.5).setAlpha(0);
+    const sub = this.add.text(w / 2, h * 0.36 + 44, `You reached level ${level}`, textStyle(15, COLORS.text, { stroke: 4 }))
+      .setScrollFactor(0).setDepth(201).setOrigin(0.5).setAlpha(0);
 
     this.tweens.add({
-      targets: txt, alpha: 1, y: h / 2 - 20,
-      duration: 300, ease: 'Back.easeOut',
+      targets: [title, sub], alpha: 1, y: '-=26',
+      duration: 320, ease: 'Back.easeOut',
       onComplete: () => {
         this.tweens.add({
-          targets: txt, alpha: 0, y: h / 2 - 60,
-          delay: 1200, duration: 500, ease: 'Power2',
-          onComplete: () => txt.destroy(),
+          targets: [title, sub], alpha: 0, y: '-=30',
+          delay: 1300, duration: 500, ease: 'Power2',
+          onComplete: () => { title.destroy(); sub.destroy(); },
         });
       },
     });
@@ -815,8 +921,8 @@ export class WorldScene extends Phaser.Scene {
     this.sfx?.playSurge();
 
     // Screen tint pulse: brief gold flash to signal the event
-    const cam   = this.cameras.main;
-    const flash = this.add.rectangle(cam.width / 2, cam.height / 2, cam.width, cam.height, 0xfcd860, 0)
+    const { w: sw, h: sh } = uiSize(this);
+    const flash = this.add.rectangle(sw / 2, sh / 2, sw, sh, 0xfcd860, 0)
       .setScrollFactor(0).setDepth(199);
     this.tweens.add({
       targets: flash, alpha: 0.18,

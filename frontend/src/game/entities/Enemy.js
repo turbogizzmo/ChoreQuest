@@ -2,6 +2,11 @@
 
 import { ENEMY_STATS, BOSS_STATS } from '../data/WorldData.js';
 import Phaser from 'phaser';
+import { DEPTH, ySort } from '../engine/depth.js';
+import { textStyle, COLORS } from '../ui/theme.js';
+
+const BOSS_BAR_DY  = 40;
+const BOSS_NAME_DY = 46;
 
 export function createEnemyAnimations(scene) {
   const allTypes = [...Object.keys(ENEMY_STATS), ...Object.keys(BOSS_STATS)];
@@ -35,11 +40,11 @@ export function spawnEnemy(scene, type, x, y, isBoss = false) {
   enemy.baseSpeed  = stats.speed;
   enemy.speed      = stats.speed;
   enemy.label      = stats.name;
-  enemy.setDepth(isBoss ? 9.5 : 9);
+  enemy.setDepth(ySort(y));
   enemy.setCollideWorldBounds(true);
 
   if (isBoss) {
-    enemy.setScale(3); // 48 px display — imposing and crisp (integer scale keeps pixel grid sharp)
+    enemy.setScale(2); // 32 px texture → 64 px: two tiles tall, imposing but not screen-filling
 
     // Boss charge state machine (shared across all boss types)
     enemy._chargeState  = 'idle';
@@ -61,18 +66,16 @@ export function spawnEnemy(scene, type, x, y, isBoss = false) {
       enemy._hasTeleported = false;
     }
 
-    // HP bar — offset raised to match 3× scale (24px half-height + margin)
-    const hpBg   = scene.add.rectangle(x, y - 34, 52, 6, 0x330000, 0.9).setDepth(9.6);
-    const hpFill = scene.add.rectangle(x - 26, y - 34, 52, 6, 0xff2222, 1)
-      .setOrigin(0, 0.5).setDepth(9.7);
+    // HP bar above the head (32 px half-height + margin)
+    const hpBg   = scene.add.rectangle(x, y - BOSS_BAR_DY, 52, 6, 0x330000, 0.9).setDepth(DEPTH.LABEL);
+    const hpFill = scene.add.rectangle(x - 26, y - BOSS_BAR_DY, 52, 6, 0xff2222, 1)
+      .setOrigin(0, 0.5).setDepth(DEPTH.LABEL + 0.1);
     enemy._hpBarBg   = hpBg;
     enemy._hpBarFill = hpFill;
 
     // Boss name tag
-    enemy._nameTag = scene.add.text(x, y - 42, stats.name.toUpperCase(), {
-      fontSize: '8px', fontFamily: 'monospace',
-      color: '#ff4444', stroke: '#000', strokeThickness: 3, resolution: 2,
-    }).setOrigin(0.5, 1).setDepth(9.8);
+    enemy._nameTag = scene.add.text(x, y - BOSS_NAME_DY, stats.name, textStyle(12, COLORS.red, { weight: 900, stroke: 4 }))
+      .setOrigin(0.5, 1).setDepth(DEPTH.LABEL + 0.2);
   }
 
   const animKey = `enemy_${type}_walk`;
@@ -95,14 +98,14 @@ export function updateEnemy(enemy, playerSprite, delta) {
 
   // ── Boss-specific logic ──────────────────────────────────────────────────────
   if (enemy.isBoss) {
-    // Track HP bar + name tag (offsets match 3× scale: 24px half-height + margin)
-    if (enemy._hpBarBg)   enemy._hpBarBg.setPosition(enemy.x, enemy.y - 34);
+    // Track HP bar + name tag
+    if (enemy._hpBarBg)   enemy._hpBarBg.setPosition(enemy.x, enemy.y - BOSS_BAR_DY);
     if (enemy._hpBarFill) {
       const ratio = Math.max(0, enemy.hp / enemy.maxHp);
-      enemy._hpBarFill.setPosition(enemy.x - 26, enemy.y - 34);
+      enemy._hpBarFill.setPosition(enemy.x - 26, enemy.y - BOSS_BAR_DY);
       enemy._hpBarFill.width = 52 * ratio;
     }
-    if (enemy._nameTag) enemy._nameTag.setPosition(enemy.x, enemy.y - 42);
+    if (enemy._nameTag) enemy._nameTag.setPosition(enemy.x, enemy.y - BOSS_NAME_DY);
 
     // Charge state machine
     if (enemy._chargeState === 'charging') {

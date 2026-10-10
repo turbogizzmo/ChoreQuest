@@ -5,6 +5,7 @@
 // showing a random tip from DIALOGUE_LINES, auto-hides after 3.5 s.
 
 import { TILE_SIZE } from '../data/WorldData.js';
+import { DEPTH, ySort } from '../engine/depth.js';
 
 const PROX_TILES = 3;      // tile radius for dialogue trigger
 const PROX_PX    = PROX_TILES * TILE_SIZE;
@@ -29,7 +30,7 @@ export class NPC {
 
     // ── Sprite ────────────────────────────────────────────────────────────
     this.sprite = scene.add.sprite(px, py, 'npc_shopkeeper', 0)
-      .setScale(2.5).setDepth(10).setOrigin(0.5, 1);
+      .setScale(2).setDepth(ySort(py)).setOrigin(0.5, 1);
 
     if (!scene.anims.exists('npc_idle')) {
       scene.anims.create({
@@ -54,7 +55,7 @@ export class NPC {
         fontSize: '7px', fontFamily: 'monospace', color: '#fcd860',
         stroke: '#000', strokeThickness: 2, resolution: 2,
       },
-    ).setDepth(11).setOrigin(0.5, 1);
+    ).setDepth(DEPTH.LABEL).setOrigin(0.5, 1);
 
     // ── Dialogue state ────────────────────────────────────────────────────
     this._bubble        = null;
@@ -94,9 +95,9 @@ export class NPC {
       fontSize: '7px', fontFamily: 'monospace', color: '#ffffff',
       stroke: '#000', strokeThickness: 2, resolution: 2,
       wordWrap: { width: 96, useAdvancedWrap: true },
-    }).setDepth(20).setOrigin(0.5, 1);
+    }).setDepth(DEPTH.BUBBLE + 0.1).setOrigin(0.5, 1);
 
-    const bubble = scene.add.graphics().setDepth(19);
+    const bubble = scene.add.graphics().setDepth(DEPTH.BUBBLE);
 
     this._bubble     = bubble;
     this._bubbleText = textEl;
