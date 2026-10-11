@@ -1,6 +1,9 @@
 // Procedural pixel-art sprite generator using canvas.
 // All sprites are generated at runtime — no external image files required.
 
+import { generateBuildings, generateProps } from './WorldArt.js';
+import { drawHeroSheet } from './HeroSprite.js';
+
 const NES = {
   black:      '#000000',
   white:      '#fcfcfc',
@@ -321,264 +324,7 @@ export function generateTileset(scene) {
 }
 
 // ─── PLAYER SPRITE SHEET ──────────────────────────────────────────────────────
-// 4 directions × 3 frames each = 12 frames, 16×16 each → sheet 192×16
-
-const PLAYER_FRAMES = {
-  // down/side walk: frames 0,1,2 — hero faces the viewer
-  down: [
-    // frame 0 (stand)
-    [
-      '....SSSSSSSS....',
-      '...SSSSSSSSSS...',
-      '...SsSSSSSSsS...',
-      '...SSSSSSSSSS...',
-      '....HHHHHHHH....',
-      '...HhHHHHHhHH...',
-      '..HHHHHHHHHHHH..',
-      '..HHHHbbHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..BBBBBBBBBBBB..',
-      '..BBBBBBBBBBB...',
-      '..BBB......BBB..',
-      '...LL......LL...',
-      '...LL......LL...',
-      '..llll....llll..',
-      '................',
-    ],
-    // frame 1 (walk L)
-    [
-      '....SSSSSSSS....',
-      '...SSSSSSSSSS...',
-      '...SsSSSSSSsS...',
-      '...SSSSSSSSSS...',
-      '....HHHHHHHH....',
-      '...HhHHHHHhHH...',
-      '..HHHHHHHHHHHH..',
-      '..HHHHbbHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..BBBBBBBBBBBB..',
-      '..BBBBBBBBBBB...',
-      '..BBB......BBB..',
-      '..LLL......LL...',
-      '...LL......LLL..',
-      '..llll.....lll..',
-      '................',
-    ],
-    // frame 2 (walk R)
-    [
-      '....SSSSSSSS....',
-      '...SSSSSSSSSS...',
-      '...SsSSSSSSsS...',
-      '...SSSSSSSSSS...',
-      '....HHHHHHHH....',
-      '...HhHHHHHhHH...',
-      '..HHHHHHHHHHHH..',
-      '..HHHHbbHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..BBBBBBBBBBBB..',
-      '..BBBBBBBBBBB...',
-      '..BBB......BBB..',
-      '...LL......LLL..',
-      '..LLL......LL...',
-      '..lll.....llll..',
-      '................',
-    ],
-  ],
-  // up walk: frames 0,1,2 — back-of-head, no eye pixels visible
-  up: [
-    // frame 0 (stand, back)
-    [
-      '....SSSSSSSS....',
-      '...SSSSSSSSSS...',
-      '...SSSSSSSSSS...',  // no eye pixels — back of head
-      '...SSSSSSSSSS...',
-      '....HHHHHHHH....',
-      '...HHHHHHHHHH...',  // plain back of tunic
-      '..HHHHHHHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..BBBBBBBBBBBB..',
-      '..BBBBBBBBBBB...',
-      '..BBB......BBB..',
-      '...LL......LL...',
-      '...LL......LL...',
-      '..llll....llll..',
-      '................',
-    ],
-    // frame 1 (walk L, back)
-    [
-      '....SSSSSSSS....',
-      '...SSSSSSSSSS...',
-      '...SSSSSSSSSS...',
-      '...SSSSSSSSSS...',
-      '....HHHHHHHH....',
-      '...HHHHHHHHHH...',
-      '..HHHHHHHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..BBBBBBBBBBBB..',
-      '..BBBBBBBBBBB...',
-      '..BBB......BBB..',
-      '..LLL......LL...',
-      '...LL......LLL..',
-      '..llll.....lll..',
-      '................',
-    ],
-    // frame 2 (walk R, back)
-    [
-      '....SSSSSSSS....',
-      '...SSSSSSSSSS...',
-      '...SSSSSSSSSS...',
-      '...SSSSSSSSSS...',
-      '....HHHHHHHH....',
-      '...HHHHHHHHHH...',
-      '..HHHHHHHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..HHHHHHHHHHHH..',
-      '..BBBBBBBBBBBB..',
-      '..BBBBBBBBBBB...',
-      '..BBB......BBB..',
-      '...LL......LLL..',
-      '..LLL......LL...',
-      '..lll.....llll..',
-      '................',
-    ],
-  ],
-};
-
-const PLAYER_PALETTE = {
-  S: NES.skin,    s: NES.darkskin,
-  H: NES.lgreen,  h: NES.green,    // green tunic — easy to read as hero
-  b: NES.lyellow,                   // gold belt/buckle detail
-  B: NES.lblue,                     // blue pants
-  L: NES.lbrown,  l: NES.brown,    // brown boots
-  A: NES.lgray,   a: NES.white,    // broom handle (light gray shaft, white tip)
-  '.': null,
-};
-
-function normalizeHexColor(raw, fallback = null) {
-  if (typeof raw !== 'string') return fallback;
-  const value = raw.trim();
-  const short = value.match(/^#([0-9a-f]{3})$/i);
-  if (short) {
-    const [r, g, b] = short[1].split('');
-    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
-  }
-  return /^#([0-9a-f]{6})$/i.test(value) ? value.toLowerCase() : fallback;
-}
-
-function shadeColor(color, percent, fallback = color) {
-  const hex = normalizeHexColor(color, null);
-  if (!hex) return fallback;
-  const n = parseInt(hex.slice(1), 16);
-  const clamp = (x) => Math.max(0, Math.min(255, x));
-  const factor = (100 + percent) / 100;
-  const r = clamp(Math.round(((n >> 16) & 0xff) * factor));
-  const g = clamp(Math.round(((n >> 8) & 0xff) * factor));
-  const b = clamp(Math.round((n & 0xff) * factor));
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-}
-
-function buildPlayerPaletteFromAvatar(avatarConfig = {}) {
-  const skin = normalizeHexColor(avatarConfig?.head_color, PLAYER_PALETTE.S);
-  const tunic = normalizeHexColor(avatarConfig?.body_color, PLAYER_PALETTE.H);
-  const accent = normalizeHexColor(
-    avatarConfig?.accessory_color || avatarConfig?.hat_color,
-    PLAYER_PALETTE.b,
-  );
-  const boots = normalizeHexColor(avatarConfig?.hair_color, PLAYER_PALETTE.L);
-
-  return {
-    S: skin,
-    s: shadeColor(skin, -14),
-    H: tunic,
-    h: shadeColor(tunic, -22),
-    b: accent,
-    B: shadeColor(tunic, -8),
-    L: boots,
-    l: shadeColor(boots, -22),
-    A: PLAYER_PALETTE.A,
-    a: PLAYER_PALETTE.a,
-    '.': null,
-  };
-}
-
-// Attack frames — one per cardinal direction (arm extended with broom)
-// These are appended after the 12 walk frames: indices 12..15
-const PLAYER_ATTACK_FRAMES = {
-  down: [
-    '....SSSSSSSS....',
-    '...SSSSSSSSSS...',
-    '...SsSSSSSSsS...',
-    '...SSSSSSSSSS...',
-    '....HHHHHHHH....',
-    '...HhHHHHHhHH...',
-    '..HHHHHHHHHHHH..',
-    '..HHHHbbHHHHHH..',
-    '..HHHHHHHHHAHHH.',
-    '..BBBBBBBBBAHHH.',
-    '..BBBBBBBBBA....',
-    '..BBB.....Aa....',
-    '...LL.....A.....',
-    '...LL......LL...',
-    '..llll....llll..',
-    '................',
-  ],
-  up: [
-    '....SSSSSSSS....',
-    '...SSSSSSSSSS...',
-    '...SSSSSSSSSS...',
-    '...SSSSSSSSSS...',
-    '....HHHHHHHH....',
-    '...HHHHHHHHHH...',
-    '..HHHHHHHHHAAH..',
-    '..HHHHHHHHAAaH..',
-    '..HHHHHHHHAAHH..',
-    '..BBBBBBBBBBBB..',
-    '..BBBBBBBBBBB...',
-    '..BBB......BBB..',
-    '...LL......LL...',
-    '...LL......LL...',
-    '..llll....llll..',
-    '................',
-  ],
-  right: [
-    '....SSSSSSSS....',
-    '...SSSSSSSSSS...',
-    '...SsSSSSSSsS...',
-    '...SSSSSSSSSS...',
-    '....HHHHHHHH....',
-    '...HhHHHHHhHH...',
-    '..HHHHHHHHHHHH..',
-    '..HHHHbbHHAAAAa.',
-    '..HHHHHHHHHHHH..',
-    '..BBBBBBBBBBBB..',
-    '..BBBBBBBBBBB...',
-    '..BBB......BBB..',
-    '...LL......LL...',
-    '...LL......LL...',
-    '..llll....llll..',
-    '................',
-  ],
-  left: [
-    '....SSSSSSSS....',
-    '...SSSSSSSSSS...',
-    '...SsSSSSSSsS...',
-    '...SSSSSSSSSS...',
-    '....HHHHHHHH....',
-    '...HhHHHHHhHH...',
-    '..HHHHHHHHHHHH..',
-    '.aAAAAHHbbHHHHH.',
-    '..HHHHHHHHHHHH..',
-    '..BBBBBBBBBBBB..',
-    '..BBBBBBBBBBB...',
-    '..BBB......BBB..',
-    '...LL......LL...',
-    '...LL......LL...',
-    '..llll....llll..',
-    '................',
-  ],
-};
+// Frames are authored in HeroSprite.js; this packs them into the 'player' sheet.
 
 export function generatePlayerSheet(scene, options = {}) {
   const WALK_FRAMES   = 12; // 4 dirs × 3 walk frames
@@ -592,46 +338,8 @@ export function generatePlayerSheet(scene, options = {}) {
   const c = createCanvas(W, H);
   const ctx = c.getContext('2d');
 
-  // Dir-specific palettes
-  const avatarPalette = buildPlayerPaletteFromAvatar(options.avatarConfig);
-  const palettes = [
-    avatarPalette,                       // down
-    { ...avatarPalette },                // left
-    { ...avatarPalette },                // right
-    { ...avatarPalette },                // up (back-of-head)
-  ];
-
-  // Walk frames (0–11)
-  for (let dir = 0; dir < 4; dir++) {
-    for (let f = 0; f < 3; f++) {
-      const frameIdx = dir * 3 + f;
-      const ox = frameIdx * FS * SCALE;
-      const src = (dir === 3) ? PLAYER_FRAMES.up[f % 3] : PLAYER_FRAMES.down[f % 3];
-      ctx.save();
-      ctx.translate(ox, 0);
-      if (dir === 1) {           // flip for left
-        ctx.translate(FS * SCALE, 0);
-        ctx.scale(-1, 1);
-      }
-      drawGridOutlined(ctx, src, palettes[dir], SCALE);
-      ctx.restore();
-    }
-  }
-
-  // Attack frames (12–15): down, left, right, up
-  const attackOrder = [
-    PLAYER_ATTACK_FRAMES.down,
-    PLAYER_ATTACK_FRAMES.left,
-    PLAYER_ATTACK_FRAMES.right,
-    PLAYER_ATTACK_FRAMES.up,
-  ];
-  attackOrder.forEach((grid, i) => {
-    const ox = (WALK_FRAMES + i) * FS * SCALE;
-    ctx.save();
-    ctx.translate(ox, 0);
-    drawGridOutlined(ctx, grid, avatarPalette, SCALE);
-    ctx.restore();
-  });
+  // Drawn from the kid's avatar: hair style/colour, face, shirt, accessory
+  drawHeroSheet(ctx, options.avatarConfig ?? {}, drawGridOutlined);
 
   addCanvasSpriteSheet(scene, 'player', c, FS * SCALE, FS * SCALE);
 }
@@ -1062,145 +770,6 @@ export function generateBossSheets(scene) {
 
 // ─── BUILDING SPRITES (32×32) ─────────────────────────────────────────────────
 
-const BUILDING_DEFS = {
-  kitchen: {
-    grid: [
-      '................RRRRRRRRRRRRRRRR',
-      '...............RRRRRRRRRRRRRRRRRR',
-      '..............RRRRRRRRRRRRRRRRRRRR',
-      '.............RRRRRRRRRRRRRRRRRRRRRR',
-      '............RRRRRRrRRRRRRrRRRRRRRR',
-      '...........RRRRRRRrRRRRRRrRRRRRRRRR',
-      '...........RRRRRRRRRRRRRRRRRRRRRRRR.',
-      '...........WWWWWWWWWWWWWWWWWWWWWWW.',
-      '...........WbbWWWWWbbbbbbbWWWWbbW..',
-      '...........WbbWWWWWbbbbbbbWWWWbbW..',
-      '...........WbbWWWWWbbbbbbbWWWWbbW..',
-      '...........WWWWWWWWWWWWWWWWWWWWWW..',
-      '...........WWWWWWWWWWWWWWWWWWWWWW..',
-      '...........WWDDDWWWWWWWWWWWWWWWWW..',
-      '...........WWDDDWWWWWWWWWWWWWWWWW..',
-      '...........WWDDDWWWWWWWWWWWWWWWWW..',
-      '...........WWWWWWWWWWWWWWWWWWWWWW..',
-      '...........WWWWWWWWWWWWWWWWWWWWWW..',
-      '...........WWWWWWWWWWWWWWWWWWWWWW..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '...........GGGGGGGGGGGGGGGGGGGGGG..',
-      '..........GGGGGGGGGGGGGGGGGGGGGGG..',
-      '..........GGGGGGGGGGGGGGGGGGGGGGG..',
-      '..........GGGGGGGGGGGGGGGGGGGGGGG..',
-    ],
-    p: {
-      R: NES.red, r: NES.lred,
-      W: NES.lgray, w: NES.white,
-      b: NES.sky, D: NES.brown,
-      G: NES.lgreen, '.': null,
-    },
-  },
-  laundry: {
-    grid: [
-      '................BBBBBBBBBBBBBBBB',
-      '...............BBBBBBBBBBBBBBBBBB',
-      '..............BBBBBBbBBBBBbBBBBBBB',
-      '.............BBBBBBBbBBBBBbBBBBBBBB',
-      '............BBBBBBBBbBBBBBbBBBBBBBBB',
-      '...........BBBBBBBBBBBBBBBBBBBBBBBBB.',
-      '...........WWWWWWWWWWWWWWWWWWWWWWWW.',
-      '...........WrrrrrrWWrrrrrrWWrrrrrrrW.',
-      '...........WrCCCCrWWrCCCCrWWrCCCCrW.',
-      '...........WrCCCCrWWrCCCCrWWrCCCCrW.',
-      '...........WrCCCCrWWrCCCCrWWrCCCCrW.',
-      '...........WrrrrrrWWrrrrrrWWrrrrrrrW.',
-      '...........WWWWWWWWWWWWWWWWWWWWWWWW.',
-      '...........WWDDDWWWWWWWWWWWWWWWWWWW.',
-      '...........WWDDDWWWWWWWWWWWWWWWWWWW.',
-      '...........WWDDDWWWWWWWWWWWWWWWWWWW.',
-      '...........WWWWWWWWWWWWWWWWWWWWWWWW.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '...........GGGGGGGGGGGGGGGGGGGGGGGG.',
-      '..........GGGGGGGGGGGGGGGGGGGGGGGGG.',
-      '..........GGGGGGGGGGGGGGGGGGGGGGGGG.',
-      '..........GGGGGGGGGGGGGGGGGGGGGGGGG.',
-      '..........GGGGGGGGGGGGGGGGGGGGGGGGG.',
-      '..........GGGGGGGGGGGGGGGGGGGGGGGGG.',
-    ],
-    p: {
-      B: NES.lblue, b: NES.blue,
-      W: NES.lgray, r: NES.lred, C: NES.sky,
-      D: NES.brown, G: NES.lgreen, '.': null,
-    },
-  },
-  reward_castle: {
-    grid: [
-      'YYYY..YYYYYY..YYYY......YYYY..YYYYYY..YYYY',
-      'YYYY..YYYYYY..YYYY......YYYY..YYYYYY..YYYY',
-      'YYYYYYYYYYYYYYYYYY......YYYYYYYYYYYYYYYYYY',
-      'YYYYYYYYYYYYYYYYYY......YYYYYYYYYYYYYYYYYY',
-      'YYYYYYYYYYYYYYYYYYyyyyyYYYYYYYYYYYYYYYYYY',
-      'YYYYYYYYYYYYYYYYYYyyyyyYYYYYYYYYYYYYYYYYY',
-      'YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY',
-      'YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WbbWWWWWWbbbbbbbbbbbbbbbbbbbbbWWWWWWWbbW',
-      'WbbWWWWWWbbbbbbbbbbbbbbbbbbbbbWWWWWWWbbW',
-      'WbbWWWWWWbbbbbbbbbbbbbbbbbbbbbWWWWWWWbbW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWDDDDDDWWWWWWWDDDDDDWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWDDDDDDDWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWDDDDDDDWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWDDDDDDDWWWWWWWWWWWWWWWWWW',
-      'WWWWWWWWWWWWWWWWWDDDDDDDWWWWWWWWWWWWWWWWWW',
-      'GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
-      'GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
-      'GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG',
-    ],
-    p: {
-      Y: NES.yellow, y: NES.lyellow,
-      W: NES.lgray, b: NES.sky,
-      D: NES.brown, G: NES.lgreen, '.': null,
-    },
-  },
-};
-
-export function generateBuildingSprites(scene) {
-  Object.entries(BUILDING_DEFS).forEach(([key, def]) => {
-    const rows = def.grid.length;
-    const cols = def.grid[0].length;
-    const SCALE = 3; // 3× so buildings stand ~3 tiles tall — clearly visible in the world
-    const c = createCanvas(cols * SCALE, rows * SCALE);
-    const ctx = c.getContext('2d');
-    drawGrid(ctx, def.grid, def.p, SCALE);
-    addCanvasTexture(scene, `building_${key}`, c);
-  });
-}
-
 // ─── UI SPRITES ───────────────────────────────────────────────────────────────
 
 export function generateUISprites(scene) {
@@ -1265,7 +834,8 @@ export function generateUISprites(scene) {
   //   row 7: 2px (pointed tip)
   const hc = createCanvas(2 * 8 * SCALE, 8 * SCALE);
   const hctx = hc.getContext('2d');
-  [[NES.red, NES.lred], [NES.dgray, NES.mgray]].forEach(([fg, hi], f) => {
+  // Empty hearts are a light slate so they stay visible on the dark HUD panel
+  [[NES.red, NES.lred], ['#4f586d', '#737d93']].forEach(([fg, hi], f) => {
     hctx.save();
     hctx.translate(f * 8 * SCALE, 0);
     hctx.fillStyle = fg;
@@ -1335,37 +905,47 @@ export function generateUISprites(scene) {
   chctx.restore();
   addCanvasSpriteSheet(scene, 'chest', chc, chW * SCALE, chH * SCALE);
 
-  // ── NPC shopkeeper sprite (8×8 source × SCALE, 2 idle frames) ─────────────
-  const nW = 8, nH = 8;
-  const nc = createCanvas(2 * nW * SCALE, nH * SCALE);
+  // ── NPC shopkeeper: 16×16 wizard (same pixel density as the hero), 2 idle frames
+  const NPC_GRID = [
+    '......OOOO......',
+    '.....OhhhHO.....',
+    '....OhhHHHHO....',
+    '....OHHSHHHO....',
+    '...OHHHHHHHHO...',
+    '..OOOOOOOOOOOO..',
+    '...OKKKKKKKKO...',
+    '...OKEKKKKEKO...',
+    '...OKKKkkKKKO...',
+    '...OBBBMMBBBO...',
+    '..ORBBBBBBBBRO..',
+    '.ORrRBBBBBBRrRO.',
+    '.ORrRRBBBBRRrRO.',
+    '.ORrRRRGRRRRrRO.',
+    '..ORRRRGRRRRRO..',
+    '...OOO....OOO...',
+  ];
+  const NPC_PAL = {
+    O: '#1c1a2e', H: '#6a4cd8', h: '#9a82f0', S: '#ffd246', K: '#f6c9a0', k: '#e2a882',
+    E: '#2b1d14', B: '#f4f4f4', M: '#d26a6a', R: '#2f5fd0', r: '#5f8ef0', G: '#ffd246', '.': null,
+  };
+  const nc = createCanvas(2 * 16 * SCALE, 16 * SCALE);
   const nctx = nc.getContext('2d');
-  [[0, false], [1, true]].forEach(([frame, blink]) => {
+  [false, true].forEach((blink, frame) => {
+    const grid = blink ? NPC_GRID.map((row, y) => (y === 7 ? row.replace(/E/g, 'k') : row)) : NPC_GRID;
     nctx.save();
-    nctx.translate(frame * nW * SCALE, 0);
-    // Hat (purple wizard hat)
-    nctx.fillStyle = NES.purple;   nctx.fillRect(2*SCALE,0*SCALE,4*SCALE,1*SCALE);
-    nctx.fillStyle = NES.lpurple;  nctx.fillRect(2*SCALE,1*SCALE,4*SCALE,2*SCALE);
-    nctx.fillStyle = NES.lpurple;  nctx.fillRect(1*SCALE,2*SCALE,6*SCALE,1*SCALE);
-    // Face
-    nctx.fillStyle = NES.skin;     nctx.fillRect(1*SCALE,3*SCALE,6*SCALE,2*SCALE);
-    if (!blink) {
-      nctx.fillStyle = NES.brown;  nctx.fillRect(2*SCALE,3*SCALE,1*SCALE,1*SCALE); // left eye
-      nctx.fillStyle = NES.brown;  nctx.fillRect(5*SCALE,3*SCALE,1*SCALE,1*SCALE); // right eye
-    }
-    nctx.fillStyle = NES.lred;     nctx.fillRect(3*SCALE,4*SCALE,2*SCALE,1*SCALE); // mouth
-    // Robe (blue)
-    nctx.fillStyle = NES.blue;     nctx.fillRect(0*SCALE,5*SCALE,8*SCALE,3*SCALE);
-    nctx.fillStyle = NES.lblue;    nctx.fillRect(1*SCALE,5*SCALE,6*SCALE,1*SCALE); // collar
+    nctx.translate(frame * 16 * SCALE, 0);
+    drawGrid(nctx, grid, NPC_PAL, SCALE);
     nctx.restore();
   });
-  addCanvasSpriteSheet(scene, 'npc_shopkeeper', nc, nW * SCALE, nH * SCALE);
+  addCanvasSpriteSheet(scene, 'npc_shopkeeper', nc, 16 * SCALE, 16 * SCALE);
 }
 
 export function generateAllSprites(scene, options = {}) {
   generatePlayerSheet(scene, options);
   generateEnemySheets(scene);
   generateBossSheets(scene);
-  generateBuildingSprites(scene);
+  generateBuildings(scene);
+  generateProps(scene);
   generateUISprites(scene);
   return generateTileset(scene);
 }

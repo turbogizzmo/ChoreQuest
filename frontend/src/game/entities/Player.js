@@ -1,6 +1,8 @@
 // Player entity — Phaser Physics Sprite with 4-direction walk animation.
 // Animation key convention: player_down/up/left/right (3 frames each).
 
+import { ySort } from '../engine/depth.js';
+
 export const PLAYER_SPEED = 120;
 const MIN_FRAME_DELTA_MS = 8;
 const DEFAULT_FRAME_DELTA_MS = 16;
@@ -53,7 +55,7 @@ export function createPlayer(scene, x, y) {
 
   const player = scene.physics.add.sprite(x, y, 'player');
   player.setCollideWorldBounds(true);
-  player.setDepth(10);
+  player.setDepth(ySort(y));
   player.play('player_down_idle');
 
   // State

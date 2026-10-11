@@ -4,6 +4,8 @@
 import Phaser from 'phaser';
 import { BootScene }  from './BootScene.js';
 import { WorldScene } from './WorldScene.js';
+import { computeView } from './view.js';
+import { setTextResolution } from '../ui/theme.js';
 
 // Height of the React header bar above the canvas (desktop only). Single
 // source of truth — AdventureMode renders the header at this height.
@@ -16,15 +18,16 @@ export function createGame(containerId, options = {}) {
   const availW = container ? container.clientWidth  : window.innerWidth;
   const availH = container ? container.clientHeight : (window.innerHeight - headerH);
 
-  const gameW = Math.min(availW, 800);
-  const gameH = Math.min(availH, 600);
+  // Fill the container at device resolution; see view.js for the zoom rules.
+  const view = computeView(availW, availH, window.devicePixelRatio);
+  setTextResolution(view.textResolution);
 
   const config = {
     type: Phaser.AUTO,
     parent: containerId,
-    width:  gameW,
-    height: gameH,
-    backgroundColor: '#121212',
+    width:  view.width,
+    height: view.height,
+    backgroundColor: '#0d1b2a',
     pixelArt: true,
     antialias: false,
     roundPixels: true,
@@ -34,12 +37,17 @@ export function createGame(containerId, options = {}) {
     },
     scene: [BootScene, WorldScene],
     scale: {
+      // Canvas is view.width × view.height device pixels; FIT shows it at the
+      // container's CSS size (exactly 1/dpr), so nothing is stretched.
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
-      width:  gameW,
-      height: gameH,
+      width:  view.width,
+      height: view.height,
     },
     input: { touch: true },
+    callbacks: {
+      preBoot: (g) => g.registry.set('view', view),
+    },
   };
 
   const game = new Phaser.Game(config);
@@ -48,6 +56,22 @@ export function createGame(containerId, options = {}) {
   game.events.once('ready', () => {
     game.scene.start('BootScene', { userId, userName, avatarConfig, isKid, onExit, onComplete });
   });
+
+  // Phaser caches where the canvas sits on the page to map clicks/taps. The
+  // React shell can shift it after boot (header, splash, mobile chrome), which
+  // left on-canvas buttons unclickable — re-measure whenever the container moves.
+  if (container && typeof ResizeObserver !== 'undefined') {
+    const remeasure = () => { if (!game.isDestroyed) game.scale.updateBounds(); };
+    const ro = new ResizeObserver(remeasure);
+    ro.observe(container);
+    window.addEventListener('scroll', remeasure, true);
+    const timer = setTimeout(remeasure, 500);
+    game.events.once('destroy', () => {
+      ro.disconnect();
+      window.removeEventListener('scroll', remeasure, true);
+      clearTimeout(timer);
+    });
+  }
 
   return game;
 }
