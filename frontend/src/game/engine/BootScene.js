@@ -4,6 +4,7 @@
 import Phaser from 'phaser';
 import { generateAllSprites } from '../sprites/SpriteGenerator.js';
 import { loadSave, defaultSave } from '../systems/SaveSystem.js';
+import { loadUiFont } from '../ui/theme.js';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -44,7 +45,7 @@ export class BootScene extends Phaser.Scene {
     // Generate all sprites (canvas-based, synchronous)
     const tileMap = generateAllSprites(this, { avatarConfig: this.avatarConfig });
 
-    loadSave(this.userId).then((save) => {
+    Promise.all([loadSave(this.userId), loadUiFont()]).then(([save]) => {
       // Guard: game may have been destroyed by the time this resolves (React StrictMode double-invoke)
       if (!this.sys?.game || this.sys.game.isDestroyed) return;
       const gameData = save ?? defaultSave(this.userId);

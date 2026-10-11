@@ -1,100 +1,119 @@
-// In-game HUD: hearts, XP bar, level, coin count, mini-map, touch controls.
-// All elements are fixed to the camera (setScrollFactor(0)).
+// In-game HUD: hearts, level + XP bar, coin count, mini-map, touch controls.
+// All elements are fixed to the screen (setScrollFactor(0)) and laid out in
+// CSS pixels via uiSize(); view.js routes them to the HUD camera.
 
-import Phaser from 'phaser';
-import { xpForLevel, levelFromXp, PORTAL_ZONES, BOSS_ZONES, MAP_COLS, TILE_SIZE } from '../data/WorldData.js';
+import { xpForLevel, levelFromXp, PORTAL_ZONES, BOSS_ZONES, MAP_COLS, MAP_ROWS, TILE_SIZE, TILE, buildBaseMap } from '../data/WorldData.js';
+import { uiSize, pointerToUi } from '../engine/view.js';
+import { textStyle, drawPanel, COLORS } from './theme.js';
 
-const MAX_HEARTS   = 5;
-const HUD_DEPTH    = 100;
-const PADDING      = 8;
-const HEART_SCALE  = 3;            // 8px source × 3 = 24px display
-const HEART_SIZE   = 8 * HEART_SCALE;
-const HEART_GAP    = 3;
+const MAX_HEARTS = 5;
+const HUD_DEPTH  = 100;
+const MARGIN     = 10;
+const PAD        = 10;
 
-const WORLD_PX = MAP_COLS * TILE_SIZE; // 1280 px
+// Heart/coin textures are 16 px (8 design px × 2). 1.5× → 24 px, 3 px per
+// design pixel, which stays even at every zoom view.js picks.
+const ICON_SCALE = 1.5;
+const ICON_SIZE  = 24;
+const HEART_GAP  = 3;
+
+const XP_BAR_W = 128;
+const XP_BAR_H = 10;
+
+// Mobile Exit chip (React) sits over the canvas top-right on narrow screens.
+const NARROW_W       = 480;
+const EXIT_CHIP_ROOM = 44;
+
+const MINIMAP_TILE_COLORS = {
+  [TILE.GRASS]:    '#4e9f3d',
+  [TILE.FLOWER]:   '#5aa848',
+  [TILE.DIRT]:     '#9b6b3d',
+  [TILE.WATER]:    '#2f6fd6',
+  [TILE.PATH]:     '#d9c38f',
+  [TILE.TREE_TOP]: '#1f5e2c',
+  [TILE.TREE_BOT]: '#1f5e2c',
+  [TILE.WALL]:     '#8b8478',
+  [TILE.SAND]:     '#e6d29a',
+  [TILE.STONE]:    '#b3ada2',
+  [TILE.BUSH]:     '#3f8f45',
+  [TILE.ROCK]:     '#8e8a86',
+};
 
 export class HUD {
   constructor(scene) {
     this.scene   = scene;
     this.hearts  = [];
-    this.xpMask  = null;
     this._surgeBanner = null;
+    this._lastXpKey = null;
     this._buildHUD();
+  }
+
+  _add(obj, depth = HUD_DEPTH) {
+    return obj.setScrollFactor(0).setDepth(depth);
   }
 
   _buildHUD() {
     const scene = this.scene;
-    const cam   = scene.cameras.main;
-    const W     = cam.width;
+    const { w: W } = uiSize(scene);
+    this._narrow = W <= NARROW_W;
 
-    const xpY  = PADDING + HEART_SIZE + 6;
-    const BAR_W = 128;
-    const HUD_BG_H = xpY + 12 + 6;
+    // ── Top-left: hearts + level/XP ──────────────────────────────────
+    const heartsW = MAX_HEARTS * ICON_SIZE + (MAX_HEARTS - 1) * HEART_GAP;
+    const panelW  = PAD * 2 + heartsW + 28;          // + day/night icon
+    const panelH  = PAD * 2 + ICON_SIZE + 8 + 20;
+    this._leftPanel = { x: MARGIN, y: MARGIN, w: panelW, h: panelH };
+    this._add(drawPanel(scene.add.graphics(), MARGIN, MARGIN, panelW, panelH), HUD_DEPTH - 1);
 
-    // ── Dark background strip for top-left HUD ───────────────────────
-    // Width covers hearts row OR xp bar + level badge, whichever is wider.
-    // BAR_W * 1.25 = 160px bar + 50px for level badge text = 210px content.
-    const HUD_BG_CONTENT = Math.max(
-      MAX_HEARTS * (HEART_SIZE + HEART_GAP),   // hearts: 135px
-      BAR_W * 1.25 + 50,                        // xp bar + level badge: 210px
-    );
-    const bgLeft = scene.add.graphics();
-    bgLeft.fillStyle(0x0d0d14, 0.62);
-    bgLeft.fillRoundedRect(4, 4, PADDING + HUD_BG_CONTENT + 6, HUD_BG_H, 8);
-    bgLeft.lineStyle(1, 0xffffff, 0.10);
-    bgLeft.strokeRoundedRect(4, 4, PADDING + HUD_BG_CONTENT + 6, HUD_BG_H, 8);
-    bgLeft.setScrollFactor(0).setDepth(HUD_DEPTH - 1);
-
-    // ── Hearts (top-left) ────────────────────────────────────────────
     for (let i = 0; i < MAX_HEARTS; i++) {
-      const hx = PADDING + i * (HEART_SIZE + HEART_GAP);
-      const hy = PADDING;
-      const empty = scene.add.image(hx, hy, 'heart', 1)
-        .setScrollFactor(0).setDepth(HUD_DEPTH).setOrigin(0).setScale(HEART_SCALE);
-      const full  = scene.add.image(hx, hy, 'heart', 0)
-        .setScrollFactor(0).setDepth(HUD_DEPTH + 1).setOrigin(0).setScale(HEART_SCALE);
-      this.hearts.push({ empty, full });
+      const hx = MARGIN + PAD + i * (ICON_SIZE + HEART_GAP);
+      const hy = MARGIN + PAD;
+      const empty = this._add(scene.add.image(hx, hy, 'heart', 1).setOrigin(0).setScale(ICON_SCALE));
+      const full  = this._add(scene.add.image(hx, hy, 'heart', 0).setOrigin(0).setScale(ICON_SCALE), HUD_DEPTH + 1);
+      this.hearts.push({ empty, full, lastVisible: true });
     }
 
-    // ── XP bar (below hearts) ────────────────────────────────────────
-    scene.add.image(PADDING, xpY, 'xpbar_bg')
-      .setScrollFactor(0).setDepth(HUD_DEPTH).setOrigin(0).setScale(1.25, 1.5);
+    // Day/night icon at the end of the heart row
+    this._dayNightLabel = this._add(scene.add.text(
+      MARGIN + panelW - PAD - 10, MARGIN + PAD + ICON_SIZE / 2, '☀',
+      textStyle(16, COLORS.gold, { weight: 400, stroke: 3 }),
+    ).setOrigin(0.5));
 
-    this.xpFill = scene.add.image(PADDING, xpY, 'xpbar_fill')
-      .setScrollFactor(0).setDepth(HUD_DEPTH + 1).setOrigin(0).setScale(1.25, 1.5);
+    // Level badge + XP bar row
+    const rowY = MARGIN + PAD + ICON_SIZE + 8;
+    this._levelBadgeBg = this._add(scene.add.graphics());
+    this.levelLabel = this._add(scene.add.text(MARGIN + PAD + 19, rowY + 10, 'LV 1',
+      textStyle(11, COLORS.ink, { weight: 800, stroke: 0 })).setOrigin(0.5), HUD_DEPTH + 2);
+    this._levelBadge = { x: MARGIN + PAD, y: rowY, w: 38, h: 20 };
 
-    this.xpFill.setCrop(0, 0, 0, 8);
+    const barX = MARGIN + PAD + 38 + 8;
+    const barW = Math.min(XP_BAR_W, panelW - PAD - (barX - MARGIN));
+    this._xpBar = { x: barX, y: rowY + 5, w: barW, h: XP_BAR_H };
+    this._xpGfx = this._add(scene.add.graphics(), HUD_DEPTH + 1);
+    this.xpLabel = this._add(scene.add.text(barX + barW / 2, rowY + 10, '',
+      textStyle(9, COLORS.text, { weight: 800, stroke: 3 })).setOrigin(0.5), HUD_DEPTH + 3);
 
-    // XP label (centered on bar)
-    this.xpLabel = scene.add.text(PADDING + BAR_W * 1.25 / 2, xpY + 6, 'XP 0', {
-      fontSize: '9px',
-      fontFamily: 'monospace',
-      color: '#ffffff',
-      stroke: '#000000',
-      strokeThickness: 3,
-      resolution: 2,
-    }).setScrollFactor(0).setDepth(HUD_DEPTH + 2).setOrigin(0.5);
+    // Combo counter (below the panel, hidden until first combo)
+    this._comboLabel = this._add(scene.add.text(MARGIN + 4, MARGIN + panelH + 8, '',
+      textStyle(14, COLORS.orange, { weight: 900, stroke: 4, align: 'left' })), HUD_DEPTH + 5).setVisible(false);
+    this._comboFadeTimer = null;
 
-    // ── Level badge (right of XP bar) ────────────────────────────────
-    this.levelLabel = scene.add.text(PADDING + BAR_W * 1.25 + 6, xpY + 1, 'LV 1', {
-      fontSize: '10px',
-      fontFamily: 'monospace',
-      color: '#fcd860',
-      stroke: '#000000',
-      strokeThickness: 4,
-      resolution: 2,
-    }).setScrollFactor(0).setDepth(HUD_DEPTH + 3); // above xpFill crop edge
+    // ── Top-right: coins + mini-map ──────────────────────────────────
+    const rightTop = MARGIN + (this._narrow ? EXIT_CHIP_ROOM : 0);
+    this._buildCoins(W, rightTop);
+    this._buildMinimap(W, rightTop + 40 + 8);
 
-    // ── Coin counter (top-right) ──────────────────────────────────────
-    const coinX = W - PADDING - 48;
-    const bgRight = scene.add.graphics();
-    bgRight.fillStyle(0x0d0d14, 0.62);
-    bgRight.fillRoundedRect(coinX - 6, 4, 62, 28, 8);
-    bgRight.lineStyle(1, 0xffffff, 0.10);
-    bgRight.strokeRoundedRect(coinX - 6, 4, 62, 28, 8);
-    bgRight.setScrollFactor(0).setDepth(HUD_DEPTH - 1);
+    // ── Touch action buttons (bottom) ────────────────────────────────
+    if (scene.sys.game.device.input.touch) {
+      this._buildTouchControls();
+    }
+  }
 
-    // Coin animation
+  _buildCoins(W, top) {
+    const scene = this.scene;
+    const pillH = 40;
+    this._coinPill = { right: W - MARGIN, top, h: pillH };
+    this._coinBg = this._add(scene.add.graphics(), HUD_DEPTH - 1);
+
     if (!scene.anims.exists('coin_spin')) {
       scene.anims.create({
         key: 'coin_spin',
@@ -103,114 +122,76 @@ export class HUD {
         repeat: -1,
       });
     }
-    const coinAnim = scene.add.sprite(coinX, PADDING + 2, 'coin')
-      .setScrollFactor(0).setDepth(HUD_DEPTH).setOrigin(0).setScale(2.5);
-    coinAnim.play('coin_spin');
-
-    this.coinLabel = scene.add.text(coinX + 24, PADDING + 8, '0', {
-      fontSize: '12px',
-      fontFamily: 'monospace',
-      color: '#fcd860',
-      stroke: '#000000',
-      strokeThickness: 4,
-      resolution: 2,
-    }).setScrollFactor(0).setDepth(HUD_DEPTH).setOrigin(0, 0.5);
-
-    // ── Mini-map (top-right, below coin counter) ──────────────────────
-    this._buildMinimap(W);
-
-    // ── Combo counter (below XP bar, hidden until first combo) ──────
-    this._comboLabel = scene.add.text(PADDING, xpY + 20, '', {
-      fontSize: '10px', fontFamily: 'monospace',
-      color: '#ff8800', stroke: '#000000', strokeThickness: 3, resolution: 2,
-    }).setScrollFactor(0).setDepth(HUD_DEPTH + 5).setVisible(false);
-    this._comboFadeTimer = null;
-
-    // ── Day/night clock icon (top-center) ───────────────────────────
-    // Unicode sun ☀ → moon ☾ tint shifts as the overlay darkens.
-    this._dayNightLabel = scene.add.text(W / 2, 6, '☀', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#fcd860',
-      stroke: '#000000', strokeThickness: 3, resolution: 2,
-    }).setScrollFactor(0).setDepth(HUD_DEPTH).setOrigin(0.5, 0);
-
-    // ── Touch action buttons (bottom) ────────────────────────────────
-    if (scene.sys.game.device.input.touch) {
-      this._buildTouchControls();
-    }
+    this._coinIcon = this._add(scene.add.sprite(0, top + pillH / 2, 'coin').setOrigin(0, 0.5).setScale(ICON_SCALE));
+    this._coinIcon.play('coin_spin');
+    this.coinLabel = this._add(scene.add.text(0, top + pillH / 2, '0',
+      textStyle(17, COLORS.gold, { weight: 800, stroke: 4, align: 'left' })).setOrigin(0, 0.5));
+    this._layoutCoins('0');
   }
 
-  _buildMinimap(W) {
+  _layoutCoins(text) {
+    const { right, top, h } = this._coinPill;
+    this.coinLabel.setText(text);
+    const w = Math.max(84, PAD + ICON_SIZE + 8 + Math.ceil(this.coinLabel.width) + PAD + 2);
+    const x = right - w;
+    this._coinBg.clear();
+    drawPanel(this._coinBg, x, top, w, h);
+    this._coinIcon.setX(x + PAD);
+    this.coinLabel.setX(x + PAD + ICON_SIZE + 8);
+  }
+
+  // Mini-map drawn from the real tile grid (rendered once into a texture),
+  // with portal pins and live player/enemy dots on top.
+  _buildMinimap(W, top) {
     const scene   = this.scene;
-    const MM_SIZE = 80;
-    const MM_X    = W - MM_SIZE - PADDING;
-    const MM_Y    = 44; // below coin counter
+    const PX      = this._narrow ? 2 : 3;                // px per tile
+    const MM_W    = MAP_COLS * PX;
+    const MM_H    = MAP_ROWS * PX;
+    const MM_X    = W - MARGIN - PAD / 2 - MM_W;
+    const MM_Y    = top + PAD / 2;
 
-    // Background
-    const mmBg = scene.add.graphics();
-    mmBg.fillStyle(0x0d0d14, 0.70);
-    mmBg.fillRoundedRect(MM_X - 4, MM_Y - 4, MM_SIZE + 8, MM_SIZE + 8, 6);
-    mmBg.lineStyle(1, 0xffffff, 0.12);
-    mmBg.strokeRoundedRect(MM_X - 4, MM_Y - 4, MM_SIZE + 8, MM_SIZE + 8, 6);
-    mmBg.setScrollFactor(0).setDepth(HUD_DEPTH - 1);
+    this._add(drawPanel(scene.add.graphics(), MM_X - PAD / 2, top, MM_W + PAD, MM_H + PAD), HUD_DEPTH - 1);
 
-    // Dark green fill
-    const mmFill = scene.add.graphics();
-    mmFill.fillStyle(0x0a1a0a, 1);
-    mmFill.fillRect(MM_X, MM_Y, MM_SIZE, MM_SIZE);
-    mmFill.setScrollFactor(0).setDepth(HUD_DEPTH);
+    const key = `minimap_${PX}`;
+    const grid = scene.worldGrid ?? buildBaseMap();
+    if (scene.textures.exists(key)) scene.textures.remove(key);
+    const tex = scene.textures.createCanvas(key, MM_W, MM_H);
+    const ctx = tex.context;
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        ctx.fillStyle = MINIMAP_TILE_COLORS[grid[r]?.[c]] ?? MINIMAP_TILE_COLORS[TILE.GRASS];
+        ctx.fillRect(c * PX, r * PX, PX, PX);
+      }
+    }
+    // Building footprints
+    (scene.buildingFootprints ?? []).forEach(({ x, y, w, h, color }) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.round(x / TILE_SIZE * PX), Math.round(y / TILE_SIZE * PX),
+        Math.max(PX, Math.round(w / TILE_SIZE * PX)), Math.max(PX, Math.round(h / TILE_SIZE * PX)));
+    });
+    tex.refresh();
+    this._add(scene.add.image(MM_X, MM_Y, key).setOrigin(0));
 
-    // "MAP" label
-    scene.add.text(MM_X + MM_SIZE / 2, MM_Y - 3, 'MAP', {
-      fontSize: '7px', fontFamily: 'monospace', color: '#556655',
-      stroke: '#000', strokeThickness: 2, resolution: 2,
-    }).setScrollFactor(0).setDepth(HUD_DEPTH).setOrigin(0.5, 1);
-
-    // Water border trace — gives the map geographic context
-    const mmBorder = scene.add.graphics();
-    mmBorder.lineStyle(1, 0x4880e8, 0.45);
-    mmBorder.strokeRect(MM_X, MM_Y, MM_SIZE, MM_SIZE);
-    mmBorder.setScrollFactor(0).setDepth(HUD_DEPTH + 1);
-
-    // Path tile layer — main cross paths run through tile 19–20 (midRow/midCol of 40×40 map).
-    // Each tile = 2px on the 80px mini-map (80 / 40 = 2).
-    // The path is 2 tiles wide, so draw a 4px-wide cross centred at tile 19.5.
-    const mmPath = scene.add.graphics();
-    mmPath.fillStyle(0xbcbcbc, 0.30); // light grey, semi-transparent
-    const pathTile  = 19;             // first of the two mid-column/row tiles
-    const pathPx    = pathTile * 2;   // pixel position on the 80px map
-    // Vertical path (columns 19–20 → x 38–41)
-    mmPath.fillRect(MM_X + pathPx, MM_Y, 4, MM_SIZE);
-    // Horizontal path (rows 19–20 → y 38–41)
-    mmPath.fillRect(MM_X, MM_Y + pathPx, MM_SIZE, 4);
-    mmPath.setScrollFactor(0).setDepth(HUD_DEPTH + 1);
-
-    // Portal markers (static) — castle marker larger and brighter
-    const scale = MM_SIZE / WORLD_PX;
+    const scale = PX / TILE_SIZE;
     PORTAL_ZONES.forEach((zone) => {
-      const px = MM_X + zone.x * TILE_SIZE * scale;
-      const py = MM_Y + zone.y * TILE_SIZE * scale;
-      const colorHex = zone.color ?? 0xffffff;
-      const sz = zone.isRewardShop ? 6 : 4;
-      scene.add.rectangle(px, py, sz, sz, colorHex, 0.9)
-        .setScrollFactor(0).setDepth(HUD_DEPTH + 1).setOrigin(0.5);
+      const px = MM_X + (zone.x + 0.5) * TILE_SIZE * scale;
+      const py = MM_Y + (zone.y + 0.5) * TILE_SIZE * scale;
+      const r  = zone.isRewardShop ? 4 : 3;
+      this._add(scene.add.circle(px, py, r + 1, 0x000000, 0.6), HUD_DEPTH + 1);
+      this._add(scene.add.circle(px, py, r, zone.color ?? 0xffffff, 1), HUD_DEPTH + 1);
     });
 
-    // Boss respawn timer labels — shown when boss is defeated (re-evaluated in update)
+    // Boss respawn countdowns (shown while a boss is on cooldown)
     this._bossTimers = BOSS_ZONES.map((bz) => {
-      const px = MM_X + bz.x * TILE_SIZE * scale;
-      const py = MM_Y + bz.y * TILE_SIZE * scale;
-      const label = scene.add.text(px, py - 4, '', {
-        fontSize: '5px', fontFamily: 'monospace', color: '#ff8888',
-        stroke: '#000', strokeThickness: 2, resolution: 2,
-      }).setScrollFactor(0).setDepth(HUD_DEPTH + 3).setOrigin(0.5, 1);
+      const label = this._add(scene.add.text(
+        MM_X + bz.x * TILE_SIZE * scale, MM_Y + bz.y * TILE_SIZE * scale - 3, '',
+        textStyle(9, COLORS.red, { weight: 800, stroke: 3 }),
+      ).setOrigin(0.5, 1), HUD_DEPTH + 3);
       return { bossType: bz.type, label };
     });
 
-    // Dynamic graphics (player + enemies) — redrawn each frame
-    this._mmGfx = scene.add.graphics()
-      .setScrollFactor(0).setDepth(HUD_DEPTH + 2);
-
-    this._mmPos = { x: MM_X, y: MM_Y, size: MM_SIZE, scale };
+    this._mmGfx = this._add(scene.add.graphics(), HUD_DEPTH + 2);
+    this._mmPos = { x: MM_X, y: MM_Y, scale };
   }
 
   _updateMinimap() {
@@ -219,47 +200,76 @@ export class HUD {
     const gfx = this._mmGfx;
     gfx.clear();
 
-    // Enemy dots (red)
     const enemies = this.scene.enemies;
     if (enemies) {
-      gfx.fillStyle(0xff3333, 0.85);
       enemies.getChildren().forEach((e) => {
         if (!e.active) return;
         const ex = mmX + e.x * scale;
         const ey = mmY + e.y * scale;
-        gfx.fillRect(ex - 1, ey - 1, e.isBoss ? 4 : 2, e.isBoss ? 4 : 2);
-      });
-    }
-
-    // Player dot (white, slightly larger)
-    const player = this.scene.player;
-    if (player) {
-      gfx.fillStyle(0xffffff, 1);
-      gfx.fillRect(mmX + player.x * scale - 2, mmY + player.y * scale - 2, 4, 4);
-    }
-
-    // Boss respawn countdown labels
-    const bossDefeats = this.scene.gameData?.bossDefeats ?? {};
-    const RESPAWN_MS  = 24 * 60 * 60 * 1000;
-    if (this._bossTimers) {
-      this._bossTimers.forEach(({ bossType, label }) => {
-        const defeatedAt = bossDefeats[bossType] ?? 0;
-        const remaining  = defeatedAt ? RESPAWN_MS - (Date.now() - defeatedAt) : 0;
-        if (remaining > 0) {
-          const hrs = Math.ceil(remaining / (60 * 60 * 1000));
-          label.setText(`${hrs}h`);
-          label.setVisible(true);
+        if (e.isBoss) {
+          gfx.fillStyle(0x000000, 0.7);
+          gfx.fillCircle(ex, ey, 4);
+          gfx.fillStyle(0xff3b3b, 1);
+          gfx.fillCircle(ex, ey, 3);
         } else {
-          label.setVisible(false);
+          gfx.fillStyle(0xff5a5a, 0.9);
+          gfx.fillRect(ex - 1, ey - 1, 2, 2);
         }
       });
     }
+
+    const player = this.scene.player;
+    if (player) {
+      const px = mmX + player.x * scale;
+      const py = mmY + player.y * scale;
+      gfx.fillStyle(0x000000, 0.8);
+      gfx.fillCircle(px, py, 4);
+      gfx.fillStyle(0xffffff, 1);
+      gfx.fillCircle(px, py, 3);
+    }
+
+    const bossDefeats = this.scene.gameData?.bossDefeats ?? {};
+    const RESPAWN_MS  = 24 * 60 * 60 * 1000;
+    this._bossTimers?.forEach(({ bossType, label }) => {
+      const defeatedAt = bossDefeats[bossType] ?? 0;
+      const remaining  = defeatedAt ? RESPAWN_MS - (Date.now() - defeatedAt) : 0;
+      if (remaining > 0) {
+        label.setText(`${Math.ceil(remaining / (60 * 60 * 1000))}h`).setVisible(true);
+      } else if (label.visible) {
+        label.setVisible(false);
+      }
+    });
+  }
+
+  _drawXp(progress, level) {
+    const { x, y, w, h } = this._xpBar;
+    const g = this._xpGfx;
+    g.clear();
+    g.fillStyle(0x000000, 0.55);
+    g.fillRoundedRect(x - 1, y - 1, w + 2, h + 2, (h + 2) / 2);
+    g.fillStyle(0x1d2433, 1);
+    g.fillRoundedRect(x, y, w, h, h / 2);
+    const fw = Math.round(w * progress);
+    if (fw > 0) {
+      g.fillStyle(COLORS.greenHex, 1);
+      g.fillRoundedRect(x, y, Math.max(fw, h), h, h / 2);
+      g.fillStyle(0xffffff, 0.28);
+      g.fillRoundedRect(x + 2, y + 1, Math.max(fw - 4, 2), 2, 1);
+    }
+
+    const b = this._levelBadge;
+    const bg = this._levelBadgeBg;
+    bg.clear();
+    bg.fillStyle(COLORS.goldHex, 1);
+    bg.fillRoundedRect(b.x, b.y, b.w, b.h, b.h / 2);
+    bg.fillStyle(0xffffff, 0.35);
+    bg.fillRoundedRect(b.x + 3, b.y + 2, b.w - 6, 3, 1.5);
+    this.levelLabel.setText(level >= 100 ? `${level}` : `LV ${level}`);
   }
 
   _buildTouchControls() {
     const scene = this.scene;
-    const W     = scene.cameras.main.width;
-    const H     = scene.cameras.main.height;
+    const { w: W, h: H } = uiSize(scene);
 
     this.touchKeys = {
       left:   { isDown: false },
@@ -270,34 +280,27 @@ export class HUD {
     };
 
     // ── Virtual joystick (bottom-left) ───────────────────────────────
-    const JOY_R  = 40;
-    const JOY_X  = JOY_R + 16;
-    const JOY_Y  = H - JOY_R - 20;
+    const JOY_R  = 46;
+    const JOY_X  = JOY_R + 22;
+    const JOY_Y  = H - JOY_R - 26;
 
-    // Base ring
-    scene.add.circle(JOY_X, JOY_Y, JOY_R, 0xffffff, 0.10)
-      .setScrollFactor(0).setDepth(HUD_DEPTH);
-    const joyRing = scene.add.graphics().setScrollFactor(0).setDepth(HUD_DEPTH + 1);
-    joyRing.lineStyle(1, 0xffffff, 0.30);
+    this._add(scene.add.circle(JOY_X, JOY_Y, JOY_R, 0x0f1420, 0.45));
+    const joyRing = this._add(scene.add.graphics(), HUD_DEPTH + 1);
+    joyRing.lineStyle(2, 0xffffff, 0.35);
     joyRing.strokeCircle(JOY_X, JOY_Y, JOY_R);
-
-    // Thumb
-    const joyThumb = scene.add.circle(JOY_X, JOY_Y, 18, 0xffffff, 0.40)
-      .setScrollFactor(0).setDepth(HUD_DEPTH + 2);
+    const joyThumb = this._add(scene.add.circle(JOY_X, JOY_Y, 20, 0xffffff, 0.55), HUD_DEPTH + 2);
 
     let activeId = null;
 
     const updateJoy = (ptr) => {
-      const dx   = ptr.x - JOY_X;
-      const dy   = ptr.y - JOY_Y;
+      const p    = pointerToUi(scene, ptr);
+      const dx   = p.x - JOY_X;
+      const dy   = p.y - JOY_Y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       const max  = JOY_R * 0.72;
       const angle = Math.atan2(dy, dx);
       const clamped = Math.min(dist, max);
-      joyThumb.setPosition(
-        JOY_X + Math.cos(angle) * clamped,
-        JOY_Y + Math.sin(angle) * clamped,
-      );
+      joyThumb.setPosition(JOY_X + Math.cos(angle) * clamped, JOY_Y + Math.sin(angle) * clamped);
       const dead = JOY_R * 0.28;
       this.touchKeys.left.isDown  = dx < -dead;
       this.touchKeys.right.isDown = dx >  dead;
@@ -316,36 +319,31 @@ export class HUD {
 
     scene.input.on('pointerdown', (ptr) => {
       if (activeId !== null) return;
-      if (ptr.x < W / 2 && ptr.y > H * 0.55) {
+      const p = pointerToUi(scene, ptr);
+      if (p.x < W / 2 && p.y > H * 0.55) {
         activeId = ptr.id;
         updateJoy(ptr);
       }
     });
-    scene.input.on('pointermove', (ptr) => {
-      if (ptr.id === activeId) updateJoy(ptr);
-    });
+    scene.input.on('pointermove', (ptr) => { if (ptr.id === activeId) updateJoy(ptr); });
     scene.input.on('pointerup',  (ptr) => { if (ptr.id === activeId) releaseJoy(); });
     scene.input.on('pointerout', (ptr) => { if (ptr.id === activeId) releaseJoy(); });
 
-    // ── Attack button (bottom-right) — 56 px circle + ripple ─────────
-    const ATK_R = 28;
-    const ATK_X = W - ATK_R - 20;
-    const ATK_Y = H - ATK_R - 20;
+    // ── Attack button (bottom-right) ─────────────────────────────────
+    const ATK_R = 34;
+    const ATK_X = W - ATK_R - 24;
+    const ATK_Y = H - ATK_R - 30;
 
-    const atkBtn = scene.add.circle(ATK_X, ATK_Y, ATK_R, 0xff4400, 0.55)
-      .setScrollFactor(0).setDepth(HUD_DEPTH).setInteractive();
-    scene.add.text(ATK_X, ATK_Y, '⚔', {
-      fontSize: '22px', color: '#ffffff', resolution: 2,
-    }).setScrollFactor(0).setDepth(HUD_DEPTH + 1).setOrigin(0.5);
+    const atkBtn = this._add(scene.add.circle(ATK_X, ATK_Y, ATK_R, 0xff6a2b, 0.8)).setInteractive();
+    atkBtn.setStrokeStyle(3, 0xffffff, 0.5);
+    this._add(scene.add.text(ATK_X, ATK_Y, '⚔', textStyle(26, '#ffffff', { weight: 400, stroke: 0 })).setOrigin(0.5), HUD_DEPTH + 1);
 
     atkBtn.on('pointerdown', () => {
       this.touchKeys.attack.isDown = true;
-      // Ripple effect
-      const ripple = scene.add.circle(ATK_X, ATK_Y, ATK_R, 0xff8800, 0.40)
-        .setScrollFactor(0).setDepth(HUD_DEPTH - 1);
+      const ripple = this._add(scene.add.circle(ATK_X, ATK_Y, ATK_R, 0xffa24c, 0.4), HUD_DEPTH - 1);
       scene.tweens.add({
-        targets: ripple, scaleX: 2.6, scaleY: 2.6, alpha: 0,
-        duration: 380, ease: 'Power2',
+        targets: ripple, scaleX: 2.2, scaleY: 2.2, alpha: 0,
+        duration: 360, ease: 'Power2',
         onComplete: () => ripple.destroy(),
       });
     });
@@ -361,12 +359,10 @@ export class HUD {
       this._comboFadeTimer = null;
     }
 
-    const color = multiplier >= 3 ? '#ff4444' : '#ff8800';
-    const stars = multiplier >= 3 ? '★★★' : '★★';
-    this._comboLabel.setText(`${multiplier}× COMBO! ${stars}`)
-      .setColor(color).setVisible(true).setAlpha(1);
+    const color = multiplier >= 3 ? COLORS.red : COLORS.orange;
+    this._comboLabel.setText(`${multiplier}× combo!`).setColor(color).setVisible(true).setAlpha(1).setScale(1.25);
+    this.scene.tweens.add({ targets: this._comboLabel, scale: 1, duration: 160, ease: 'Back.easeOut' });
 
-    // Cancel any running fade and restart 1.5 s countdown
     this._comboFadeTimer = this.scene.time.delayedCall(1500, () => {
       this.scene.tweens.add({
         targets: this._comboLabel, alpha: 0, duration: 400,
@@ -378,73 +374,78 @@ export class HUD {
     });
   }
 
-  // Called each frame with the current night overlay alpha (0 = full day, 0.55 = full night).
-  // Three zones: day → dusk → night, avoiding an abrupt binary snap.
+  // Called each frame with the current night overlay alpha (0 = day, 0.55 = full night).
   updateNightCycle(nightAlpha) {
     if (!this._dayNightLabel) return;
-    const ratio = nightAlpha / 0.55; // normalise to 0–1
-    if (ratio > 0.6) {
-      this._dayNightLabel.setText('☾').setColor('#a4e4fc'); // night — pale blue
-    } else if (ratio > 0.25) {
-      this._dayNightLabel.setText('☀').setColor('#f08828'); // dusk — orange
-    } else {
-      this._dayNightLabel.setText('☀').setColor('#fcd860'); // day — yellow
-    }
+    const ratio = nightAlpha / 0.55;
+    const phase = ratio > 0.6 ? 'night' : ratio > 0.25 ? 'dusk' : 'day';
+    if (phase === this._dayPhase) return;
+    this._dayPhase = phase;
+    if (phase === 'night')     this._dayNightLabel.setText('☾').setColor(COLORS.sky);
+    else if (phase === 'dusk') this._dayNightLabel.setText('☀').setColor(COLORS.orange);
+    else                       this._dayNightLabel.setText('☀').setColor(COLORS.gold);
   }
 
   update(gameData) {
-    const { hp, maxHp, xp, coins } = gameData;
+    const { hp, xp, coins } = gameData;
     const level = levelFromXp(xp);
 
-    // Hearts
     this.hearts.forEach((h, i) => {
-      h.full.setVisible(i < hp);
+      const visible = i < hp;
+      if (visible !== h.lastVisible) {
+        h.full.setVisible(visible);
+        h.lastVisible = visible;
+        if (!visible) {
+          // Little pop when a heart is lost
+          this.scene.tweens.add({ targets: h.empty, scale: ICON_SCALE * 1.3, yoyo: true, duration: 110 });
+        }
+      }
     });
 
-    // XP fill
-    const needed   = xpForLevel(level);
-    let   prevXp   = 0;
-    for (let l = 1; l < level; l++) {
-      prevXp += xpForLevel(l);
+    // XP — only redraw when something changed
+    const key = `${xp}|${level}`;
+    if (key !== this._lastXpKey) {
+      this._lastXpKey = key;
+      const needed = xpForLevel(level);
+      let prevXp = 0;
+      for (let l = 1; l < level; l++) prevXp += xpForLevel(l);
+      const into = xp - prevXp;
+      this._drawXp(Math.min(into / needed, 1), level);
+      this.xpLabel.setText(`${into} / ${needed} XP`);
     }
-    const progress = Math.min((xp - prevXp) / needed, 1);
-    this.xpFill.setCrop(0, 0, Math.floor(128 * progress), 8);
-    this.xpLabel.setText(`XP ${xp - prevXp}/${needed}`);
-    this.levelLabel.setText(`LV ${level}`);
 
-    // Coins
-    this.coinLabel.setText(String(coins));
+    const coinText = String(coins);
+    if (coinText !== this.coinLabel.text) this._layoutCoins(coinText);
 
-    // Mini-map
     this._updateMinimap();
   }
 
   // ── Chore Surge banner ────────────────────────────────────────────────────────
-  // Slides in from the top, holds for most of durationMs, then slides out.
+  // Slides in below the HUD, holds for most of durationMs, then slides out.
   showSurgeBanner(durationMs = 90_000) {
     const scene = this.scene;
-    const cam   = scene.cameras.main;
-    const w     = cam.width;
+    const { w } = uiSize(scene);
+    const bw = Math.min(w - 2 * MARGIN, 300);
+    const bh = 40;
+    const targetY = this._leftPanel.y + this._leftPanel.h + (this._narrow ? 40 : 18) + bh / 2;
 
-    const bg = scene.add.rectangle(w / 2, -30, Math.min(w * 0.82, 340), 28, 0x1a1000, 0.92)
-      .setScrollFactor(0).setDepth(160)
-      .setStrokeStyle(2, 0xf8b800);
+    const bg = this._add(scene.add.graphics(), 160);
+    bg.fillStyle(0x2a1a00, 0.94);
+    bg.fillRoundedRect(-bw / 2, -bh / 2, bw, bh, bh / 2);
+    bg.lineStyle(2, COLORS.goldHex, 1);
+    bg.strokeRoundedRect(-bw / 2, -bh / 2, bw, bh, bh / 2);
+    bg.setPosition(w / 2, -40);
 
-    const txt = scene.add.text(w / 2, -30, '⚡  CHORE SURGE!  2× XP', {
-      fontSize: '12px', fontFamily: 'monospace', color: '#fcd860',
-      stroke: '#000', strokeThickness: 4, resolution: 2,
-    }).setScrollFactor(0).setDepth(161).setOrigin(0.5);
+    const txt = this._add(scene.add.text(w / 2, -40, '⚡ Chore Surge!  2× XP', textStyle(15, COLORS.gold, { weight: 900, stroke: 0 }))
+      .setOrigin(0.5), 161);
 
     const banner = { bg, txt, introTween: null, holdTimer: null, outroTween: null };
     this._surgeBanner = banner;
-
-    const targetY = 50; // just below the hearts/XP HUD strip
 
     banner.introTween = scene.tweens.add({
       targets: [bg, txt], y: targetY,
       duration: 340, ease: 'Back.easeOut',
       onComplete: () => {
-        // Slide out 1 s before the surge ends
         const holdMs = Math.max(200, durationMs - 1000);
         banner.holdTimer = scene.time.delayedCall(holdMs, () => {
           banner.holdTimer = null;
@@ -477,26 +478,17 @@ export class HUD {
     } catch (_) {}
   }
 
-  showFloatingText(x, y, text, color = '#fcd860') {
+  // Floating text lives in world space so it tracks the spot it pops from.
+  showFloatingText(x, y, text, color = COLORS.gold) {
     const scene = this.scene;
-    const cam   = scene.cameras.main;
-    const sx    = x - cam.scrollX;
-    const sy    = y - cam.scrollY;
-
-    const label = scene.add.text(sx, sy, text, {
-      fontSize: '12px',
-      fontFamily: 'monospace',
-      color,
-      stroke: '#000000',
-      strokeThickness: 3,
-      resolution: 2,
-    }).setScrollFactor(0).setDepth(HUD_DEPTH + 10).setOrigin(0.5);
+    const label = scene.add.text(x, y, text, textStyle(13, color, { weight: 900, stroke: 4 }))
+      .setDepth(60).setOrigin(0.5);
 
     scene.tweens.add({
       targets: label,
-      y: sy - 40,
+      y: y - 36,
       alpha: 0,
-      duration: 1200,
+      duration: 1100,
       ease: 'Power2',
       onComplete: () => label.destroy(),
     });

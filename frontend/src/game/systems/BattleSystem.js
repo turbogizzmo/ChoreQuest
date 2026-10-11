@@ -3,6 +3,8 @@
 // Enemy touches player -> triggers damage.
 
 import { WEAPON_STATS } from '../data/WorldData.js';
+import { uiSize } from '../engine/view.js';
+import { DEPTH } from '../engine/depth.js';
 
 const COMBO_WINDOW_MS = 1500; // hits within this window count toward combo
 
@@ -140,11 +142,8 @@ export class BattleSystem {
 
     if (enemy.isBoss) {
       // Boss: big flash + dramatic scale-burst
-      const cam = scene.cameras.main;
-      const flash = scene.add.rectangle(
-        cam.width / 2, cam.height / 2, cam.width, cam.height,
-        0xffffff, 0,
-      ).setScrollFactor(0).setDepth(200);
+      const { w, h } = uiSize(scene);
+      const flash = scene.add.rectangle(w / 2, h / 2, w, h, 0xffffff, 0).setScrollFactor(0).setDepth(200);
       scene.tweens.add({
         targets: flash, alpha: 0.45,
         yoyo: true, duration: 120, repeat: 1,
@@ -163,7 +162,7 @@ export class BattleSystem {
       for (let i = 0; i < 6; i++) {
         const angle  = (Math.PI * 2 * i) / 6;
         const puff   = scene.add.rectangle(enemy.x, enemy.y, 4, 4, 0xbcbcbc, 1)
-          .setDepth(12);
+          .setDepth(DEPTH.VFX);
         scene.tweens.add({
           targets: puff,
           x: enemy.x + Math.cos(angle) * 28,
@@ -244,10 +243,8 @@ export class BattleSystem {
     // Screen shake + white flash — much more impactful than a red tint
     this.scene.cameras.main.shake(150, 0.008);
 
-    const cam   = this.scene.cameras.main;
-    const flash = this.scene.add.rectangle(
-      cam.width / 2, cam.height / 2, cam.width, cam.height, 0xffffff, 0.55,
-    ).setScrollFactor(0).setDepth(210);
+    const { w, h } = uiSize(this.scene);
+    const flash = this.scene.add.rectangle(w / 2, h / 2, w, h, 0xffffff, 0.55).setScrollFactor(0).setDepth(210);
     this.scene.tweens.add({
       targets: flash, alpha: 0, duration: 200,
       onComplete: () => flash.destroy(),

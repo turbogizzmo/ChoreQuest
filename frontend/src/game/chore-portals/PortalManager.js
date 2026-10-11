@@ -1,7 +1,17 @@
-// Creates portal sprites on the map and handles zone entry detection.
-// Emits 'portalEnter' scene event when player walks into a portal zone.
+// District doorways: each portal is the glowing entrance of its building.
+// An invisible physics body on the tile in front of the door detects entry and
+// emits 'portalEnter'; the visible part is a pulsing light pool at the door, a
+// nameplate above the roof and a hint that appears when the hero is close.
 
-import { PORTAL_ZONES, TILE_SIZE } from '../data/WorldData.js';
+import Phaser from 'phaser';
+import { PORTAL_ZONES, BUILDINGS, TILE_SIZE } from '../data/WorldData.js';
+import { DEPTH } from '../engine/depth.js';
+import { BUILDING_SPRITE } from '../sprites/WorldArt.js';
+import { textStyle, COLORS } from '../ui/theme.js';
+
+const HINT_RANGE_PX = TILE_SIZE * 3;
+// Door glow brightness per restore level (0 = dim, 4 = fully restored)
+const GLOW_ALPHA = [0.75, 0.82, 0.9, 0.95, 1];
 
 export class PortalManager {
   constructor(scene) {
@@ -11,69 +21,73 @@ export class PortalManager {
   }
 
   _createPortals() {
+    const scene = this.scene;
+
+    if (!scene.anims.exists('door_glow')) {
+      scene.anims.create({
+        key: 'door_glow',
+        frames: scene.anims.generateFrameNumbers('door_glow', { start: 0, end: 3 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+    }
+
     PORTAL_ZONES.forEach((zone) => {
       const px = zone.x * TILE_SIZE + TILE_SIZE / 2;
       const py = zone.y * TILE_SIZE + TILE_SIZE / 2;
 
-      const portal = this.portals.create(px, py, 'portal');
-      portal.zoneData  = zone;
-      portal.setDepth(8);
+      // Invisible trigger on the doorstep tile
+      const portal = this.portals.create(px, py, 'door_glow', 0);
+      portal.setVisible(false);
       portal.body.setSize(TILE_SIZE * 1.5, TILE_SIZE * 1.5);
+      portal.zoneData = zone;
 
-      // Start at restore level 0 (dim grey, slow pulse)
-      // setRestoreLevel() updates this when save data is loaded.
-      portal.setTint(0x888888);
-      this.scene.tweens.add({
-        targets: portal,
-        alpha: 0.3,
-        duration: 1800,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.easeInOut',
-      });
+      // Light pool spilling out of the door
+      const glow = scene.add.sprite(px, zone.y * TILE_SIZE + 6, 'door_glow', 0)
+        .setTint(zone.color ?? 0xffffff)
+        .setDepth(DEPTH.NIGHT + 1)   // doorways keep glowing after dark
+        .setScale(zone.isRewardShop ? 1.9 : 1.35, 1.4)
+        .setBlendMode(Phaser.BlendModes.ADD);
+      glow.play('door_glow');
+      portal.glow = glow;
 
-      // Label with dark background for readability
-      const label = this.scene.add.text(px, py - 30, zone.label, {
-        fontSize: '11px',
-        fontFamily: 'monospace',
-        color: '#fcd860',
-        stroke: '#000000',
-        strokeThickness: 4,
-        resolution: 2,
-      }).setOrigin(0.5).setDepth(15);
+      // Nameplate floating above the roof
+      const building = BUILDINGS.find((b) => b.id === zone.id);
+      const sprite = zone.isRewardShop ? BUILDING_SPRITE.castle : BUILDING_SPRITE.house;
+      const roofTop = building
+        ? (building.row + building.h) * TILE_SIZE - sprite.h * 2
+        : py - TILE_SIZE * 2;
+      portal.nameplate = this._makeNameplate(px, roofTop - 6, zone);
 
-      // Width is measured one frame later — text.width is 0 before the first render tick.
-      const labelBg = this.scene.add.rectangle(
-        px, py - 30, 80, 18, 0x000000, 0.7,
-      ).setOrigin(0.5).setDepth(14);
-      this.scene.time.delayedCall(32, () => {
-        labelBg.setSize(label.width + 14, 18);
-      });
-
-      const hint = this.scene.add.text(px, py - 14, 'walk in to enter', {
-        fontSize: '8px',
-        fontFamily: 'monospace',
-        color: '#aaffaa',
-        stroke: '#000000',
-        strokeThickness: 3,
-        resolution: 2,
-      }).setOrigin(0.5).setDepth(15);
-
-      portal.label    = label;
-      portal.labelBg  = labelBg;
+      // "Walk in" hint tucked under the nameplate (never covered by the hero),
+      // only shown when the hero is near the door
+      const hint = scene.add.text(px, roofTop, 'Walk into the doorway ↓',
+        textStyle(11, COLORS.gold, { weight: 800, stroke: 3 }))
+        .setOrigin(0.5, 0).setDepth(DEPTH.LABEL).setAlpha(0);
       portal.hintText = hint;
-    });
+      portal._hintShown = false;
 
-    // Animate portal frames
-    if (!this.scene.anims.exists('portal_spin')) {
-      this.scene.anims.create({
-        key: 'portal_spin',
-        frames: this.scene.anims.generateFrameNumbers('portal', { start: 0, end: 3 }),
-        frameRate: 4,
-        repeat: -1,
-      });
-    }
-    this.portals.getChildren().forEach((p) => p.play('portal_spin'));
+      this.setRestoreLevel(zone.id, 0, portal);
+    });
+  }
+
+  _makeNameplate(x, y, zone) {
+    const scene = this.scene;
+    const label = scene.add.text(0, 0, zone.label, textStyle(13, COLORS.text, { weight: 800, stroke: 0 }))
+      .setOrigin(0, 0.5);
+    const dotR = 4;
+    const padX = 10;
+    const w = Math.ceil(label.width) + padX * 2 + dotR * 2 + 6;
+    const h = 24;
+    const bg = scene.add.graphics();
+    bg.fillStyle(0x0f1420, 0.82);
+    bg.fillRoundedRect(-w / 2, -h, w, h, h / 2);
+    bg.lineStyle(1, zone.color ?? 0xffffff, 0.8);
+    bg.strokeRoundedRect(-w / 2 + 0.5, -h + 0.5, w - 1, h - 1, h / 2);
+    bg.fillStyle(zone.color ?? 0xffffff, 1);
+    bg.fillCircle(-w / 2 + padX + dotR, -h / 2, dotR);
+    label.setPosition(-w / 2 + padX + dotR * 2 + 6, -h / 2);
+    return scene.add.container(x, y, [bg, label]).setDepth(DEPTH.LABEL);
   }
 
   addOverlap(player) {
@@ -82,34 +96,37 @@ export class PortalManager {
     });
   }
 
-  setRestoreLevel(zoneId, level) {
-    // Tint and scale portal to reflect restoration progress (0 = dim, 4 = fully restored)
-    const child = this.portals.getChildren().find(
-      (p) => p.zoneData.id === zoneId
-    );
-    if (!child) return;
+  /** Show door hints when the hero is nearby. Call from the scene update. */
+  update(player) {
+    if (!player) return;
+    this.portals.getChildren().forEach((portal) => {
+      const dx = player.x - portal.x;
+      const dy = player.y - portal.y;
+      const near = dx * dx + dy * dy < HINT_RANGE_PX * HINT_RANGE_PX;
+      if (near === portal._hintShown) return;
+      portal._hintShown = near;
+      this.scene.tweens.killTweensOf(portal.hintText);
+      this.scene.tweens.add({ targets: portal.hintText, alpha: near ? 1 : 0, duration: 180 });
+    });
+  }
 
-    // Progressively brighter green tint
-    const tints = [0x888888, 0xaaffaa, 0x44ff44, 0x00cc00, 0x00ff88];
-    child.setTint(tints[Math.min(level, 4)]);
+  setRestoreLevel(zoneId, level, child = null) {
+    child = child ?? this.portals.getChildren().find((p) => p.zoneData.id === zoneId);
+    if (!child?.glow) return;
+    const lvl = Math.max(0, Math.min(4, level));
+    const glow = child.glow;
+    const base = GLOW_ALPHA[lvl];
 
-    // Stop any running alpha tween and replace with level-appropriate pulse speed
-    this.scene.tweens.killTweensOf(child);
-    const pulseDuration = level === 0 ? 1800 : level < 3 ? 1200 : 600; // faster = healthier
-    const minAlpha      = level === 0 ? 0.3 : 0.55;
+    // Healthier districts glow brighter and pulse faster
+    this.scene.tweens.killTweensOf(glow);
+    glow.setAlpha(base);
     this.scene.tweens.add({
-      targets: child,
-      alpha: minAlpha,
-      duration: pulseDuration,
+      targets: glow,
+      alpha: base * 0.6,
+      duration: lvl === 0 ? 1600 : lvl < 3 ? 1100 : 650,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
-
-    // Grow portal slightly as the zone restores (scale 1 → 1.4).
-    // refreshBody() keeps the static physics hitbox in sync with the new visual size.
-    const scale = 1 + level * 0.1;
-    child.setScale(scale);
-    child.refreshBody();
   }
 }
