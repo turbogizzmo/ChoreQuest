@@ -11,6 +11,7 @@ import {
   Check,
   Loader2,
 } from 'lucide-react';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 export default function Wishlist() {
   const { user } = useAuth();
@@ -52,11 +53,7 @@ export default function Wishlist() {
   }, [fetchWishlist]);
 
   // Live updates via WebSocket
-  useEffect(() => {
-    const handler = () => { fetchWishlist(); };
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchWishlist]);
+  useWsRefetch(() => { fetchWishlist(); });
 
   const addItem = async () => {
     if (!newTitle.trim()) return;

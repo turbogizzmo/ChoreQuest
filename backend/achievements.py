@@ -57,18 +57,23 @@ async def _check_criteria(db: AsyncSession, user: User, criteria: dict) -> bool:
 
     elif ctype == "completion_before_time":
         hour = criteria["hour"]
-        result = await db.execute(
-            select(ChoreAssignment).where(
+        # Only the timestamp column, streamed, stopping at the first match —
+        # not every completed assignment hydrated as ORM objects on every
+        # verify/redeem/spin. (Local hour is computed in Python because the
+        # zone comes from TZ, which SQLite's 'localtime' may not match.)
+        result = await db.stream_scalars(
+            select(ChoreAssignment.completed_at).where(
                 ChoreAssignment.user_id == user.id,
                 ChoreAssignment.status.in_([AssignmentStatus.completed, AssignmentStatus.verified]),
                 ChoreAssignment.completed_at.isnot(None),
-            )
+            ).execution_options(yield_per=200)
         )
-        for assignment in result.scalars().all():
-            if assignment.completed_at:
-                local_hour = assignment.completed_at.replace(tzinfo=timezone.utc).astimezone(_LOCAL_TZ).hour
-                if local_hour < hour:
+        try:
+            async for completed_at in result:
+                if completed_at.replace(tzinfo=timezone.utc).astimezone(_LOCAL_TZ).hour < hour:
                     return True
+        finally:
+            await result.close()
         return False
 
     elif ctype == "streak_reached":

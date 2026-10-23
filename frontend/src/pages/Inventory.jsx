@@ -8,6 +8,7 @@ import {
   Gift,
   Loader2,
 } from 'lucide-react';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 export default function Inventory() {
   const { user } = useAuth();
@@ -36,11 +37,7 @@ export default function Inventory() {
   }, [fetchInventory]);
 
   // Live updates via WebSocket
-  useEffect(() => {
-    const handler = () => { fetchInventory(); };
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchInventory]);
+  useWsRefetch(() => { fetchInventory(); });
 
   const handleFulfill = async (redemption) => {
     setFulfillingId(redemption.id);

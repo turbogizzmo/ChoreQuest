@@ -22,6 +22,7 @@ import {
   Star,
   Zap,
 } from 'lucide-react';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 function toISO(date) {
   return toLocalISO(date);
@@ -194,11 +195,7 @@ export default function Calendar() {
   }, [fetchCalendar]);
 
   // Live updates via WebSocket
-  useEffect(() => {
-    const handler = () => { fetchCalendar(); };
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchCalendar]);
+  useWsRefetch(() => { fetchCalendar(); });
 
   const prevPeriod = () => setStartDate(addDays(startDate, -viewDays));
   const nextPeriod = () => setStartDate(addDays(startDate, viewDays));

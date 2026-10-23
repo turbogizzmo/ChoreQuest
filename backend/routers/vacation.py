@@ -211,5 +211,6 @@ async def is_vacation_day(
         # Only family-wide vacations
         scope = VacationPeriod.user_id == None  # noqa: E711
 
-    result = await db.execute(select(VacationPeriod).where(*base, scope))
-    return result.scalar_one_or_none() is not None
+    # A family-wide and a per-kid vacation can overlap — any match counts.
+    result = await db.execute(select(VacationPeriod.id).where(*base, scope).limit(1))
+    return result.first() is not None

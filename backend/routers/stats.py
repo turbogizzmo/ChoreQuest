@@ -212,24 +212,22 @@ async def get_party(
     # Family streak: consecutive days where ALL kids completed at least 1 quest
     family_streak = 0
     if kid_ids:
+        # One grouped query instead of one COUNT per kid per day (up to 60 × kids)
+        kids_done_result = await db.execute(
+            select(ChoreAssignment.date, func.count(func.distinct(ChoreAssignment.user_id)))
+            .where(
+                ChoreAssignment.user_id.in_(kid_ids),
+                ChoreAssignment.date >= today - timedelta(days=59),
+                ChoreAssignment.date <= today,
+                ChoreAssignment.status.in_([AssignmentStatus.completed, AssignmentStatus.verified]),
+            )
+            .group_by(ChoreAssignment.date)
+        )
+        kids_done = dict(kids_done_result.all())
         for days_back in range(60):
-            check_date = today - timedelta(days=days_back)
-            all_completed = True
-            for kid_id in kid_ids:
-                count_result = await db.execute(
-                    select(func.count()).select_from(ChoreAssignment).where(
-                        ChoreAssignment.user_id == kid_id,
-                        ChoreAssignment.date == check_date,
-                        ChoreAssignment.status.in_([AssignmentStatus.completed, AssignmentStatus.verified]),
-                    )
-                )
-                if count_result.scalar() == 0:
-                    all_completed = False
-                    break
-            if all_completed:
-                family_streak += 1
-            else:
+            if kids_done.get(today - timedelta(days=days_back), 0) < len(set(kid_ids)):
                 break
+            family_streak += 1
 
     # Combined family XP
     family_total_xp = sum(u.total_points_earned for u in kids)

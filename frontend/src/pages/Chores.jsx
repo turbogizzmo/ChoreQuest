@@ -31,6 +31,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 const DIFFICULTY_OPTIONS = [
   { value: 'easy', label: 'Easy', level: 1 },
@@ -189,11 +190,7 @@ export default function Chores() {
     fetchAll().finally(() => setLoading(false));
   }, [fetchAll]);
 
-  useEffect(() => {
-    const handler = () => { fetchChores(); fetchAssignments(); };
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchChores, fetchAssignments]);
+  useWsRefetch(() => { fetchChores(); fetchAssignments(); });
 
   const handleKidComplete = async (chore) => {
     if (completeInFlight.current) return;

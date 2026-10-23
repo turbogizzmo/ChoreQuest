@@ -25,6 +25,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../hooks/useSettings';
 import AvatarDisplay from '../components/AvatarDisplay';
 import Modal from '../components/Modal';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 /** Return a human-readable label for an assignment date string (YYYY-MM-DD). */
 function getDateLabel(dateStr) {
@@ -145,11 +146,7 @@ export default function ParentDashboard() {
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    const handler = () => { fetchData(); };
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchData]);
+  useWsRefetch(() => { fetchData(); });
 
   const setActionBusy = (key, busy) => {
     setActionLoading((prev) => ({ ...prev, [key]: busy }));
@@ -264,7 +261,7 @@ export default function ParentDashboard() {
       <div className="xp-bar">
         <div
           className="xp-bar-fill"
-          style={{ width: `${pct}%` }}
+          style={{ '--fill': pct / 100 }}
         />
       </div>
     );

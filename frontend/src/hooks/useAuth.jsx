@@ -1,5 +1,9 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api, setAccessToken, clearAccessToken, getAccessToken, ensureToken } from '../api/client';
+
+// /me returns a fresh object on every refresh; keep the old reference when
+// nothing changed so context consumers (the whole app) don't re-render.
+const sameUser = (a, b) => !!a && !!b && JSON.stringify(a) === JSON.stringify(b);
 
 const AuthContext = createContext(null);
 
@@ -19,7 +23,7 @@ export function AuthProvider({ children }) {
         // attempt a cookie-based refresh if the token has expired.
         if (getAccessToken()) {
           const userData = await api('/api/auth/me');
-          setUser(userData);
+          setUser((prev) => (sameUser(prev, userData) ? prev : userData));
           return true;
         }
 
@@ -27,7 +31,7 @@ export function AuthProvider({ children }) {
         // ensureToken() promise so this never races an api() 401 retry with
         // the same refresh cookie.
         const data = await ensureToken();
-        setUser(data.user);
+        setUser((prev) => (sameUser(prev, data.user) ? prev : data.user));
         return true;
       } catch (err) {
         // Only an auth failure ends the session. This runs on every WS
@@ -57,43 +61,49 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener('auth:expired', handleExpired);
   }, [refreshSession]);
 
-  const login = async (username, password) => {
+  const login = useCallback(async (username, password) => {
     const data = await api('/api/auth/login', { method: 'POST', body: { username, password } });
     setAccessToken(data.access_token);
     setUser(data.user);
     return data.user;
-  };
+  }, []);
 
-  const pinLogin = async (username, pin) => {
+  const pinLogin = useCallback(async (username, pin) => {
     const data = await api('/api/auth/pin-login', { method: 'POST', body: { username, pin } });
     setAccessToken(data.access_token);
     setUser(data.user);
     return data.user;
-  };
+  }, []);
 
-  const register = async (username, password, display_name, role, invite_code) => {
+  const register = useCallback(async (username, password, display_name, role, invite_code) => {
     const body = { username, password, display_name, role };
     if (invite_code) body.invite_code = invite_code;
     const data = await api('/api/auth/register', { method: 'POST', body });
     setAccessToken(data.access_token);
     setUser(data.user);
     return data.user;
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await api('/api/auth/logout', { method: 'POST' });
     } catch { /* ignore */ }
     clearAccessToken();
     setUser(null);
-  };
+  }, []);
 
-  const updateUser = (updates) => {
+  const updateUser = useCallback((updates) => {
     setUser(prev => prev ? { ...prev, ...updates } : null);
-  };
+  }, []);
+
+  // Stable value: consumers only re-render when user/loading actually change
+  const value = useMemo(
+    () => ({ user, loading, login, pinLogin, register, logout, updateUser, refreshSession }),
+    [user, loading, login, pinLogin, register, logout, updateUser, refreshSession],
+  );
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, pinLogin, register, logout, updateUser, refreshSession }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

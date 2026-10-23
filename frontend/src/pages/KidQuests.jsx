@@ -16,6 +16,7 @@ import { api } from '../api/client';
 import { useTheme } from '../hooks/useTheme';
 import { themedTitle, themedDescription } from '../utils/questThemeText';
 import AvatarDisplay from '../components/AvatarDisplay';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 const STATUS_CONFIG = {
   pending: { label: 'Pending', color: 'text-muted', icon: Clock },
@@ -61,11 +62,7 @@ export default function KidQuests() {
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    const handler = () => fetchData();
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchData]);
+  useWsRefetch(() => fetchData());
 
   const setActionBusy = (key, busy) => {
     setActionLoading((prev) => ({ ...prev, [key]: busy }));

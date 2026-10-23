@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../api/client';
 
 const ThemeContext = createContext(null);
@@ -68,7 +68,10 @@ export function ThemeProvider({ children }) {
     }
   }, [resolved, colorTheme]);
 
-  const toggleMode = () => setPreference((p) => (resolveMode(p) === 'dark' ? 'light' : 'dark'));
+  const toggleMode = useCallback(
+    () => setPreference((p) => (resolveMode(p) === 'dark' ? 'light' : 'dark')),
+    [],
+  );
 
   const setColorThemeAndSync = useCallback(async (themeId) => {
     setColorTheme(themeId);
@@ -96,18 +99,18 @@ export function ThemeProvider({ children }) {
     }
   }, []);
 
+  const value = useMemo(() => ({
+    theme: resolved,       // 'dark' or 'light' — what's actually applied
+    mode: preference,      // 'dark', 'light', or 'system' — what the user chose
+    setMode: setPreference,
+    toggle: toggleMode,
+    colorTheme,
+    setColorTheme: setColorThemeAndSync,
+    syncFromUser,
+  }), [resolved, preference, toggleMode, colorTheme, setColorThemeAndSync, syncFromUser]);
+
   return (
-    <ThemeContext.Provider
-      value={{
-        theme: resolved,       // 'dark' or 'light' — what's actually applied
-        mode: preference,      // 'dark', 'light', or 'system' — what the user chose
-        setMode: setPreference,
-        toggle: toggleMode,
-        colorTheme,
-        setColorTheme: setColorThemeAndSync,
-        syncFromUser,
-      }}
-    >
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );
