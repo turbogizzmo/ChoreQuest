@@ -75,6 +75,11 @@ export class WorldScene extends Phaser.Scene {
     // SoundSystem (music playing over itself).
     this._gameplayListeners = [];
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this._cleanup());
+    // game.destroy() (leaving Adventure Mode) tears scenes down via DESTROY
+    // and never emits SHUTDOWN, so clean up on DESTROY too. off() first so
+    // restarts don't stack copies of this listener.
+    this.events.off(Phaser.Scenes.Events.DESTROY, this._cleanup, this);
+    this.events.once(Phaser.Scenes.Events.DESTROY, this._cleanup, this);
 
     // ── Tilemap ────────────────────────────────────────────────────────
     const { map, layer } = buildWorldTilemap(this);
@@ -1045,12 +1050,21 @@ export class WorldScene extends Phaser.Scene {
     // other systems add on the same event names are left alone.
     (this._gameplayListeners ?? []).forEach(([evt, fn]) => this.events.off(evt, fn));
     this._gameplayListeners = [];
-    this.sfx?.destroy();
+    this.stopAudio();
     this.sfx = null;
     this.chestSystem?.destroy();
     this.chestSystem = null;
     this.npc?.destroy();
     this.npc = null;
+  }
+
+  /**
+   * Silence everything right now: stop the music loop, mute and detach the
+   * mixer. Safe to call repeatedly. sfx stays assigned (inert) so anything
+   * still running this frame can call it without crashing.
+   */
+  stopAudio() {
+    this.sfx?.destroy();
   }
 
   // scene.events.on() wrapper that records the handler so _cleanup() can
