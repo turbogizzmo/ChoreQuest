@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import base64
+import secrets
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -74,13 +75,18 @@ def verify_pin(pin: str, hashed: str) -> bool:
 
 def create_access_token(user_id: int, role: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": str(user_id), "role": role, "exp": expire, "type": "access"}
+    payload = {"sub": str(user_id), "role": role, "exp": expire, "type": "access",
+               "jti": secrets.token_hex(16)}
     return _jwt_encode(payload, settings.SECRET_KEY)
 
 
 def create_refresh_token(user_id: int) -> tuple[str, datetime]:
     expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    payload = {"sub": str(user_id), "exp": expire, "type": "refresh"}
+    # jti makes every token unique: without it, two tokens issued for the same
+    # user in the same second are byte-identical (exp has 1 s resolution) and
+    # collide on refresh_tokens.token_hash.
+    payload = {"sub": str(user_id), "exp": expire, "type": "refresh",
+               "jti": secrets.token_hex(16)}
     token = _jwt_encode(payload, settings.SECRET_KEY)
     return token, expire
 

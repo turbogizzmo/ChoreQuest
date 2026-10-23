@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
@@ -37,6 +37,11 @@ from backend.websocket_manager import ws_manager
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 REFRESH_COOKIE_NAME = "refresh_token"
+
+# A token rotated less than this long ago may still be refreshed once more, so
+# two concurrent refreshes with the same cookie (e.g. page load + a 401 retry)
+# don't make the loser clear the winner's freshly set cookie.
+ROTATION_GRACE_SECONDS = 30
 
 
 def _set_refresh_cookie(response: Response, token: str):
@@ -253,7 +258,7 @@ async def refresh(
     if stored is None:
         raise HTTPException(status_code=401, detail="Refresh token not found")
 
-    if stored.is_revoked:
+    if stored.is_revoked and not await _within_rotation_grace(stored, db):
         resp = JSONResponse({"detail": "Refresh token already used"}, status_code=401)
         _clear_refresh_cookie(resp)
         return resp
@@ -269,8 +274,6 @@ async def refresh(
         return resp
 
     # Rotate: revoke old token, issue a fresh pair
-    stored.is_revoked = True
-
     access_token = create_access_token(user.id, user.role.value)
     new_raw_refresh, new_expires_at = create_refresh_token(user.id)
     new_stored = RefreshToken(
@@ -279,6 +282,12 @@ async def refresh(
         expires_at=new_expires_at,
     )
     db.add(new_stored)
+    await db.flush()
+
+    if not stored.is_revoked:
+        stored.is_revoked = True
+        stored.rotated_at = datetime.now(timezone.utc)
+        stored.replaced_by_id = new_stored.id
     await db.commit()
 
     _set_refresh_cookie(response, new_raw_refresh)
@@ -287,6 +296,21 @@ async def refresh(
         access_token=access_token,
         user=UserResponse.model_validate(user),
     )
+
+
+async def _within_rotation_grace(stored: RefreshToken, db: AsyncSession) -> bool:
+    """True if a revoked token was rotated (not logged out) moments ago and
+    its successor is still live — i.e. this is the losing side of a
+    concurrent refresh, not a replayed token."""
+    if stored.rotated_at is None or stored.replaced_by_id is None:
+        return False
+    rotated_at = stored.rotated_at
+    if rotated_at.tzinfo is None:
+        rotated_at = rotated_at.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) - rotated_at > timedelta(seconds=ROTATION_GRACE_SECONDS):
+        return False
+    successor = await db.get(RefreshToken, stored.replaced_by_id)
+    return successor is not None and not successor.is_revoked
 
 
 # ---------- POST /logout ----------
