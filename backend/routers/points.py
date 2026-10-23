@@ -15,6 +15,7 @@ from backend.models import (
     NotificationType,
 )
 from backend.services.pet_leveling import award_pet_xp_db
+from backend.services.balance import credit_points, debit_points
 from backend.schemas import (
     BonusRequest,
     AdjustRequest,
@@ -81,9 +82,7 @@ async def award_bonus(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Update the user's balance
-    user.points_balance += body.amount
-    user.total_points_earned += body.amount
+    await credit_points(db, user, body.amount)
 
     # Create the point transaction
     tx = PointTransaction(
@@ -152,17 +151,14 @@ async def adjust_points(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Prevent balance from going negative
-    if user.points_balance + body.amount < 0:
+    # Prevent balance from going negative (checked atomically in the UPDATE)
+    if body.amount >= 0:
+        await credit_points(db, user, body.amount)
+    elif not await debit_points(db, user, -body.amount):
         raise HTTPException(
             status_code=400,
             detail="Adjustment would result in a negative balance",
         )
-
-    # Update the user's balance
-    user.points_balance += body.amount
-    if body.amount > 0:
-        user.total_points_earned += body.amount
 
     # Create the point transaction
     tx = PointTransaction(

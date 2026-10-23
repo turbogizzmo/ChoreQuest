@@ -26,13 +26,27 @@ export function clearAccessToken() {
 
 async function refreshToken() {
   const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
-  if (!res.ok) {
+  if (res.status === 401 || res.status === 403) {
     clearAccessToken();
-    throw new Error('Session expired');
+    throw authError();
+  }
+  if (!res.ok) {
+    // Server down / restarting: keep the current token, the session may be fine.
+    const err = new Error('Token refresh failed');
+    err.status = res.status;
+    throw err;
   }
   const data = await res.json();
   setAccessToken(data.access_token);
   return data;
+}
+
+// Errors that mean the session is really gone carry status 401, so callers
+// can tell them apart from network blips and server errors.
+function authError(message = 'Session expired') {
+  const err = new Error(message);
+  err.status = 401;
+  return err;
 }
 
 export async function ensureToken() {
@@ -78,7 +92,7 @@ export async function api(path, options = {}) {
       res = await fetch(path, { ...config, _retried: true });
     } catch {
       window.dispatchEvent(new CustomEvent('auth:expired'));
-      throw new Error('Session expired');
+      throw authError();
     }
   }
 
@@ -95,7 +109,9 @@ export async function api(path, options = {}) {
     } catch {
       // Response wasn't JSON (server error page, etc.)
     }
-    throw new Error(detail);
+    const err = new Error(detail);
+    err.status = res.status;
+    throw err;
   }
 
   const text = await res.text();

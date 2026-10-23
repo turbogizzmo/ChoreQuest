@@ -28,14 +28,23 @@ export function AuthProvider({ children }) {
           method: 'POST',
           credentials: 'include',
         });
-        if (!res.ok) throw new Error('No session');
+        if (!res.ok) {
+          const err = new Error('No session');
+          err.status = 401;
+          throw err;
+        }
         const data = await res.json();
         setAccessToken(data.access_token);
         setUser(data.user);
         return true;
-      } catch {
-        clearAccessToken();
-        setUser(null);
+      } catch (err) {
+        // Only an auth failure ends the session. This runs on every WS
+        // message, so a network blip or a 5xx during a container update
+        // must not log the kid out.
+        if (err?.status === 401) {
+          clearAccessToken();
+          setUser(null);
+        }
         return false;
       } finally {
         refreshPromiseRef.current = null;

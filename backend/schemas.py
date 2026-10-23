@@ -46,7 +46,9 @@ class SetPinRequest(BaseModel):
 
 class UpdateProfileRequest(BaseModel):
     display_name: str | None = Field(None, max_length=10)
-    avatar_config: dict | None = None
+    # Only the theme is writable here — the rest of avatar_config goes through
+    # PUT /api/avatar, which protects pet XP and checks item ownership.
+    color_theme: str | None = Field(None, max_length=32, pattern=r"^[a-z0-9_-]+$")
 
 
 class UserResponse(BaseModel):

@@ -23,6 +23,7 @@ from backend.models import (
 from backend.schemas import BountyResponse, BountyClaimResponse, CategoryResponse, ChoreResponse
 from backend.dependencies import get_current_user, require_parent
 from backend.websocket_manager import ws_manager
+from backend.services.balance import credit_points
 
 import os, uuid, logging
 
@@ -487,8 +488,7 @@ async def verify_bounty_claim(
     bonus_points = int(base_points * multiplier) - base_points if multiplier > 1.0 else 0
     total_awarded = base_points + bonus_points
 
-    kid.points_balance += total_awarded
-    kid.total_points_earned += total_awarded
+    await credit_points(db, kid, total_awarded)
 
     db.add(PointTransaction(
         user_id=kid.id,

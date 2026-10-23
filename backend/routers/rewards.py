@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,6 +27,7 @@ from backend.schemas import (
 )
 from backend.dependencies import get_current_user, require_parent
 from backend.achievements import check_achievements
+from backend.services.balance import credit_points, debit_points
 from backend.websocket_manager import ws_manager
 from backend.services.ai_provider import (
     check_ai_generation_rate_limit,
@@ -150,7 +151,7 @@ async def deny_redemption(
     if kid is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    kid.points_balance += redemption.points_spent
+    await credit_points(db, kid, redemption.points_spent, count_as_earned=False)
 
     refund_tx = PointTransaction(
         user_id=kid.id,
@@ -386,21 +387,25 @@ async def redeem_reward(
     if not reward.is_active:
         raise HTTPException(status_code=400, detail="Reward is no longer available")
 
-    # Balance check
-    if current_user.points_balance < reward.point_cost:
+    # Stock and balance are checked inside the UPDATEs themselves so two
+    # concurrent redeems can't both pass a stale Python-side check.
+    if reward.stock is not None:
+        took = await db.execute(
+            update(Reward)
+            .where(Reward.id == reward.id, Reward.stock > 0)
+            .values(stock=Reward.stock - 1)
+            .execution_options(synchronize_session=False)
+        )
+        if took.rowcount != 1:
+            await db.rollback()
+            raise HTTPException(status_code=400, detail="Reward is out of stock")
+
+    if not await debit_points(db, current_user, reward.point_cost):
+        await db.rollback()
         raise HTTPException(
             status_code=400,
             detail="Insufficient points balance",
         )
-
-    # Stock check
-    if reward.stock is not None:
-        if reward.stock <= 0:
-            raise HTTPException(status_code=400, detail="Reward is out of stock")
-        reward.stock -= 1
-
-    # Deduct points
-    current_user.points_balance -= reward.point_cost
 
     # Create negative point transaction
     tx = PointTransaction(
