@@ -17,6 +17,7 @@ from backend.models import (
     PointTransaction, PointType, RewardRedemption, Notification, NotificationType,
 )
 from backend.websocket_manager import ws_manager
+from backend.services.balance import credit_points
 
 
 async def check_achievements(db: AsyncSession, user: User):
@@ -145,8 +146,7 @@ async def _unlock_achievement(db: AsyncSession, user: User, achievement: Achieve
 
     # Award bonus XP
     if achievement.points_reward > 0:
-        user.points_balance += achievement.points_reward
-        user.total_points_earned += achievement.points_reward
+        await credit_points(db, user, achievement.points_reward)
         tx = PointTransaction(
             user_id=user.id,
             amount=achievement.points_reward,

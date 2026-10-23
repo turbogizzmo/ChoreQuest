@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -137,7 +138,7 @@ async def register(
     user = User(
         username=body.username,
         display_name=body.display_name,
-        password_hash=hash_password(body.password),
+        password_hash=await asyncio.to_thread(hash_password, body.password),
         role=role,
     )
     db.add(user)
@@ -175,7 +176,7 @@ async def login(
     result = await db.execute(select(User).where(User.username == body.username))
     user = result.scalar_one_or_none()
 
-    if user is None or not verify_password(body.password, user.password_hash):
+    if user is None or not await asyncio.to_thread(verify_password, body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
     if not user.is_active:
@@ -207,7 +208,7 @@ async def pin_login(
     result = await db.execute(select(User).where(User.username == body.username))
     user = result.scalar_one_or_none()
 
-    if user is None or user.pin_hash is None or not verify_pin(body.pin, user.pin_hash):
+    if user is None or user.pin_hash is None or not await asyncio.to_thread(verify_pin, body.pin, user.pin_hash):
         raise HTTPException(status_code=401, detail="Invalid username or PIN")
 
     if not user.is_active:
@@ -325,8 +326,9 @@ async def update_me(
 ):
     if body.display_name is not None:
         user.display_name = body.display_name
-    if body.avatar_config is not None:
-        user.avatar_config = body.avatar_config
+    if body.color_theme is not None:
+        # Merge server-side so a concurrent pet XP award isn't overwritten
+        user.avatar_config = {**(user.avatar_config or {}), "color_theme": body.color_theme}
 
     user.updated_at = datetime.now(timezone.utc)
     await db.commit()
@@ -343,10 +345,10 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if not verify_password(body.current_password, user.password_hash):
+    if not await asyncio.to_thread(verify_password, body.current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
-    user.password_hash = hash_password(body.new_password)
+    user.password_hash = await asyncio.to_thread(hash_password, body.new_password)
     user.updated_at = datetime.now(timezone.utc)
 
     # Invalidate all refresh tokens
@@ -379,7 +381,7 @@ async def set_pin(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    user.pin_hash = hash_pin(body.pin)
+    user.pin_hash = await asyncio.to_thread(hash_pin, body.pin)
     user.updated_at = datetime.now(timezone.utc)
     await db.commit()
     return {"detail": "PIN set successfully"}
