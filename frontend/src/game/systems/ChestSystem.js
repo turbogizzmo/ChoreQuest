@@ -6,7 +6,7 @@
 // Emits 'chestCollect' event with { coins, xp } on pickup.
 
 import { CHEST_DROP_CHANCE, CHEST_REWARDS } from '../data/WorldData.js';
-import { DEPTH, ySort } from '../engine/depth.js';
+import { ySort } from '../engine/depth.js';
 
 const DESPAWN_MS = 10_000; // ms until an uncollected chest fades out
 
@@ -88,19 +88,9 @@ export class ChestSystem {
       onComplete: () => sprite.destroy(),
     });
 
-    // Coin sparkle burst — 6 yellow pixels radiate outward
-    for (let i = 0; i < 6; i++) {
-      const angle = (Math.PI * 2 * i) / 6;
-      const sq = this.scene.add.rectangle(sprite.x, sprite.y, 5, 5, 0xfcd860, 1).setDepth(DEPTH.VFX);
-      this.scene.tweens.add({
-        targets: sq,
-        x: sprite.x + Math.cos(angle) * 30,
-        y: sprite.y + Math.sin(angle) * 30,
-        alpha: 0, scaleX: 0.3, scaleY: 0.3,
-        duration: 320, ease: 'Power1',
-        onComplete: () => sq.destroy(),
-      });
-    }
+    // Gold sparkle burst + a beat of freeze so opening feels like a reward
+    this.scene.juice.burst(sprite.x, sprite.y, { count: 18, tint: 0xfcd860 });
+    this.scene.juice.hitStop(40);
 
     // Tell WorldScene about the reward
     this.scene.events.emit('chestCollect', reward);

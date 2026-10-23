@@ -4,9 +4,17 @@
 
 import { WEAPON_STATS } from '../data/WorldData.js';
 import { uiSize } from '../engine/view.js';
-import { DEPTH } from '../engine/depth.js';
 
 const COMBO_WINDOW_MS = 1500; // hits within this window count toward combo
+
+// Death-puff colour per enemy type (anything else puffs white)
+const DEATH_TINT = {
+  dust_bunny:      0xbcbcbc,
+  crumb_slime:     0x9be15d,
+  sock_goblin:     0xc084fc,
+  mop_golem:       0x7dd3fc,
+  trash_bag_ghost: 0x94a3b8,
+};
 
 export class BattleSystem {
   constructor(scene) {
@@ -21,6 +29,12 @@ export class BattleSystem {
     const now  = Date.now();
     const last = this.cooldowns[weapon] || 0;
     return now - last >= (WEAPON_STATS[weapon]?.cooldown ?? 500);
+  }
+
+  /** 0 right after a swing → 1 when the weapon is ready again (for the HUD). */
+  cooldownProgress(weapon) {
+    const cd = WEAPON_STATS[weapon]?.cooldown ?? 500;
+    return Math.min(1, (Date.now() - (this.cooldowns[weapon] || 0)) / cd);
   }
 
   // Returns damage dealt (or 0 if on cooldown)
@@ -103,9 +117,12 @@ export class BattleSystem {
       onComplete: () => { enemy.clearTint(); enemy.setAlpha(1); },
     });
 
-    // Phase 5-C: micro screen shake on every boss hit so attacks feel impactful
+    // Contact sparks on every hit; bosses also get a micro shake and a
+    // short freeze so heavy hits read as heavy
+    this.scene.juice.burst(enemy.x, enemy.y, { count: 5, tint: 0xfff2b0 });
     if (enemy.isBoss) {
-      this.scene.cameras.main.shake(80, 0.005);
+      this.scene.juice.shake(80, 0.005);
+      this.scene.juice.hitStop(55);
     }
 
     if (enemy.hp <= 0) {
@@ -133,6 +150,16 @@ export class BattleSystem {
     const coinDrop = Math.round((enemy.coinDrop ?? 1) * (mult > 1 ? 1.5 : 1));
     this.scene.events.emit('enemyDefeated', { enemy, xpDrop, coinDrop });
 
+    // Kill feedback: freeze, shake and a puff in the enemy's colour
+    const juice = this.scene.juice;
+    juice.hitStop(enemy.isBoss ? 120 : 35);
+    juice.shake(enemy.isBoss ? 260 : 70, enemy.isBoss ? 0.012 : 0.003);
+    juice.burst(enemy.x, enemy.y, {
+      kind: 'puffs',
+      count: enemy.isBoss ? 28 : 12,
+      tint: DEATH_TINT[enemy.enemyType] ?? 0xffffff,
+    });
+
     this._playDeathAnimation(enemy);
   }
 
@@ -143,12 +170,10 @@ export class BattleSystem {
     if (enemy.isBoss) {
       // Boss: big flash + dramatic scale-burst
       const { w, h } = uiSize(scene);
+      // One pulse, not a strobe: the old yoyo+repeat flashed ~4×/s, above the
+      // 3-flashes-per-second photosensitivity limit.
       const flash = scene.add.rectangle(w / 2, h / 2, w, h, 0xffffff, 0).setScrollFactor(0).setDepth(200);
-      scene.tweens.add({
-        targets: flash, alpha: 0.45,
-        yoyo: true, duration: 120, repeat: 1,
-        onComplete: () => flash.destroy(),
-      });
+      scene.juice.flash(flash, 0.45);
       scene.tweens.add({
         targets: enemy, alpha: 0, scaleX: 4, scaleY: 4,
         duration: 500, ease: 'Power2',
@@ -158,20 +183,7 @@ export class BattleSystem {
     }
 
     if (type === 'dust_bunny') {
-      // Dust bunny: scatter into 6 tiny white pixel puffs
-      for (let i = 0; i < 6; i++) {
-        const angle  = (Math.PI * 2 * i) / 6;
-        const puff   = scene.add.rectangle(enemy.x, enemy.y, 4, 4, 0xbcbcbc, 1)
-          .setDepth(DEPTH.VFX);
-        scene.tweens.add({
-          targets: puff,
-          x: enemy.x + Math.cos(angle) * 28,
-          y: enemy.y + Math.sin(angle) * 28,
-          alpha: 0, scaleX: 0.3, scaleY: 0.3,
-          duration: 280, ease: 'Power1',
-          onComplete: () => puff.destroy(),
-        });
-      }
+      // Dust bunny: squash flat (the puff burst comes from defeatEnemy)
       scene.tweens.add({
         targets: enemy, alpha: 0, scaleX: 1.8, scaleY: 0.3,
         duration: 180, onComplete: () => enemy.destroy(),
@@ -240,15 +252,14 @@ export class BattleSystem {
       onComplete: () => player.setAlpha(1),
     });
 
-    // Screen shake + white flash — much more impactful than a red tint
-    this.scene.cameras.main.shake(150, 0.008);
+    // Screen shake + white flash + a short freeze so the hit registers
+    // (all skipped under prefers-reduced-motion)
+    this.scene.juice.shake(150, 0.008);
+    this.scene.juice.hitStop(70);
 
     const { w, h } = uiSize(this.scene);
-    const flash = this.scene.add.rectangle(w / 2, h / 2, w, h, 0xffffff, 0.55).setScrollFactor(0).setDepth(210);
-    this.scene.tweens.add({
-      targets: flash, alpha: 0, duration: 200,
-      onComplete: () => flash.destroy(),
-    });
+    const flash = this.scene.add.rectangle(w / 2, h / 2, w, h, 0xffffff, 0).setScrollFactor(0).setDepth(210);
+    this.scene.juice.flash(flash, 0.55);
 
     // Also tint the player sprite briefly
     this.scene.tweens.add({

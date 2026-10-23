@@ -33,7 +33,11 @@ export function createGame(containerId, options = {}) {
     roundPixels: true,
     physics: {
       default: 'arcade',
-      arcade: { gravity: { y: 0 }, debug: false },
+      // Step physics with the real frame delta so sprites move every rendered
+      // frame on 90/120 Hz screens (a fixed 60 Hz step judders there). Safe
+      // here: the fastest body moves ~3 px per 60 Hz step against 32 px
+      // tiles, so a variable step can't tunnel through walls or portals.
+      arcade: { gravity: { y: 0 }, debug: false, fixedStep: false },
     },
     scene: [BootScene, WorldScene],
     scale: {

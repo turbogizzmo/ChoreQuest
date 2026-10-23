@@ -13,6 +13,8 @@ const WALK_SWAY_DEGREES = 4;
 const IDLE_BREATH_X = 0.015;
 const IDLE_BREATH_Y = 0.012;
 const IDLE_SWAY_DEGREES = 1.5;
+const ACCEL_RATE = 32;   // 1/s — higher = snappier start
+const DECEL_RATE = 40;   // 1/s — higher = snappier stop
 
 export function createPlayerAnimations(scene) {
   const anims = scene.anims;
@@ -105,10 +107,17 @@ export function updatePlayer(player, cursors, wasd, speed = PLAYER_SPEED, delta 
     vy *= 0.707;
   }
 
-  body.setVelocity(vx, vy);
   const moving = vx !== 0 || vy !== 0;
-
   const dSec = Math.max(MIN_FRAME_DELTA_MS, Math.min(delta || DEFAULT_FRAME_DELTA_MS, MAX_FRAME_DELTA_MS)) / 1000;
+
+  // Ease toward the target velocity instead of snapping: ~70 ms to 90% of
+  // full speed, slightly quicker to stop so it never feels slippery.
+  // Facing/animation below still follow the input, so turning stays instant.
+  const k = 1 - Math.exp(-dSec * (moving ? ACCEL_RATE : DECEL_RATE));
+  let nvx = body.velocity.x + (vx - body.velocity.x) * k;
+  let nvy = body.velocity.y + (vy - body.velocity.y) * k;
+  if (!moving && Math.abs(nvx) < 1 && Math.abs(nvy) < 1) { nvx = 0; nvy = 0; }
+  body.setVelocity(nvx, nvy);
   player._motionPhase = (player._motionPhase ?? 0) + dSec * (moving ? 12 : 4);
   const wave = Math.sin(player._motionPhase);
 
