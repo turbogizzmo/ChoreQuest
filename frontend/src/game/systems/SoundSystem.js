@@ -133,6 +133,25 @@ export class SoundSystem {
 
     // Boss music state
     this._bossMode  = false;
+
+    // Page lifecycle: stop all audio the moment the page is hidden or being
+    // unloaded (tab closed, app switched/swiped away, navigated away, put in
+    // the back/forward cache). React's unmount — and with it Phaser's game
+    // teardown — never runs when the tab itself is closed, and Safari can keep
+    // a cached page's AudioContext alive, so this must not depend on either.
+    this._pagePaused  = false;
+    this._bgmWasOn    = false;
+    this._onVisibility = () => {
+      if (document.visibilityState === 'hidden') this.pauseForPage();
+      else this.resumeForPage();
+    };
+    this._onPageHide = () => this.pauseForPage();
+    this._onPageShow = (e) => { if (e.persisted && document.visibilityState === 'visible') this.resumeForPage(); };
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this._onVisibility);
+      window.addEventListener('pagehide', this._onPageHide);
+      window.addEventListener('pageshow', this._onPageShow);
+    }
   }
 
   // ── Utility builders ────────────────────────────────────────────────────────
@@ -341,7 +360,7 @@ export class SoundSystem {
   // Schedules one full 16 s loop, then re-schedules 500 ms before it ends.
 
   startBGM() {
-    if (this._dead || this._loopTimer !== null) return;
+    if (this._dead || this._pagePaused || this._loopTimer !== null) return;
     this._nextLoop = this._ctx.currentTime + 0.05;
     this._tick();
   }
@@ -372,12 +391,38 @@ export class SoundSystem {
       this._playDrums(loopStart);
     }
 
-    // Re-schedule 500 ms before this loop ends so the next loop queues seamlessly
+    this._scheduleNextLoop();
+  }
+
+  // Re-schedule 500 ms before the current loop ends so the next loop queues seamlessly
+  _scheduleNextLoop() {
     const msUntilNext = (this._nextLoop - this._ctx.currentTime - 0.5) * 1000;
     this._loopTimer = setTimeout(() => {
       this._loopTimer = null;
       this._tick();
     }, Math.max(50, msUntilNext));
+  }
+
+  // ── Page hide/show ──────────────────────────────────────────────────────────
+  // Suspending the context freezes its clock, so notes already scheduled for
+  // the current loop pick up exactly where they stopped on resume, and the
+  // loop timer is re-armed from that frozen position (no overlap, no gap).
+
+  pauseForPage() {
+    if (this._dead || this._pagePaused) return;
+    this._pagePaused = true;
+    this._bgmWasOn = this._loopTimer !== null;
+    this.stopBGM();
+    try { this._ctx.suspend(); } catch (_) { /* closed */ }
+  }
+
+  resumeForPage() {
+    if (this._dead || !this._pagePaused) return;
+    this._pagePaused = false;
+    try { this._ctx.resume(); } catch (_) { /* closed */ }
+    if (this._bgmWasOn && this._loopTimer === null && this._nextLoop !== null) {
+      this._scheduleNextLoop();
+    }
   }
 
   _playPattern(pattern, loopStart, vol, type, wave, gate = 0.88) {
@@ -522,6 +567,11 @@ export class SoundSystem {
   }
 
   destroy() {
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this._onVisibility);
+      window.removeEventListener('pagehide', this._onPageHide);
+      window.removeEventListener('pageshow', this._onPageShow);
+    }
     this._dead = true;
     this.stopBGM();
     try {

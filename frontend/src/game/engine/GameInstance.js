@@ -81,7 +81,14 @@ export function createGame(containerId, options = {}) {
 }
 
 export function destroyGame(game) {
-  if (game && !game.isDestroyed) {
+  if (game && !game.pendingDestroy) {
+    // Phaser only finishes destroying on its next frame (and only then closes
+    // the AudioContext). Silence audio now so nothing plays past the exit even
+    // if that frame is delayed or never comes (page hidden, app backgrounded).
+    try {
+      game.scene?.getScene?.('WorldScene')?.stopAudio?.();
+      game.sound?.context?.suspend?.();
+    } catch (_) { /* game never finished booting */ }
     game.destroy(true);
   }
   if (typeof window !== 'undefined' && import.meta.env.DEV && window.__CHOREQUEST_ACTIVE_GAME === game) {
