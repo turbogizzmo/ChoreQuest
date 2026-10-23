@@ -22,7 +22,7 @@ function ProgressBar({ completed, total }) {
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
   return (
     <div className="xp-bar">
-      <div className="xp-bar-fill" style={{ width: `${pct}%` }} />
+      <div className="xp-bar-fill" style={{ '--fill': pct / 100 }} />
     </div>
   );
 }
@@ -183,6 +183,34 @@ function KioskKidSlide({ kid, visible }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+// Owns its own state so the clock ticking doesn't re-render the whole kiosk
+// (every kid card and SVG avatar). Ticks on the minute — it shows no seconds.
+function KioskClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    let timer;
+    const schedule = () => {
+      timer = setTimeout(() => {
+        setNow(new Date());
+        schedule();
+      }, 60_000 - (Date.now() % 60_000));
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="text-right">
+      <p className="text-cream font-bold tabular-nums" style={{ fontSize: '3rem' }}>
+        {now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+      </p>
+      <p className="text-muted text-lg">
+        {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+      </p>
+    </div>
+  );
+}
+
 export default function PublicDashboard() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
@@ -192,17 +220,9 @@ export default function PublicDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastRefreshed, setLastRefreshed] = useState(null);
-  const [now, setNow] = useState(new Date());
   const [activeKidIndex, setActiveKidIndex] = useState(0);
   const intervalRef = useRef(null);
   const slideRef = useRef(null);
-
-  // Live clock for kiosk mode
-  useEffect(() => {
-    if (!isKiosk) return;
-    const tick = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(tick);
-  }, [isKiosk]);
 
   // Auto-cycle through kids in kiosk mode
   useEffect(() => {
@@ -266,14 +286,7 @@ export default function PublicDashboard() {
             </div>
           </div>
 
-          <div className="text-right">
-            <p className="text-cream font-bold tabular-nums" style={{ fontSize: '3rem' }}>
-              {now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-            </p>
-            <p className="text-muted text-lg">
-              {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-            </p>
-          </div>
+          <KioskClock />
         </div>
 
         {/* Error */}

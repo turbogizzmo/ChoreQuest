@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, Component } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, Component } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -137,9 +137,13 @@ export default function App() {
   const { user, loading, refreshSession } = useAuth();
   const location = useLocation();
 
+  // Refresh the user object (points_balance, etc.) after WS events, but
+  // coalesce bursts into one /api/auth/me call.
+  const refreshTimer = useRef();
+  useEffect(() => () => clearTimeout(refreshTimer.current), []);
   const handleWsMessage = useCallback((msg) => {
-    // Refresh user object (points_balance, etc.) on every WS event
-    refreshSession();
+    clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(refreshSession, 250);
     window.dispatchEvent(new CustomEvent('ws:message', { detail: msg }));
   }, [refreshSession]);
 

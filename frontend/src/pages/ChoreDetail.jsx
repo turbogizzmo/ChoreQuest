@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Users,
 } from 'lucide-react';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 const DIFFICULTY_LEVEL = { easy: 1, medium: 2, hard: 3, expert: 4 };
 const DIFFICULTY_LABELS = ['Trivial', 'Easy', 'Medium', 'Hard', 'Legendary'];
@@ -163,11 +164,7 @@ export default function ChoreDetail() {
   }, [fetchChore, fetchRotation, fetchAssignmentRules, isParent]);
 
   // Live updates via WebSocket
-  useEffect(() => {
-    const handler = () => { fetchChore(); fetchRotation(); };
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchChore, fetchRotation]);
+  useWsRefetch(() => { fetchChore(); fetchRotation(); });
 
   const handleComplete = async () => {
     if (chore?.requires_photo && !photoFile) return;

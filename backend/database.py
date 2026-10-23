@@ -15,6 +15,19 @@ class Base(DeclarativeBase):
     pass
 
 
+# Indexes for hot read paths (created idempotently at startup):
+#  - 30-day progress chart: point_transactions by user + time
+#  - unread notification count, fetched on every WebSocket event
+#  - calendar week for all kids (date range across users)
+#  - auto-approve job (completed assignments by completion time)
+_PERF_INDEXES = (
+    "CREATE INDEX IF NOT EXISTS idx_point_tx_user_created ON point_transactions(user_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read)",
+    "CREATE INDEX IF NOT EXISTS idx_chore_assignments_date ON chore_assignments(date)",
+    "CREATE INDEX IF NOT EXISTS idx_chore_assignments_status_completed ON chore_assignments(status, completed_at)",
+)
+
+
 async def init_db():
     async with engine.begin() as conn:
         # Enable WAL mode
@@ -78,6 +91,8 @@ async def init_db():
             "CREATE INDEX IF NOT EXISTS idx_chore_assignments_user_date "
             "ON chore_assignments(user_id, date)"
         )
+        for ddl in _PERF_INDEXES:
+            await conn.exec_driver_sql(ddl)
 
         # Refresh tokens issued in the same second used to be byte-identical,
         # leaving duplicate token_hash rows. Keep one row per hash (prefer a

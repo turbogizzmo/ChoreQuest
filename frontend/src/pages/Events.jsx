@@ -12,6 +12,7 @@ import {
   Zap,
   Square,
 } from 'lucide-react';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 function formatDate(iso) {
   if (!iso) return '';
@@ -60,11 +61,7 @@ export default function Events() {
     fetchEvents();
   }, [fetchEvents]);
 
-  useEffect(() => {
-    const handler = () => { fetchEvents(); };
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchEvents]);
+  useWsRefetch(() => { fetchEvents(); });
 
   const openCreate = () => {
     setEditing(null);

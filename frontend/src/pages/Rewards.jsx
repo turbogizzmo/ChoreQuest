@@ -20,6 +20,7 @@ import {
   Filter,
   Loader2,
 } from 'lucide-react';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 const emptyForm = {
   title: '',
@@ -85,11 +86,7 @@ export default function Rewards() {
     fetchRewards().finally(() => setLoading(false));
   }, [fetchRewards]);
 
-  useEffect(() => {
-    const handler = () => { fetchRewards(); };
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchRewards]);
+  useWsRefetch(() => { fetchRewards(); });
 
   if (activeTab === 'avatar') {
     return (

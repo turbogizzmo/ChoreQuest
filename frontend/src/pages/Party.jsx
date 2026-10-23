@@ -20,6 +20,7 @@ import {
   Send,
 } from 'lucide-react';
 import { timeAgo } from '../utils/dates';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 function ProgressRing({ completed, total, size = 72 }) {
   const radius = (size - 8) / 2;
@@ -91,11 +92,7 @@ export default function Party() {
     Promise.all([fetchParty(), fetchAnnouncements()]).finally(() => setLoading(false));
   }, [fetchParty, fetchAnnouncements]);
 
-  useEffect(() => {
-    const handler = () => { fetchParty(); fetchAnnouncements(); };
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchParty, fetchAnnouncements]);
+  useWsRefetch(() => { fetchParty(); fetchAnnouncements(); });
 
   const handlePostAnnouncement = async () => {
     if (!announcementForm.title.trim() || !announcementForm.message.trim()) return;

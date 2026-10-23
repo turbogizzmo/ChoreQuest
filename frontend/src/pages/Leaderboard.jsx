@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useSettings } from '../hooks/useSettings';
 import AvatarDisplay from '../components/AvatarDisplay';
 import { Trophy, Loader2, Flame, Swords } from 'lucide-react';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -31,11 +32,7 @@ export default function Leaderboard() {
     fetchLeaderboard().finally(() => setLoading(false));
   }, [fetchLeaderboard, leaderboard_enabled]);
 
-  useEffect(() => {
-    const handler = () => { fetchLeaderboard(); };
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchLeaderboard]);
+  useWsRefetch(() => { fetchLeaderboard(); });
 
   const topScore = entries.length > 0 ? Math.max(...entries.map((e) => e.weekly_xp || e.xp || 0), 1) : 1;
 
@@ -139,7 +136,7 @@ export default function Leaderboard() {
                   <div className="xp-bar mt-1.5 !h-4">
                     <div
                       className="xp-bar-fill"
-                      style={{ width: `${pct}%` }}
+                      style={{ '--fill': pct / 100 }}
                     />
                     <span className="absolute inset-0 flex items-center justify-center text-navy font-medium text-[10px] z-10">
                       {xp} XP this week
