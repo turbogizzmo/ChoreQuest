@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { api, setAccessToken, clearAccessToken, getAccessToken } from '../api/client';
+import { api, setAccessToken, clearAccessToken, getAccessToken, ensureToken } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -23,18 +23,10 @@ export function AuthProvider({ children }) {
           return true;
         }
 
-        // No stored token — try cookie-based refresh
-        const res = await fetch('/api/auth/refresh', {
-          method: 'POST',
-          credentials: 'include',
-        });
-        if (!res.ok) {
-          const err = new Error('No session');
-          err.status = 401;
-          throw err;
-        }
-        const data = await res.json();
-        setAccessToken(data.access_token);
+        // No stored token — try cookie-based refresh. Go through the shared
+        // ensureToken() promise so this never races an api() 401 retry with
+        // the same refresh cookie.
+        const data = await ensureToken();
         setUser(data.user);
         return true;
       } catch (err) {

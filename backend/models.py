@@ -119,10 +119,14 @@ class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    token_hash: Mapped[str] = mapped_column(String, nullable=False)
+    token_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # Set when this token is revoked by rotation (not logout); used for the
+    # concurrent-refresh grace window together with replaced_by_id.
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    replaced_by_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     user = relationship("User", back_populates="refresh_tokens")
 
