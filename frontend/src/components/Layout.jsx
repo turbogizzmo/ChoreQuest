@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import AvatarDisplay from './AvatarDisplay';
 import { timeAgo } from '../utils/dates';
+import { refreshUpdateCheck, UPDATE_STATUS_EVENT } from '../utils/updateCheck';
 
 const ALL_NAV_ITEMS = [
   { label: 'Home', icon: Home, path: '/' },
@@ -62,22 +63,23 @@ export default function Layout({ children }) {
   const [showMore, setShowMore] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
-  // Silent background update check — once per session, parents/admins only
+  // Silent background update check — parents/admins only. Cached per tab, but
+  // re-checked whenever the server's running version changes (e.g. right after
+  // an update) or the cache is older than 15 minutes.
+  const isParentOrAdmin = !!user && (user.role === 'parent' || user.role === 'admin');
   useEffect(() => {
-    if (!user || (user.role !== 'parent' && user.role !== 'admin')) return;
-    const already = sessionStorage.getItem('cq_update_checked');
-    if (already) {
-      setUpdateAvailable(sessionStorage.getItem('cq_update_available') === 'true');
-      return;
-    }
-    api('/api/admin/update/check')
-      .then((data) => {
-        sessionStorage.setItem('cq_update_checked', '1');
-        sessionStorage.setItem('cq_update_available', data.update_available ? 'true' : 'false');
-        setUpdateAvailable(!!data.update_available);
-      })
+    if (!isParentOrAdmin) return;
+    refreshUpdateCheck()
+      .then((entry) => setUpdateAvailable(!!entry?.available))
       .catch(() => {});
-  }, [user]);
+  }, [isParentOrAdmin]);
+
+  // Settings' live check and applying an update both update the badge here
+  useEffect(() => {
+    const handler = (e) => setUpdateAvailable(!!e.detail?.available);
+    window.addEventListener(UPDATE_STATUS_EVENT, handler);
+    return () => window.removeEventListener(UPDATE_STATUS_EVENT, handler);
+  }, []);
   const panelRef = useRef(null);
   const moreRef = useRef(null);
 
