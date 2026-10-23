@@ -8,6 +8,7 @@ export const DEPTH = {
   ENTITY:     10,  // + y/100 — see ySort()
   VFX:        30,  // attack swings, coin pickups
   NIGHT:      40,  // day/night tint covers the whole world…
+  VFX_GLOW:   42,  // …except emissive effects (slashes, sparks), which stay bright at night
   LABEL:      45,  // …but nameplates, HP bars and speech stay readable
   BUBBLE:     46,
   FLOAT_TEXT: 60,

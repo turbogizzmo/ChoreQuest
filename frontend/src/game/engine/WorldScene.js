@@ -10,9 +10,10 @@ import { HUD }                   from '../ui/HUD.js';
 import { writeSave }             from '../systems/SaveSystem.js';
 import { SoundSystem }           from '../systems/SoundSystem.js';
 import { pickRespawnPoint }      from '../systems/RespawnSystem.js';
-import { PORTAL_ZONES, ENEMY_ZONES, BOSS_ZONES, BOSS_STATS, BUILDINGS, TILE, TILE_SIZE, MAP_COLS, levelFromXp, tileHash, SURGE_INTERVAL, SURGE_DURATION, SURGE_XP_MULT } from '../data/WorldData.js';
+import { PORTAL_ZONES, ENEMY_ZONES, BOSS_ZONES, BOSS_STATS, BUILDINGS, TILE, TILE_SIZE, MAP_COLS, levelFromXp, tileHash, SURGE_INTERVAL, SURGE_DURATION, SURGE_XP_MULT, WEAPON_STATS } from '../data/WorldData.js';
 import { paintGround } from '../sprites/WorldArt.js';
 import { ChestSystem } from '../systems/ChestSystem.js';
+import { Juice } from '../systems/Juice.js';
 import { NPC }         from '../entities/NPC.js';
 import { api } from '../../api/client.js';
 import { setupCameras, uiSize } from './view.js';
@@ -147,6 +148,7 @@ export class WorldScene extends Phaser.Scene {
     this.sfx.startBGM();
 
     // ── HUD — must be created before event listeners that call this.hud ─
+    this.juice = new Juice(this);
     this.hud = new HUD(this);
 
     // ── Battle system ──────────────────────────────────────────────────
@@ -285,6 +287,7 @@ export class WorldScene extends Phaser.Scene {
 
   update(time, delta) {
     if (this._paused) return;
+    if (this.juice.stopped) return; // hit-stop: hold every system for the freeze
     const portals = this.portalMgr?.portals;
     if (this._portalLockId && portals && !this.physics.overlap(this.player, portals)) {
       this._portalLockId = null;
@@ -317,14 +320,15 @@ export class WorldScene extends Phaser.Scene {
       this._nextRespawnBlinkAt = 0;
     }
 
-    // Attack on SPACE or touch attack button
-    if (
-      Phaser.Input.Keyboard.JustDown(this.spaceKey) ||
-      (touch.attack?.isDown)
-    ) {
-      this.battle.playerAttack(this.player.weapon, this.enemies, this.player);
+    // Attack on SPACE or touch attack button. Holding the touch button
+    // auto-repeats at the weapon's cooldown; swing feedback (VFX, sound,
+    // swing frame) only plays when a swing actually happens.
+    const weapon = this.player.weapon ?? 'broom';
+    const wantsAttack = Phaser.Input.Keyboard.JustDown(this.spaceKey) || touch.attack?.isDown;
+    if (wantsAttack && this.battle.canAttack(weapon)) {
+      this.battle.playerAttack(weapon, this.enemies, this.player);
       this._spawnAttackVfx();
-      this.sfx.playAttack(this.player.weapon ?? 'broom');
+      this.sfx.playAttack(weapon);
       playAttackAnim(this, this.player, 180); // show directional swing frame
     }
 
@@ -393,6 +397,7 @@ export class WorldScene extends Phaser.Scene {
 
     // Update HUD
     this.hud.update(this.gameData);
+    this.hud.updateCooldown(this.battle.cooldownProgress(weapon), weapon);
   }
 
   // ── World dressing ──────────────────────────────────────────────────────
@@ -554,11 +559,11 @@ export class WorldScene extends Phaser.Scene {
     const isHoriz  = (facing === 'left' || facing === 'right');
     const px = this.player.x + ox;
     const py = this.player.y + oy;
+    const facingAngle = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 }[facing] ?? Math.PI / 2;
 
     if (weapon === 'broom') {
       // Crescent swoosh sweeping across the facing direction
-      const facingAngle = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 }[facing] ?? Math.PI / 2;
-      const g = this.add.graphics({ x: this.player.x, y: this.player.y }).setDepth(DEPTH.VFX);
+      const g = this.add.graphics({ x: this.player.x, y: this.player.y }).setDepth(DEPTH.VFX_GLOW);
       const R = 30;
       const span = Math.PI * 0.75;
       for (let i = 0; i < 4; i++) {
@@ -576,34 +581,55 @@ export class WorldScene extends Phaser.Scene {
     }
 
     if (weapon === 'vacuum') {
-      // Rectangular "blast" beam extending from player in facing direction
-      const vfx = this.add.rectangle(
-        px, py,
-        isHoriz ? 48 : 28, isHoriz ? 28 : 48,
-        0x6888fc, 0.80
-      ).setDepth(DEPTH.VFX);
-      this.tweens.add({
-        targets: vfx, alpha: 0, scaleX: 2, scaleY: 2,
-        duration: 220, ease: 'Power1', onComplete: () => vfx.destroy(),
-      });
+      // Suction cone matching the real hitbox (range × the ±60° arc used by
+      // BattleSystem), with wind streaks pulled in toward the nozzle
+      const R  = WEAPON_STATS.vacuum.range;
+      const a0 = facingAngle - Math.PI / 3;
+      const a1 = facingAngle + Math.PI / 3;
+      const { x: cx, y: cy } = this.player;
+      const cone = this.add.graphics({ x: cx, y: cy }).setDepth(DEPTH.VFX_GLOW);
+      cone.fillStyle(0x6888fc, 0.22).slice(0, 0, R, a0, a1).fillPath();
+      cone.lineStyle(2, 0xb8c8ff, 0.6).beginPath().arc(0, 0, R, a0, a1).strokePath();
+      this.tweens.add({ targets: cone, alpha: 0, duration: 260, onComplete: () => cone.destroy() });
+
+      const nozzleX = cx + Math.cos(facingAngle) * 14;
+      const nozzleY = cy + Math.sin(facingAngle) * 14;
+      for (let i = 0; i < 12; i++) {
+        const a = a0 + (a1 - a0) * Math.random();
+        const r = R * (0.7 + Math.random() * 0.3);
+        const streak = this.add.image(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 'fx_dot')
+          .setTint(0xdfe6ff).setScale(0.5).setBlendMode('ADD').setDepth(DEPTH.VFX_GLOW);
+        this.tweens.add({
+          targets: streak, x: nozzleX, y: nozzleY, scale: 0.15, alpha: 0.2,
+          delay: i * 12, duration: 220, ease: 'Quad.easeIn',
+          onComplete: () => streak.destroy(),
+        });
+      }
       return;
     }
 
     if (weapon === 'soap') {
-      // Splatter: 5 small orange droplets radiating outward
-      for (let i = 0; i < 5; i++) {
-        const baseAngle = Math.atan2(oy, ox);
-        const spread    = (Math.PI / 3);
-        const a         = baseAngle + (i - 2) * (spread / 4);
-        const drop      = this.add.rectangle(
-          this.player.x, this.player.y, 6, 6, 0xfc7820, 0.9,
-        ).setDepth(DEPTH.VFX);
+      // Bubble trail: bubbles blown forward drift upward, wobble and pop
+      const { x: sx, y: sy } = this.player;
+      const tints = [0xbfe9ff, 0xffd6f5, 0xd9ffd6];
+      for (let i = 0; i < 7; i++) {
+        const a    = facingAngle + (Math.random() - 0.5) * (Math.PI / 3);
+        const dist = 20 + Math.random() * 36;
+        const bubble = this.add.image(sx, sy, 'fx_bubble')
+          .setTint(tints[i % tints.length])
+          .setScale(0.6 + Math.random() * 0.6)
+          .setDepth(DEPTH.VFX_GLOW);
         this.tweens.add({
-          targets: drop,
-          x: this.player.x + Math.cos(a) * 36,
-          y: this.player.y + Math.sin(a) * 36,
-          alpha: 0, scaleX: 0.3, scaleY: 0.3,
-          duration: 200, ease: 'Power1', onComplete: () => drop.destroy(),
+          targets: bubble,
+          x: sx + Math.cos(a) * dist,
+          y: sy + Math.sin(a) * dist - 10,
+          delay: i * 25,
+          duration: 420 + Math.random() * 200,
+          ease: 'Sine.easeOut',
+          onComplete: () => {
+            this.juice.burst(bubble.x, bubble.y, { count: 3, tint: 0xffffff });
+            bubble.destroy();
+          },
         });
       }
       return;
@@ -656,7 +682,11 @@ export class WorldScene extends Phaser.Scene {
               targets: coin,
               x: this.player.x, y: this.player.y,
               alpha: 0, duration: 260, ease: 'Power2',
-              onComplete: () => coin.destroy(),
+              onComplete: () => {
+                coin.destroy();
+                // Pickup sparkle where the coin lands
+                this.juice.burst(this.player.x, this.player.y - 8, { count: 4, tint: 0xfcd860 });
+              },
             });
           },
         });

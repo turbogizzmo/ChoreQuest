@@ -39,6 +39,9 @@ const MINIMAP_TILE_COLORS = {
   [TILE.ROCK]:     '#8e8a86',
 };
 
+// Weapon badge icons for the desktop cooldown chip
+const WEAPON_ICON = { broom: '🧹', vacuum: '🌀', soap: '🧼', sponge: '🧽' };
+
 export class HUD {
   constructor(scene) {
     this.scene   = scene;
@@ -105,7 +108,45 @@ export class HUD {
     // ── Touch action buttons (bottom) ────────────────────────────────
     if (scene.sys.game.device.input.touch) {
       this._buildTouchControls();
+    } else {
+      this._buildWeaponChip();
     }
+  }
+
+  // Desktop: small weapon badge (bottom-right) carrying the cooldown ring.
+  // Touch devices get the ring on the attack button instead.
+  _buildWeaponChip() {
+    const scene = this.scene;
+    const { w: W, h: H } = uiSize(scene);
+    const R = 22;
+    const x = W - R - MARGIN - 4;
+    const y = H - R - MARGIN - 4;
+    const bg = this._add(scene.add.graphics(), HUD_DEPTH - 1);
+    bg.fillStyle(COLORS.panel, 0.82).fillCircle(x, y, R);
+    bg.lineStyle(1, COLORS.panelEdge, 0.18).strokeCircle(x, y, R);
+    this._weaponIcon = this._add(
+      scene.add.text(x, y - 1, WEAPON_ICON.broom, textStyle(18, '#ffffff', { weight: 400, stroke: 0 })).setOrigin(0.5),
+      HUD_DEPTH + 1,
+    );
+    // (No "SPACE" caption: the React header already shows the key hint.)
+    this._cooldownRing = { x, y, r: R + 3, g: this._add(scene.add.graphics(), HUD_DEPTH + 2), last: 1 };
+  }
+
+  /** Sweep ring that fills back up while the weapon recharges. */
+  updateCooldown(progress, weapon) {
+    if (this._weaponIcon && weapon && this._weaponIcon.text !== WEAPON_ICON[weapon]) {
+      this._weaponIcon.setText(WEAPON_ICON[weapon] ?? WEAPON_ICON.broom);
+    }
+    const ring = this._cooldownRing;
+    if (!ring) return;
+    const p = Math.round(Math.min(1, progress) * 60) / 60; // ~60 steps: skip no-op redraws
+    if (p === ring.last) return;
+    ring.last = p;
+    ring.g.clear();
+    if (p >= 1) return;
+    ring.g.lineStyle(4, 0xfcd860, 0.9).beginPath()
+      .arc(ring.x, ring.y, ring.r, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2, false)
+      .strokePath();
   }
 
   _buildCoins(W, top) {
@@ -347,6 +388,8 @@ export class HUD {
         onComplete: () => ripple.destroy(),
       });
     });
+    this._cooldownRing = { x: ATK_X, y: ATK_Y, r: ATK_R + 5, g: this._add(scene.add.graphics(), HUD_DEPTH + 2), last: 1 };
+
     atkBtn.on('pointerup',  () => { this.touchKeys.attack.isDown = false; });
     atkBtn.on('pointerout', () => { this.touchKeys.attack.isDown = false; });
   }
@@ -480,17 +523,6 @@ export class HUD {
 
   // Floating text lives in world space so it tracks the spot it pops from.
   showFloatingText(x, y, text, color = COLORS.gold) {
-    const scene = this.scene;
-    const label = scene.add.text(x, y, text, textStyle(13, color, { weight: 900, stroke: 4 }))
-      .setDepth(60).setOrigin(0.5);
-
-    scene.tweens.add({
-      targets: label,
-      y: y - 36,
-      alpha: 0,
-      duration: 1100,
-      ease: 'Power2',
-      onComplete: () => label.destroy(),
-    });
+    this.scene.juice.popText(x, y, text, color);
   }
 }
