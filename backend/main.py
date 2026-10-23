@@ -263,6 +263,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
+        pass
+    finally:
+        # Any exit (not just a clean disconnect) must unregister the socket.
         ws_manager.disconnect(websocket, user_id)
 
 

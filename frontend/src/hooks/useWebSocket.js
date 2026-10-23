@@ -1,54 +1,86 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getAccessToken, ensureToken } from '../api/client';
 
 export function useWebSocket(userId, onMessage) {
   const wsRef = useRef(null);
   const reconnectTimeout = useRef(null);
   const retryCount = useRef(0);
+  // Latest handler in a ref so a new callback identity never tears down the socket
+  const onMessageRef = useRef(onMessage);
+  onMessageRef.current = onMessage;
   const [connected, setConnected] = useState(false);
 
-  const connect = useCallback(() => {
+  useEffect(() => {
     if (!userId) return;
-    const token = getAccessToken();
-    if (!token) return;
+    // Set on cleanup so this effect's socket can't schedule a reconnect after
+    // unmount / logout / user switch (closing it fires onclose).
+    let disposed = false;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/${userId}?token=${token}`);
-
-    ws.onopen = () => {
-      setConnected(true);
-      retryCount.current = 0;
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        onMessage?.(data);
-      } catch { /* ignore */ }
-    };
-
-    ws.onclose = () => {
-      setConnected(false);
-      wsRef.current = null;
+    const scheduleReconnect = () => {
+      if (disposed) return;
       const delay = Math.min(1000 * Math.pow(2, retryCount.current), 30000);
       retryCount.current += 1;
       reconnectTimeout.current = setTimeout(() => {
         // Refresh access token before reconnecting (it may have expired)
-        ensureToken().catch(() => {}).finally(() => connect());
+        ensureToken()
+          .catch((err) => {
+            // Session really gone — log out like api() does instead of
+            // retrying forever. Other failures (server down) just retry.
+            if (err?.status === 401) window.dispatchEvent(new CustomEvent('auth:expired'));
+          })
+          .finally(connect);
       }, delay);
     };
 
-    ws.onerror = () => ws.close();
-    wsRef.current = ws;
-  }, [userId, onMessage]);
+    const connect = () => {
+      if (disposed) return;
+      const token = getAccessToken();
+      // No token yet (e.g. refresh failed while the server was restarting):
+      // keep retrying rather than giving up for the rest of the session.
+      if (!token) {
+        scheduleReconnect();
+        return;
+      }
 
-  useEffect(() => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${protocol}//${window.location.host}/ws/${userId}?token=${token}`);
+
+      ws.onopen = () => {
+        // Anything broadcast while we were disconnected was missed — tell
+        // listeners to refetch.
+        if (retryCount.current > 0) {
+          onMessageRef.current?.({ type: 'data_changed', data: { entity: 'resync' } });
+        }
+        setConnected(true);
+        retryCount.current = 0;
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          onMessageRef.current?.(data);
+        } catch { /* ignore */ }
+      };
+
+      ws.onclose = () => {
+        setConnected(false);
+        if (wsRef.current === ws) wsRef.current = null;
+        scheduleReconnect();
+      };
+
+      ws.onerror = () => ws.close();
+      wsRef.current = ws;
+    };
+
     connect();
     return () => {
-      if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
-      if (wsRef.current) wsRef.current.close();
+      disposed = true;
+      clearTimeout(reconnectTimeout.current);
+      wsRef.current?.close();
+      wsRef.current = null;
+      retryCount.current = 0;
     };
-  }, [connect]);
+  }, [userId]);
 
   return { connected };
 }

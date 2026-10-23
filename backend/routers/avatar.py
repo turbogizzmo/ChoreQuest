@@ -1,3 +1,4 @@
+import json
 import random
 from datetime import datetime, timezone
 
@@ -13,6 +14,7 @@ from backend.models import (
 )
 from backend.dependencies import get_current_user
 from backend.websocket_manager import ws_manager
+from backend.services.balance import debit_points
 
 router = APIRouter(prefix="/api/avatar", tags=["avatar"])
 
@@ -143,6 +145,48 @@ class AvatarConfig(BaseModel):
     config: dict
 
 
+# Keys only the server writes (pet levelling, daily pet interactions). Client
+# values are always discarded so a kid can't grant their own pet XP.
+SERVER_MANAGED_AVATAR_KEYS = ("pet_xp_map", "pet_xp", "pet_interactions")
+MAX_AVATAR_CONFIG_BYTES = 8 * 1024
+
+
+async def _locked_items_in(db: AsyncSession, user: User, config: dict) -> list[str]:
+    """Return catalogue items in ``config`` the kid hasn't unlocked.
+
+    Parents/admins have everything. Values that aren't catalogue items
+    (colours, theme, etc.) are ignored.
+    """
+    if user.role in (UserRole.parent, UserRole.admin):
+        return []
+    equipped = {(k, v) for k, v in config.items() if isinstance(v, str)}
+    if not equipped:
+        return []
+    items = (await db.execute(
+        select(AvatarItem).where(AvatarItem.category.in_({k for k, _ in equipped}))
+    )).scalars().all()
+    owned_ids = set((await db.execute(
+        select(UserAvatarItem.avatar_item_id).where(UserAvatarItem.user_id == user.id)
+    )).scalars().all())
+
+    locked = []
+    for item in items:
+        if (item.category, item.item_id) not in equipped:
+            continue
+        unlocked = (
+            item.is_default
+            or item.id in owned_ids
+            or item.unlock_method == AvatarUnlockMethod.free
+            or (item.unlock_method == AvatarUnlockMethod.xp and item.unlock_value
+                and user.total_points_earned >= item.unlock_value)
+            or (item.unlock_method == AvatarUnlockMethod.streak and item.unlock_value
+                and user.longest_streak >= item.unlock_value)
+        )
+        if not unlocked:
+            locked.append(item.display_name)
+    return locked
+
+
 # ---------- GET /parts ----------
 @router.get("/parts")
 async def get_avatar_parts():
@@ -158,14 +202,23 @@ async def save_avatar(
     user: User = Depends(get_current_user),
 ):
     """Save avatar configuration for the current user."""
-    new_config = body.config
+    new_config = dict(body.config)
+    if len(json.dumps(new_config)) > MAX_AVATAR_CONFIG_BYTES:
+        raise HTTPException(status_code=400, detail="Avatar configuration is too large")
 
-    # Preserve server-managed pet XP data — the frontend may send stale values
+    locked = await _locked_items_in(db, user, new_config)
+    if locked:
+        raise HTTPException(
+            status_code=403,
+            detail=f"You haven't unlocked: {', '.join(sorted(locked))}",
+        )
+
+    # Server-managed pet data always comes from the stored config, never the client
     existing = user.avatar_config or {}
-    if "pet_xp_map" in existing:
-        new_config["pet_xp_map"] = existing["pet_xp_map"]
-    if "pet_xp" in existing:
-        new_config.setdefault("pet_xp", existing["pet_xp"])
+    for key in SERVER_MANAGED_AVATAR_KEYS:
+        new_config.pop(key, None)
+        if key in existing:
+            new_config[key] = existing[key]
 
     # Keep pet_xp in sync with the current pet from pet_xp_map
     pet = new_config.get("pet")
@@ -274,11 +327,8 @@ async def purchase_avatar_item(
         raise HTTPException(status_code=400, detail="You already own this item")
 
     cost = item.unlock_value or 0
-    if user.points_balance < cost:
+    if not await debit_points(db, user, cost):
         raise HTTPException(status_code=400, detail=f"Not enough XP. Need {cost}, have {user.points_balance}")
-
-    # Deduct points
-    user.points_balance -= cost
     db.add(PointTransaction(
         user_id=user.id,
         amount=-cost,

@@ -74,12 +74,11 @@ export function ThemeProvider({ children }) {
     setColorTheme(themeId);
     // Persist to server via avatar_config
     try {
-      // Fetch current user to get existing avatar_config
-      const me = await api('/api/auth/me');
-      const config = { ...(me.avatar_config || {}), color_theme: themeId };
+      // Server merges it into avatar_config, so a pet XP award landing
+      // between a read and a write here can't be overwritten.
       await api('/api/auth/me', {
         method: 'PUT',
-        body: { avatar_config: config },
+        body: { color_theme: themeId },
       });
     } catch {
       // Non-critical — localStorage already has the value

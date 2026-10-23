@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import os
 import secrets
@@ -112,7 +113,7 @@ async def reset_user_password(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user.password_hash = hash_password(body.new_password)
+    user.password_hash = await asyncio.to_thread(hash_password, body.new_password)
     user.updated_at = datetime.now(timezone.utc)
     await db.commit()
     return {"detail": f"Password reset for {user.username}"}

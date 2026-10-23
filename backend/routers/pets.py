@@ -76,31 +76,27 @@ async def pet_interact(
     # ── Write interactions into config ──
     config["pet_interactions"] = interactions
 
-    # ── Compute new balances ──
-    new_balance = (user.points_balance or 0) + xp
-    new_total = (user.total_points_earned or 0) + xp
-
     # ── Direct SQL UPDATE — bypasses ORM JSON mutation detection entirely ──
+    # Balances are incremented in SQL (not computed in Python) so a concurrent
+    # award or redeem can't be overwritten.
     await db.execute(
         text(
             "UPDATE users SET avatar_config = :config, "
-            "points_balance = :balance, "
-            "total_points_earned = :total "
+            "points_balance = points_balance + :xp, "
+            "total_points_earned = total_points_earned + :xp "
             "WHERE id = :uid"
         ),
         {
             "config": json.dumps(config),
-            "balance": new_balance,
-            "total": new_total,
+            "xp": xp,
             "uid": user.id,
         },
     )
     await db.commit()
 
     # Sync in-memory user object so subsequent reads in this request are correct
-    user.avatar_config = config
-    user.points_balance = new_balance
-    user.total_points_earned = new_total
+    await db.refresh(user, ["avatar_config", "points_balance", "total_points_earned"])
+    new_balance = user.points_balance
 
     return {
         "action": body.action,

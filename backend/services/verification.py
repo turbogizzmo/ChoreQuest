@@ -27,6 +27,7 @@ from backend.models import (
     User,
     UserRole,
 )
+from backend.services.balance import credit_points
 from backend.services.pet_leveling import award_pet_xp_db
 from backend.services.streak import update_streak
 from backend.websocket_manager import ws_manager
@@ -99,8 +100,7 @@ async def award_verified_assignment(
             total_awarded += bonus_points
 
     kid = (await db.execute(select(User).where(User.id == assignment.user_id))).scalar_one()
-    kid.points_balance += total_awarded
-    kid.total_points_earned += total_awarded
+    await credit_points(db, kid, total_awarded)
 
     pet_levelup = await award_pet_xp_db(db, kid, total_awarded)
     if pet_levelup:

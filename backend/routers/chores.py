@@ -10,7 +10,7 @@ from backend.services.ai_provider import (
 )
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from sqlalchemy import select, and_, func, delete, text
+from sqlalchemy import select, and_, func, delete, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -57,6 +57,7 @@ from backend.websocket_manager import ws_manager
 from backend.services.recurrence import should_create_on_day
 from backend.services.rotation import get_rotation_kid_for_day
 from backend.services.verification import award_verified_assignment, finish_verification
+from backend.services.balance import deduct_points_floor_zero
 from backend.routers._chores_helpers import (
     get_chore_or_404 as _get_chore_or_404,
     reload_chore_with_category as _reload_chore_with_category,
@@ -1065,6 +1066,32 @@ async def complete_chore(
     return AssignmentResponse.model_validate(assignment)
 
 
+async def _claim_for_verification(
+    db: AsyncSession, assignment_id: int, expected: AssignmentStatus,
+) -> None:
+    """Atomically move an assignment from ``expected`` to verified.
+
+    Same compare-and-swap as bounty verify and auto-approve: a double-tap,
+    two parents, or a parent racing the auto-approve job all read the same
+    status, but only one UPDATE can match it — the rest get a 409 instead of
+    awarding XP a second time.
+    """
+    claim = await db.execute(
+        update(ChoreAssignment)
+        .where(
+            ChoreAssignment.id == assignment_id,
+            ChoreAssignment.status == expected,
+        )
+        .values(status=AssignmentStatus.verified)
+    )
+    if claim.rowcount != 1:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This quest was already processed. Please refresh.",
+        )
+
+
 @router.post("/{chore_id}/verify", response_model=AssignmentResponse)
 async def verify_chore(
     chore_id: int,
@@ -1095,6 +1122,7 @@ async def verify_chore(
             status_code=404,
             detail="No completed assignment found to verify for this chore",
         )
+    await _claim_for_verification(db, assignment.id, AssignmentStatus.completed)
 
     kid, total_awarded = await award_verified_assignment(
         db, assignment, verified_by=user.id, now=now, today=today,
@@ -1134,6 +1162,7 @@ async def parent_verify_assignment(
             status_code=400,
             detail=f"Assignment is {assignment.status.value}, not pending",
         )
+    await _claim_for_verification(db, assignment.id, AssignmentStatus.pending)
 
     # Direct parent verification can hit legacy rows, and pending assignments
     # naturally start at completion_count=0 before any kid submission.
@@ -1203,7 +1232,7 @@ async def uncomplete_chore(
     )
     assigned_user = assigned_user_result.scalar_one()
 
-    assigned_user.points_balance = max(0, assigned_user.points_balance - total_deducted)
+    await deduct_points_floor_zero(db, assigned_user, total_deducted)
     # Note: do NOT decrement total_points_earned — it tracks lifetime XP
     # earned and is used for milestone unlocks (avatar items, achievements).
     # Deducting it would cause kids to lose unlocks when quests are undone.

@@ -110,7 +110,7 @@ export default function ChoreDetail() {
   const [actionLoading, setActionLoading] = useState('');
   const [photoFile, setPhotoFile] = useState(null);
   const photoInputRef = useRef(null);
-  const [confirmAction, setConfirmAction] = useState(null); // { type: 'skip'|'uncomplete', assignmentId }
+  const [confirmAction, setConfirmAction] = useState(null); // { type: 'skip'|'uncomplete', kidId }
   const actionInFlight = useRef(false);
 
   useEffect(() => {
@@ -201,13 +201,15 @@ export default function ChoreDetail() {
     }
   };
 
-  const handleVerify = async (assignmentId) => {
+  // The backend scopes these actions by chore + kid (there are no
+  // /assignments/{id}/verify|uncomplete|skip routes).
+  const kidActionPath = (action, kidId) =>
+    `/api/chores/${id}/${action}${kidId ? `?kid_id=${kidId}` : ''}`;
+
+  const handleVerify = async (kidId) => {
     setActionLoading('verify');
     try {
-      const path = assignmentId
-        ? `/api/chores/assignments/${assignmentId}/verify`
-        : `/api/chores/${id}/verify`;
-      await api(path, { method: 'POST' });
+      await api(kidActionPath('verify', kidId), { method: 'POST' });
       showToast('Quest verified! The hero has been rewarded.', 'success');
       await fetchChore();
     } catch (err) {
@@ -217,30 +219,24 @@ export default function ChoreDetail() {
     }
   };
 
-  const handleUncomplete = (assignmentId) => {
-    setConfirmAction({ type: 'uncomplete', assignmentId });
+  const handleUncomplete = (kidId) => {
+    setConfirmAction({ type: 'uncomplete', kidId });
   };
 
-  const handleSkip = (assignmentId) => {
-    setConfirmAction({ type: 'skip', assignmentId });
+  const handleSkip = (kidId) => {
+    setConfirmAction({ type: 'skip', kidId });
   };
 
   const confirmDestructiveAction = async () => {
     if (!confirmAction || actionLoading) return;
-    const { type, assignmentId } = confirmAction;
+    const { type, kidId } = confirmAction;
     setActionLoading(type);
     try {
       if (type === 'uncomplete') {
-        const path = assignmentId
-          ? `/api/chores/assignments/${assignmentId}/uncomplete`
-          : `/api/chores/${id}/uncomplete`;
-        await api(path, { method: 'POST' });
+        await api(kidActionPath('uncomplete', kidId), { method: 'POST' });
         showToast('Quest marked as incomplete.', 'info');
       } else if (type === 'skip') {
-        const path = assignmentId
-          ? `/api/chores/assignments/${assignmentId}/skip`
-          : `/api/chores/${id}/skip`;
-        await api(path, { method: 'POST' });
+        await api(kidActionPath('skip', kidId), { method: 'POST' });
         showToast('Quest skipped for today.', 'info');
       }
       await fetchChore();
@@ -625,7 +621,7 @@ export default function ChoreDetail() {
           <p className="text-cream text-sm font-semibold mb-3">Actions</p>
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={() => handleVerify(todayAssignment?.id)}
+              onClick={() => handleVerify(todayAssignment?.user_id)}
               disabled={!!actionLoading}
               className={`game-btn game-btn-blue flex items-center gap-2 ${
                 actionLoading === 'verify' ? 'opacity-60 cursor-wait' : ''
@@ -635,7 +631,7 @@ export default function ChoreDetail() {
               {actionLoading === 'verify' ? 'Verifying...' : 'Verify'}
             </button>
             <button
-              onClick={() => handleUncomplete(todayAssignment?.id)}
+              onClick={() => handleUncomplete(todayAssignment?.user_id)}
               disabled={!!actionLoading}
               className={`game-btn game-btn-blue flex items-center gap-2 ${
                 actionLoading === 'uncomplete' ? 'opacity-60 cursor-wait' : ''
@@ -645,7 +641,7 @@ export default function ChoreDetail() {
               {actionLoading === 'uncomplete' ? 'Undoing...' : 'Uncomplete'}
             </button>
             <button
-              onClick={() => handleSkip(todayAssignment?.id)}
+              onClick={() => handleSkip(todayAssignment?.user_id)}
               disabled={!!actionLoading}
               className={`game-btn game-btn-red flex items-center gap-2 ${
                 actionLoading === 'skip' ? 'opacity-60 cursor-wait' : ''
