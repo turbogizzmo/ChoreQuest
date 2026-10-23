@@ -11,6 +11,7 @@ import {
   Check,
   Coins,
 } from 'lucide-react';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 const RARITY_COLORS = {
   common: 'border-border text-muted',
@@ -102,11 +103,7 @@ export default function AvatarShop() {
     fetchItems().finally(() => setLoading(false));
   }, [fetchItems]);
 
-  useEffect(() => {
-    const handler = () => fetchItems();
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchItems]);
+  useWsRefetch(() => fetchItems());
 
   const handlePurchase = async (item) => {
     setPurchasing(item.id);

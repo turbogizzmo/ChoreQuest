@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
+import { useWsRefetch } from './useWsRefetch';
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState([]);
@@ -42,11 +43,7 @@ export function useNotifications() {
   }, [refresh]);
 
   // Live updates via WebSocket - refresh notifications when any WS message arrives
-  useEffect(() => {
-    const handler = () => refresh();
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [refresh]);
+  useWsRefetch(() => refresh());
 
   return { notifications, unreadCount, markRead, markAllRead, refresh };
 }

@@ -395,7 +395,7 @@ export default function Profile() {
                   <div className="xp-bar">
                     <div
                       className="xp-bar-fill"
-                      style={{ width: `${Math.round(stats.rank.progress * 100)}%` }}
+                      style={{ '--fill': stats.rank.progress }}
                     />
                   </div>
                 </div>

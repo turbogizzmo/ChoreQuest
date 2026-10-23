@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   HEAD_MAP,
   EYES_MAP,
@@ -255,7 +256,7 @@ function SvgAvatar({ config, size }) {
   );
 }
 
-export default function AvatarDisplay({ config, size = 'md', name = '', animate = false }) {
+function AvatarDisplay({ config, size = 'md', name = '', animate = false }) {
   const px = SIZES[size] || SIZES.md;
 
   if (config && typeof config === 'object' && Object.keys(config).length > 0) {
@@ -288,3 +289,13 @@ export default function AvatarDisplay({ config, size = 'md', name = '', animate 
     </div>
   );
 }
+
+// avatar_config arrives as a fresh object on every /me or list refetch, so
+// compare by value: the SVG tree is only rebuilt when the avatar changes.
+const sameProps = (a, b) =>
+  a.size === b.size &&
+  a.name === b.name &&
+  a.animate === b.animate &&
+  (a.config === b.config || JSON.stringify(a.config) === JSON.stringify(b.config));
+
+export default memo(AvatarDisplay, sameProps);

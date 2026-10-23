@@ -31,6 +31,7 @@ import RankBadge from '../components/RankBadge';
 import PetLevelBadge from '../components/PetLevelBadge';
 import { QuestBoardOverlay, QuestBoardPageGlow, QuestBoardParticles, QuestBoardDecorations, QuestBoardTitle, BOARD_THEMES, getTheme } from '../components/QuestBoardTheme';
 import { renderPet, renderPetExtras, renderPetAccessory, buildPetColors } from '../components/avatar';
+import { useWsRefetch } from '../hooks/useWsRefetch';
 
 // ---------- helpers ----------
 
@@ -216,13 +217,7 @@ export default function KidDashboard() {
 
   // ---- WebSocket listener ----
 
-  useEffect(() => {
-    const handler = () => {
-      fetchData();
-    };
-    window.addEventListener('ws:message', handler);
-    return () => window.removeEventListener('ws:message', handler);
-  }, [fetchData]);
+  useWsRefetch(() => { fetchData(); });
 
   // ---- complete overdue quest ----
 
@@ -332,9 +327,14 @@ export default function KidDashboard() {
   // ---- render ----
 
   if (loading) {
+    // Skeleton in the shape of the real board so content fills in place
+    // instead of pushing the page down when it arrives.
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="animate-spin text-accent" size={24} />
+      <div className="max-w-2xl mx-auto space-y-5" aria-busy="true" aria-label="Loading quests">
+        <div className="game-panel h-[155px] animate-pulse" />
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="game-panel h-[118px] animate-pulse" />
+        ))}
       </div>
     );
   }
@@ -406,7 +406,7 @@ export default function KidDashboard() {
             <div className="xp-bar">
               <div
                 className="xp-bar-fill"
-                style={{ width: `${progressPct}%`, transition: 'width 0.3s ease' }}
+                style={{ '--fill': progressPct / 100, transitionDuration: '0.3s' }}
               />
             </div>
           </div>
@@ -460,7 +460,7 @@ export default function KidDashboard() {
             return (
               <motion.div
                 key={assignment.id}
-                className="game-panel p-4 border-crimson/30 transition-all"
+                className="game-panel p-4 border-crimson/30 transition-colors"
                 variants={cardVariants}
                 initial="hidden"
                 animate="visible"
@@ -558,7 +558,7 @@ export default function KidDashboard() {
               return (
                 <motion.div
                   key={assignment.id}
-                  className="game-panel p-4 transition-all cursor-pointer hover:border-accent/40"
+                  className="game-panel p-4 transition-colors cursor-pointer hover:border-accent/40"
                   style={activeTheme.cardAccent ? {
                     borderColor: `${activeTheme.cardAccent}25`,
                     boxShadow: `0 0 12px ${activeTheme.cardAccent}10, inset 0 1px 0 ${activeTheme.cardAccent}08`,

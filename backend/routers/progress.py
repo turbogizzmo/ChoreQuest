@@ -1,6 +1,6 @@
 """Progress charts + Adventure Mode leaderboard endpoints."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
@@ -47,6 +47,10 @@ async def get_progress(
         .where(
             PointTransaction.user_id.in_(user_ids),
             PointTransaction.amount > 0,
+            # Plain range on the stored (UTC) column so idx_point_tx_user_created
+            # applies; a day of slack covers any UTC offset. The localtime
+            # filters below still define the exact local-day window.
+            PointTransaction.created_at >= datetime.combine(start - timedelta(days=1), time.min),
             func.date(func.datetime(PointTransaction.created_at, 'localtime')) >= start,
             func.date(func.datetime(PointTransaction.created_at, 'localtime')) <= today,
         )

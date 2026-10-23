@@ -5,9 +5,11 @@ background task to avoid duplicating the complex scheduling rules.
 """
 
 import logging
+from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +21,7 @@ from backend.models import (
     ChoreRotation,
     AssignmentStatus,
     Recurrence,
+    VacationPeriod,
 )
 from backend.services.recurrence import should_create_on_day
 from backend.services.rotation import (
@@ -41,33 +44,93 @@ async def auto_generate_week_assignments(
 
     This function does NOT advance rotations -- it reads the current
     rotation state and projects forward (useful for calendar views).
+
+    It runs on every calendar / dashboard / kiosk read, so everything is
+    loaded up front in a handful of queries and only genuinely missing
+    slots are written. In the steady state (week already generated) it
+    issues no writes at all and never takes SQLite's write lock.
     """
     week_end = week_start + timedelta(days=6)
-    week_dates = [week_start + timedelta(days=i) for i in range(7)]
+    plan = await _load_week_plan(db, week_start, week_end)
 
     # Filter out family-wide vacation days from week generation
-    from backend.routers.vacation import is_vacation_day
-    active_dates = []
-    for d in week_dates:
-        if not await is_vacation_day(db, d):
-            active_dates.append(d)
-    week_dates = active_dates
+    week_dates = [
+        d for d in (week_start + timedelta(days=i) for i in range(7))
+        if not plan.on_vacation(d)
+    ]
 
     exclusion_set = await _load_exclusion_set(db, week_start, week_end)
-
     chores = await _load_active_chores(db)
+    chore_ids = [c.id for c in chores]
 
+    rules_by_chore: dict[int, list[ChoreAssignmentRule]] = defaultdict(list)
+    rotations: dict[int, ChoreRotation] = {}
+    if chore_ids:
+        for rule in (await db.execute(
+            select(ChoreAssignmentRule).where(
+                ChoreAssignmentRule.chore_id.in_(chore_ids),
+                ChoreAssignmentRule.is_active == True,
+            )
+        )).scalars():
+            rules_by_chore[rule.chore_id].append(rule)
+        rotations = {
+            r.chore_id: r for r in (await db.execute(
+                select(ChoreRotation).where(ChoreRotation.chore_id.in_(chore_ids))
+            )).scalars()
+        }
+
+    legacy_chores = []
     for chore in chores:
-        rules = await _load_active_rules(db, chore.id)
-
+        rules = rules_by_chore.get(chore.id)
         if rules:
-            rotation = await _load_rotation(db, chore.id)
-            await _generate_from_rules(
-                db, chore, rules, rotation, week_dates, exclusion_set,
+            _plan_from_rules(
+                plan, chore, rules, rotations.get(chore.id), week_dates, exclusion_set,
             )
         else:
-            await _generate_legacy(db, chore, week_dates, exclusion_set)
+            legacy_chores.append(chore)
 
+    if legacy_chores:
+        fallback_ids = await _load_legacy_user_ids(
+            db, [c.id for c in legacy_chores if not (
+                rotations.get(c.id) and rotations[c.id].kid_ids
+            )],
+        )
+        for chore in legacy_chores:
+            rotation = rotations.get(chore.id)
+            user_ids = (
+                [int(k) for k in rotation.kid_ids] if rotation and rotation.kid_ids
+                else fallback_ids.get(chore.id, [])
+            )
+            _plan_legacy(plan, chore, user_ids, week_dates, exclusion_set)
+
+    if not plan.to_create and not plan.to_remove:
+        return  # steady state: read-only
+
+    if plan.to_create:
+        await db.execute(
+            sqlite_insert(ChoreAssignment).on_conflict_do_nothing(
+                index_elements=["chore_id", "user_id", "date"]
+            ),
+            [
+                {"chore_id": c, "user_id": u, "date": d, "status": AssignmentStatus.pending}
+                for c, u, d in sorted(plan.to_create)
+            ],
+        )
+        logger.debug("Created %d week assignment(s)", len(plan.to_create))
+    for chore_id, user_id, day in plan.to_remove:
+        # Only pending rows are removed — completed/verified are never touched
+        await db.execute(
+            delete(ChoreAssignment).where(
+                ChoreAssignment.chore_id == chore_id,
+                ChoreAssignment.user_id == user_id,
+                ChoreAssignment.date == day,
+                ChoreAssignment.status == AssignmentStatus.pending,
+            )
+        )
+        logger.debug(
+            "Removed stale rotation assignment: chore=%d user=%d day=%s",
+            chore_id, user_id, day,
+        )
     await db.commit()
 
 
@@ -247,29 +310,69 @@ async def _get_legacy_user_ids(db: AsyncSession, chore_id: int) -> list[int]:
     return list(result.scalars().all())
 
 
-async def _remove_stale_rotation_assignment(
-    db: AsyncSession, chore_id: int, user_id: int, day: date
-) -> None:
-    """Delete a pending assignment that shouldn't exist per the rotation.
+@dataclass
+class _WeekPlan:
+    """Everything the week projection needs, preloaded, plus the planned writes."""
+    vacations: list[tuple[int | None, date, date]]
+    existing: dict[tuple[int, int, date], AssignmentStatus]
+    to_create: set[tuple[int, int, date]] = field(default_factory=set)
+    to_remove: set[tuple[int, int, date]] = field(default_factory=set)
 
-    Only removes assignments that are still pending — completed or
-    verified ones are never touched.
-    """
-    result = await db.execute(
-        select(ChoreAssignment).where(
-            ChoreAssignment.chore_id == chore_id,
-            ChoreAssignment.user_id == user_id,
-            ChoreAssignment.date == day,
-            ChoreAssignment.status == AssignmentStatus.pending,
+    def on_vacation(self, day: date, user_id: int | None = None) -> bool:
+        """Same semantics as ``is_vacation_day``: family-wide always counts,
+        a per-kid period only counts for that kid."""
+        return any(
+            start <= day <= end and (vac_user is None or vac_user == user_id)
+            for vac_user, start, end in self.vacations
         )
+
+    def create(self, chore_id: int, user_id: int, day: date) -> None:
+        key = (chore_id, int(user_id), day)
+        if key not in self.existing:
+            self.to_create.add(key)
+
+    def remove_stale(self, chore_id: int, user_id: int, day: date) -> None:
+        key = (chore_id, int(user_id), day)
+        if self.existing.get(key) == AssignmentStatus.pending:
+            self.to_remove.add(key)
+
+
+async def _load_week_plan(db: AsyncSession, start: date, end: date) -> _WeekPlan:
+    vacations = (await db.execute(
+        select(VacationPeriod.user_id, VacationPeriod.start_date, VacationPeriod.end_date)
+        .where(
+            VacationPeriod.is_active == True,
+            VacationPeriod.start_date <= end,
+            VacationPeriod.end_date >= start,
+        )
+    )).all()
+    existing = (await db.execute(
+        select(
+            ChoreAssignment.chore_id, ChoreAssignment.user_id,
+            ChoreAssignment.date, ChoreAssignment.status,
+        ).where(ChoreAssignment.date >= start, ChoreAssignment.date <= end)
+    )).all()
+    return _WeekPlan(
+        vacations=[(v.user_id, v.start_date, v.end_date) for v in vacations],
+        existing={(r.chore_id, r.user_id, r.date): r.status for r in existing},
     )
-    stale = result.scalar_one_or_none()
-    if stale:
-        await db.delete(stale)
-        logger.debug(
-            "Removed stale rotation assignment: chore=%d user=%d day=%s",
-            chore_id, user_id, day,
-        )
+
+
+async def _load_legacy_user_ids(
+    db: AsyncSession, chore_ids: list[int],
+) -> dict[int, list[int]]:
+    """Batched ``_get_legacy_user_ids``: distinct past assignees per chore."""
+    if not chore_ids:
+        return {}
+    rows = (await db.execute(
+        select(ChoreAssignment.chore_id, ChoreAssignment.user_id)
+        .where(ChoreAssignment.chore_id.in_(chore_ids))
+        .distinct()
+    )).all()
+    by_chore: dict[int, list[int]] = defaultdict(list)
+    for chore_id, user_id in rows:
+        by_chore[chore_id].append(user_id)
+    return by_chore
 
 
 async def _create_if_missing(
@@ -294,15 +397,15 @@ async def _create_if_missing(
     return created
 
 
-async def _generate_from_rules(
-    db: AsyncSession,
+def _plan_from_rules(
+    plan: _WeekPlan,
     chore: Chore,
     rules: list[ChoreAssignmentRule],
     rotation: ChoreRotation | None,
     week_dates: list[date],
     exclusion_set: set[tuple[int, int, date]],
 ) -> None:
-    """Generate week assignments using per-kid assignment rules."""
+    """Plan week assignments using per-kid assignment rules (no I/O)."""
     active_weekdays = _collect_active_weekdays(rules, chore) if rotation else None
 
     # Anchor the projection to when current_index was last set, NOT today.
@@ -333,20 +436,17 @@ async def _generate_from_rules(
                 if int(rule.user_id) != expected_kid:
                     # Clean up any stale pending assignment for the wrong kid
                     # on this day (could have been created by a prior buggy run).
-                    await _remove_stale_rotation_assignment(
-                        db, chore.id, rule.user_id, day,
-                    )
+                    plan.remove_stale(chore.id, rule.user_id, day)
                     continue
 
             if (chore.id, rule.user_id, day) in exclusion_set:
                 continue
 
             # Skip if this kid is on a personal vacation for this specific day
-            from backend.routers.vacation import is_vacation_day
-            if await is_vacation_day(db, day, user_id=int(rule.user_id)):
+            if plan.on_vacation(day, int(rule.user_id)):
                 continue
 
-            await _create_if_missing(db, chore.id, rule.user_id, day)
+            plan.create(chore.id, rule.user_id, day)
 
 
 def _collect_active_weekdays(
@@ -369,33 +469,18 @@ def _collect_active_weekdays(
     return sorted(weekdays) if weekdays else None
 
 
-async def _generate_legacy(
-    db: AsyncSession,
+def _plan_legacy(
+    plan: _WeekPlan,
     chore: Chore,
+    user_ids: list[int],
     week_dates: list[date],
     exclusion_set: set[tuple[int, int, date]],
 ) -> None:
-    """Generate week assignments using chore-level recurrence (legacy path)."""
-    if chore.recurrence == Recurrence.once:
-        return
+    """Plan week assignments using chore-level recurrence (legacy path).
 
-    # Determine assigned user IDs
-    rules_result = await db.execute(
-        select(ChoreAssignmentRule.user_id).where(
-            ChoreAssignmentRule.chore_id == chore.id,
-            ChoreAssignmentRule.is_active == True,
-        )
-    )
-    user_ids = list(rules_result.scalars().all())
-
-    if not user_ids:
-        rotation = await _load_rotation(db, chore.id)
-        if rotation and rotation.kid_ids:
-            user_ids = [int(kid_id) for kid_id in rotation.kid_ids]
-        else:
-            user_ids = await _get_legacy_user_ids(db, chore.id)
-
-    if not user_ids:
+    ``user_ids`` are the rotation's kids, or the chore's past assignees.
+    """
+    if chore.recurrence == Recurrence.once or not user_ids:
         return
 
     for day in week_dates:
@@ -408,7 +493,6 @@ async def _generate_legacy(
         for user_id in user_ids:
             if (chore.id, user_id, day) in exclusion_set:
                 continue
-            from backend.routers.vacation import is_vacation_day
-            if await is_vacation_day(db, day, user_id=int(user_id)):
+            if plan.on_vacation(day, int(user_id)):
                 continue
-            await _create_if_missing(db, chore.id, user_id, day)
+            plan.create(chore.id, user_id, day)
