@@ -62,6 +62,9 @@ async def init_db():
             ("users", "adventure_xp",    "INTEGER DEFAULT 0"),
             ("users", "adventure_coins", "INTEGER DEFAULT 0"),
             ("users", "adventure_level", "INTEGER DEFAULT 1"),
+            # Refresh-token rotation grace window
+            ("refresh_tokens", "rotated_at", "DATETIME"),
+            ("refresh_tokens", "replaced_by_id", "INTEGER"),
         ]
         for table, col, typedef in _migrations:
             try:
@@ -74,6 +77,21 @@ async def init_db():
         await conn.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS idx_chore_assignments_user_date "
             "ON chore_assignments(user_id, date)"
+        )
+
+        # Refresh tokens issued in the same second used to be byte-identical,
+        # leaving duplicate token_hash rows. Keep one row per hash (prefer a
+        # live one, then the newest) so the unique index can be created.
+        await conn.exec_driver_sql(
+            "DELETE FROM refresh_tokens WHERE id NOT IN ("
+            " SELECT (SELECT r2.id FROM refresh_tokens r2"
+            "  WHERE r2.token_hash = r1.token_hash"
+            "  ORDER BY r2.is_revoked ASC, r2.id DESC LIMIT 1)"
+            " FROM refresh_tokens r1 GROUP BY r1.token_hash)"
+        )
+        await conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_refresh_tokens_token_hash "
+            "ON refresh_tokens(token_hash)"
         )
 
 
