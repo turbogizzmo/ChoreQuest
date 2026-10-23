@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { clearUpdateCheck } from '../utils/updateCheck';
 
 /**
  * Full-screen Windows-Update-style overlay shown when an in-app update is triggered.
@@ -103,6 +104,9 @@ export default function UpdateOverlay() {
   // Show overlay — shared handler used by both trigger sources below.
   // ------------------------------------------------------------------
   const showOverlay = (currentVersion, { fromLockFile = false, startedAt = null } = {}) => {
+    // An update is being applied: the cached "update available" result is
+    // about to be stale, so drop it (and hide the badge) now.
+    clearUpdateCheck();
     startVersionRef.current        = currentVersion ?? null;
     startStartedAtRef.current      = startedAt ?? null;
     startTimeRef.current           = Date.now();
@@ -247,7 +251,10 @@ export default function UpdateOverlay() {
       clearTimeout(safetyTimerRef.current);
       setPercent(100);
       setDone(true);
-      setTimeout(() => window.location.reload(), 1800);
+      setTimeout(() => {
+        clearUpdateCheck(); // reload must re-check against the new version
+        window.location.reload();
+      }, 1800);
     };
 
     const poll = async () => {

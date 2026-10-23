@@ -23,6 +23,7 @@ import {
   Timer,
 } from 'lucide-react';
 import VacationSettings from '../components/VacationSettings';
+import { hasUpdateCheck, saveUpdateCheck } from '../utils/updateCheck';
 
 const AUTO_APPROVE_PRESETS = [
   { hours: 24, label: '1 day' },
@@ -152,8 +153,7 @@ function UpdatePanel({ isAdmin }) {
 
   // Auto-check for updates on mount, reusing cached result from Layout if available
   useEffect(() => {
-    const cached = sessionStorage.getItem('cq_update_checked');
-    if (cached) {
+    if (hasUpdateCheck()) {
       // Re-use what Layout already fetched — just trigger the visual check silently
       checkForUpdates();
     }
@@ -169,6 +169,7 @@ function UpdatePanel({ isAdmin }) {
       // with the stored token showed "Invalid or expired token" instead.
       const data = await api('/api/admin/update/check');
       setUpdateInfo(data);
+      saveUpdateCheck(data); // keep the header badge in sync with this live result
       if (data.watchdog) setWatchdog(data.watchdog);
     } catch (err) {
       setUpdateInfo({ error: err.message });
