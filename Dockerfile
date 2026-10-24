@@ -1,5 +1,6 @@
-# Stage 1: Build frontend
-FROM node:20-alpine AS frontend-build
+# Stage 1: Build frontend (static output is the same on every CPU, so build it
+# natively instead of under emulation when publishing arm64 images)
+FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install
@@ -28,5 +29,8 @@ RUN printf '#!/bin/bash\nset -e\nDATA_DIR="/app/data"\nmkdir -p "$DATA_DIR/uploa
 RUN mkdir -p /app/data && chown -R appuser:appuser /app
 
 EXPOSE 8122
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8122/api/health')"
 
 ENTRYPOINT ["./entrypoint.sh"]
