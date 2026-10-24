@@ -40,7 +40,6 @@ jobs:
         run: |
           # Create a minimal .env matching .env.example
           cp .env.example .env
-          sed -i 's|SECRET_KEY=change-me-to-a-long-random-string|SECRET_KEY=ci-smoke-test-secret-key-1234|' .env
           # Validate compose file resolves all variables without building
           docker-compose config > /dev/null
           echo "✅ docker-compose config OK — .env resolves correctly"
