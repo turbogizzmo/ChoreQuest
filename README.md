@@ -33,6 +33,7 @@ A gamified family chore management app with full RPG theming. Parents create que
 | 📱 **Installable PWA** | Add to home screen on any device |
 | 🛡️ **Admin Tools** | User management, API keys with scopes, invite codes, and audit log |
 | 📺 **Kiosk / Wall Display** | Full-screen family dashboard for TVs and wall tablets |
+| 🧩 **Plugins** | Optional add-ons, off by default — e.g. pause a kid's internet on pfSense until their quests are done |
 
 ---
 
@@ -244,6 +245,52 @@ For rewards:
 - Make sure at least one provider is configured successfully
 - Check **Settings → AI Quest Generation** for the provider status pills
 - If you are using env vars, restart the app after editing `.env`
+
+---
+
+## 🧩 Plugins
+
+Plugins are optional integrations that live under **Family Settings → Plugins**.
+Every plugin is off until a parent turns it on.
+
+### pfSense Internet Lockout
+
+Blocks each kid's devices at a pfSense firewall until all of today's quests are
+submitted (or, optionally, approved), then unblocks them automatically —
+usually within a few seconds of the last quest being submitted.
+
+How it works: ChoreQuest owns one pfSense **Host alias** (default
+`ChoreQuest_Blocked`) and keeps it filled with the IPs of kids who still have
+quests to do. You add the firewall rules that use the alias once; ChoreQuest
+never edits rules.
+
+Setup:
+
+1. Install the community [pfSense REST API package](https://github.com/jaredhendrickson13/pfsense-api)
+   (v2) and create an API key (**System → REST API → Keys**).
+2. Give each kid device a static DHCP mapping and turn off private/random
+   Wi-Fi MAC addresses on it, so its IP never changes.
+3. In ChoreQuest, open **Plugins → pfSense Internet Lockout**, enter the
+   pfSense URL and API key, each kid's device IPs, and press **Test connection**.
+   Turn it on and save — the alias is created on pfSense.
+4. On pfSense, add two LAN rules **above** the default allow rule:
+   - **Pass** — source `ChoreQuest_Blocked`, destination = the ChoreQuest
+     server's IP (so kids can still open ChoreQuest to submit quests)
+   - **Reject** — source `ChoreQuest_Blocked`, destination any
+
+Options: unlock on *submitted* or *approved*, a daily lockout window (e.g.
+15:00–21:00, local time), and cutting off open connections when a device is
+blocked. Bounty quests never lock anyone out, and vacation days are respected.
+Turning the plugin off empties the alias, unblocking everyone. If ChoreQuest
+is down, the alias keeps its last contents.
+
+### Writing a plugin
+
+Subclass `Plugin` in `backend/plugins/base.py` (or `InternetLockoutPlugin` in
+`backend/plugins/internet_lockout.py` for another router — only
+`apply_blocklist()` is needed) and add it to `PLUGINS` in
+`backend/plugins/__init__.py`. The Plugins page renders its settings from the
+`fields` you declare.
 
 ---
 

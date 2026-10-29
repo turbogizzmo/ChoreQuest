@@ -21,6 +21,7 @@ from backend.services.assignment_generator import generate_daily_assignments, ex
 from backend.routers.bounty import expire_stale_bounty_claims
 from backend.services.push_hook import install_push_hooks
 from backend.services.verification import auto_approve_stale_completions
+from backend.plugins.manager import install_plugin_hooks, plugin_sync_task
 
 logger = logging.getLogger(__name__)
 
@@ -153,13 +154,16 @@ async def auto_approve_task():
 async def lifespan(app: FastAPI):
     await init_db()
     install_push_hooks()
+    install_plugin_hooks()
     async with async_session() as db:
         await seed_database(db)
     task = asyncio.create_task(daily_reset_task())
     approve_task = asyncio.create_task(auto_approve_task())
+    plugins_task = asyncio.create_task(plugin_sync_task())
     yield
     task.cancel()
     approve_task.cancel()
+    plugins_task.cancel()
 
 
 app = FastAPI(title="ChoreQuest", lifespan=lifespan)
@@ -205,6 +209,7 @@ from backend.routers import (  # noqa: E402
     auth, chores, rewards, points, stats, calendar,
     notifications, admin, avatar, wishlist, events, spin, rotations, uploads, push,
     shoutouts, vacation, progress, emotes, announcements, pets, bounty, update, public,
+    plugins,
 )
 
 app.include_router(auth.router)
@@ -231,6 +236,7 @@ app.include_router(pets.router)
 app.include_router(bounty.router)
 app.include_router(update.router)
 app.include_router(public.router)
+app.include_router(plugins.router)
 
 
 @app.get("/api/health")

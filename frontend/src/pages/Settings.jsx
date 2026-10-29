@@ -21,6 +21,8 @@ import {
   LayoutDashboard,
   Sparkles,
   Timer,
+  Puzzle,
+  ChevronRight,
 } from 'lucide-react';
 import VacationSettings from '../components/VacationSettings';
 import { hasUpdateCheck, saveUpdateCheck } from '../utils/updateCheck';
@@ -1175,6 +1177,21 @@ export default function Settings() {
               </button>
             )}
           </div>
+
+          {/* Plugins */}
+          <button
+            onClick={() => navigate('/plugins')}
+            className="game-panel p-4 w-full flex items-center gap-3 text-left hover:border-accent/40 transition-colors"
+          >
+            <Puzzle size={18} className="text-accent flex-shrink-0" />
+            <div className="min-w-0 flex-1">
+              <h2 className="text-cream text-sm font-semibold">Plugins</h2>
+              <p className="text-muted text-xs mt-0.5">
+                Optional add-ons, like pausing a kid&apos;s internet on your router until their quests are done.
+              </p>
+            </div>
+            <ChevronRight size={16} className="text-muted flex-shrink-0" />
+          </button>
 
           {/* Admin link */}
           {user?.role === 'admin' && (

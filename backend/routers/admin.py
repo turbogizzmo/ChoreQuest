@@ -35,6 +35,7 @@ from backend.services.ai_provider import (
     list_models_for_request,
 )
 from backend.services.secure_settings import SENSITIVE_SETTING_KEYS
+from backend.plugins.manager import SETTING_PREFIX as PLUGIN_SETTING_PREFIX
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -302,7 +303,10 @@ async def get_settings(
     """Get all application settings as a key-value dict."""
     result = await db.execute(select(AppSetting))
     settings_list = result.scalars().all()
-    return {s.key: s.value for s in settings_list if s.key not in SENSITIVE_SETTING_KEYS}
+    return {
+        s.key: s.value for s in settings_list
+        if s.key not in SENSITIVE_SETTING_KEYS and not s.key.startswith(PLUGIN_SETTING_PREFIX)
+    }
 
 
 # ---------- GET /settings/features ----------
@@ -390,6 +394,11 @@ async def update_settings(
             raise HTTPException(
                 status_code=400,
                 detail=f"Setting '{key}' is a secret and must be updated via the /settings/ai endpoint.",
+            )
+        if key.startswith(PLUGIN_SETTING_PREFIX):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Setting '{key}' belongs to a plugin and must be updated via /api/plugins.",
             )
         result = await db.execute(
             select(AppSetting).where(AppSetting.key == key)
