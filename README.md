@@ -263,8 +263,10 @@ automatically — usually within a few seconds of the last quest.
 living-room TV, and pick which kids it waits for. A group stays offline until
 *every* kid picked for it has finished. Add devices by picking them from the
 list of devices pfSense can see, or by typing an IP address, MAC address or
-device name. Devices picked from the list are remembered by MAC address, so
-they stay blocked when their IP changes.
+device name. When picking from the list you choose how each device is
+remembered: by **Device ID** (its MAC address — recommended, keeps working
+when the device gets a new IP), by **IP address** (for devices with a fixed IP
+on pfSense) or by **Name** (the name the device gives itself on the network).
 
 Setup:
 

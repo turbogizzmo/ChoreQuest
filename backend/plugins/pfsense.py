@@ -22,7 +22,7 @@ import urllib.request
 
 from backend.plugins.base import ConfigField, PluginError
 from backend.plugins.internet_lockout import (
-    KIND_IP, KIND_MAC, InternetLockoutPlugin, Resolution, normalise_mac,
+    KIND_IP, KIND_MAC, KIND_NAME, InternetLockoutPlugin, Resolution, normalise_mac, parse_address,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,13 @@ RULE_DNS = "ChoreQuest: let blocked devices use DNS"
 RULE_APP = "ChoreQuest: let blocked devices open ChoreQuest"
 RULE_BLOCK = "ChoreQuest: block devices with unfinished quests"
 RULE_PREFIX = "ChoreQuest:"
+
+
+def _is_hostname(value: str) -> bool:
+    try:
+        return parse_address(value)[0] == KIND_NAME
+    except PluginError:
+        return False
 
 
 class PfSenseClient:
@@ -303,6 +310,8 @@ class PfSensePlugin(InternetLockoutPlugin):
                 "name": d["names"][0] if d["names"] else "",
                 "ip": d["ips"][0] if d["ips"] else "",
                 "mac": d["mac"],
+                # A name the parent can block by ("" if the device has none).
+                "hostname": next((n for n in d["names"] if _is_hostname(n)), ""),
                 "online": d["online"],
             }
             for d in devices
