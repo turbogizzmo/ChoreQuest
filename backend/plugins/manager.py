@@ -111,7 +111,8 @@ async def run_plugin(plugin: Plugin, config: dict) -> dict:
         try:
             async with async_session() as db:
                 result = await plugin.sync(db, config)
-            return _record(plugin.key, True, result.get("message", "OK"), result.get("details"))
+            return _record(plugin.key, result.get("ok", True), result.get("message", "OK"),
+                           result.get("details"))
         except PluginError as exc:
             logger.warning("Plugin %s sync failed: %s", plugin.key, exc)
             return _record(plugin.key, False, str(exc))

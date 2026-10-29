@@ -1,12 +1,20 @@
 """Shared "no internet until quests are done" logic for router plugins.
 
-Deciding *who* is locked out lives here; each router plugin (pfSense today,
-others later) only implements :meth:`InternetLockoutPlugin.apply_blocklist`,
-which makes the router block exactly the given device addresses.
+Parents set up **device groups** ("Alice's devices", "Living room TV"). Each
+group lists devices, given as an IP address, a MAC address or a device name,
+and the kids it belongs to. A group is offline while any of its kids still
+has quests to do.
+
+Deciding *who* is locked out lives here. Each router plugin (pfSense today,
+others later) implements :meth:`InternetLockoutPlugin.resolve_addresses`
+(MAC/name → current IPs) and :meth:`InternetLockoutPlugin.apply_blocklist`
+(make the router block exactly these addresses).
 """
 
 import ipaddress
 import logging
+import re
+import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 
@@ -21,16 +29,22 @@ logger = logging.getLogger(__name__)
 UNLOCK_ON_SUBMITTED = "submitted"
 UNLOCK_ON_VERIFIED = "verified"
 
+KIND_IP = "ip"
+KIND_MAC = "mac"
+KIND_NAME = "name"
+
+MAX_GROUPS = 50
+MAX_DEVICES_PER_GROUP = 100
+
 LOCKOUT_FIELDS = [
     ConfigField(
-        key="devices",
-        label="Kid devices",
-        type="kid_devices",
-        default={},
+        key="groups",
+        label="Device groups",
+        type="device_groups",
+        default=[],
         help=(
-            "IP addresses of each kid's devices. Give each device a static DHCP "
-            "mapping on the router (and turn off private/random Wi-Fi MAC "
-            "addresses on it) so the address never changes."
+            "Make a group for each kid (or for shared things like the living-room TV), "
+            "add its devices, and pick whose quests it waits for."
         ),
     ),
     ConfigField(
@@ -48,7 +62,7 @@ LOCKOUT_FIELDS = [
         label="Lockout window starts",
         type="time",
         default="00:00",
-        help="Local time. Set start and end to the same time to enforce all day.",
+        help="Set start and end to the same time to enforce all day.",
     ),
     ConfigField(
         key="block_end",
@@ -59,41 +73,88 @@ LOCKOUT_FIELDS = [
     ),
 ]
 
-
-@dataclass
-class KidLockout:
-    user_id: int
-    display_name: str
-    ips: list[str]
-    blocked: bool
-    reason: str
-    outstanding: int = 0
-
-    def to_dict(self) -> dict:
-        return {
-            "user_id": self.user_id,
-            "display_name": self.display_name,
-            "ips": self.ips,
-            "blocked": self.blocked,
-            "reason": self.reason,
-            "outstanding": self.outstanding,
-        }
+_MAC_RE = re.compile(r"^[0-9a-f]{2}([:-]?)[0-9a-f]{2}(\1[0-9a-f]{2}){4}$", re.I)
+_CISCO_MAC_RE = re.compile(r"^[0-9a-f]{4}\.[0-9a-f]{4}\.[0-9a-f]{4}$", re.I)
+_NAME_RE = re.compile(
+    r"^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,62})(?:\.[a-z0-9](?:[a-z0-9-]{0,62}))*$"
+)
 
 
-@dataclass
-class LockoutPlan:
-    kids: list[KidLockout] = field(default_factory=list)
+def parse_address(raw) -> tuple[str, str]:
+    """Work out what a parent typed: returns (kind, normalised value)."""
+    value = str(raw or "").strip()
+    if not value:
+        raise PluginError("Device address is empty")
+    try:
+        return KIND_IP, str(ipaddress.ip_address(value))
+    except ValueError:
+        pass
+    if _MAC_RE.match(value) or _CISCO_MAC_RE.match(value):
+        digits = re.sub(r"[^0-9a-f]", "", value.lower())
+        return KIND_MAC, ":".join(digits[i:i + 2] for i in range(0, 12, 2))
+    name = value.lower().rstrip(".")
+    if _NAME_RE.match(name):
+        return KIND_NAME, name
+    raise PluginError(f"'{value}' doesn't look like an IP address, MAC address or device name")
 
-    @property
-    def blocked_entries(self) -> list[tuple[str, str]]:
-        """(ip, description) pairs to block, de-duplicated, stable order."""
-        seen: dict[str, str] = {}
-        for kid in self.kids:
-            if not kid.blocked:
+
+def normalise_mac(value) -> str | None:
+    try:
+        kind, mac = parse_address(value)
+    except PluginError:
+        return None
+    return mac if kind == KIND_MAC else None
+
+
+def clean_groups(raw) -> list[dict]:
+    """Validate and normalise the device-group list from the settings form."""
+    if not raw:
+        return []
+    if not isinstance(raw, list):
+        raise PluginError("Device groups must be a list")
+    if len(raw) > MAX_GROUPS:
+        raise PluginError(f"At most {MAX_GROUPS} device groups")
+    groups = []
+    for i, group in enumerate(raw, start=1):
+        if not isinstance(group, dict):
+            raise PluginError("Invalid device group")
+        name = str(group.get("name") or "").strip()[:50] or f"Group {i}"
+        kid_ids = []
+        for kid_id in group.get("kid_ids") or []:
+            try:
+                kid_id = int(kid_id)
+            except (TypeError, ValueError):
+                raise PluginError(f"{name}: invalid kid")
+            if kid_id not in kid_ids:
+                kid_ids.append(kid_id)
+        devices, seen = [], set()
+        raw_devices = group.get("devices") or []
+        if len(raw_devices) > MAX_DEVICES_PER_GROUP:
+            raise PluginError(f"{name}: at most {MAX_DEVICES_PER_GROUP} devices")
+        for device in raw_devices:
+            if not isinstance(device, dict):
+                raise PluginError(f"{name}: invalid device")
+            if not str(device.get("address") or "").strip():
+                continue  # blank row left in the form
+            try:
+                kind, address = parse_address(device.get("address"))
+            except PluginError as exc:
+                raise PluginError(f"{name}: {exc}")
+            if address in seen:
                 continue
-            for ip in kid.ips:
-                seen.setdefault(ip, f"ChoreQuest: {kid.display_name}")
-        return sorted(seen.items())
+            seen.add(address)
+            devices.append({
+                "name": str(device.get("name") or "").strip()[:50],
+                "address": address,
+                "kind": kind,
+            })
+        groups.append({
+            "id": str(group.get("id") or uuid.uuid4().hex[:8])[:20],
+            "name": name,
+            "kid_ids": kid_ids,
+            "devices": devices,
+        })
+    return groups
 
 
 def parse_hhmm(value: str, label: str) -> time:
@@ -112,39 +173,9 @@ def in_window(now: time, start: time, end: time) -> bool:
     return now >= start or now < end  # crosses midnight
 
 
-def clean_devices(raw) -> dict[str, list[str]]:
-    """Normalise {"<kid id>": ["ip", ...]}; raise PluginError on a bad address."""
-    if not raw:
-        return {}
-    if not isinstance(raw, dict):
-        raise PluginError("Kid devices must map kids to address lists")
-    cleaned: dict[str, list[str]] = {}
-    for kid_id, ips in raw.items():
-        try:
-            kid_key = str(int(kid_id))
-        except (TypeError, ValueError):
-            raise PluginError(f"Invalid kid id: {kid_id}")
-        if isinstance(ips, str):
-            ips = [p for p in ips.replace(",", " ").split()]
-        out: list[str] = []
-        for ip in ips or []:
-            ip = str(ip).strip()
-            if not ip:
-                continue
-            try:
-                ip = str(ipaddress.ip_address(ip))
-            except ValueError:
-                raise PluginError(f"'{ip}' is not a valid IP address")
-            if ip not in out:
-                out.append(ip)
-        if out:
-            cleaned[kid_key] = out
-    return cleaned
-
-
 def validate_lockout_config(config: dict) -> dict:
     config = dict(config)
-    config["devices"] = clean_devices(config.get("devices"))
+    config["groups"] = clean_groups(config.get("groups"))
     if config.get("unlock_on") not in (UNLOCK_ON_SUBMITTED, UNLOCK_ON_VERIFIED):
         config["unlock_on"] = UNLOCK_ON_SUBMITTED
     parse_hhmm(config.get("block_start") or "00:00", "Lockout window start")
@@ -152,10 +183,55 @@ def validate_lockout_config(config: dict) -> dict:
     return config
 
 
+@dataclass
+class KidState:
+    user_id: int
+    display_name: str
+    blocked: bool
+    reason: str
+
+    def to_dict(self) -> dict:
+        return {"user_id": self.user_id, "display_name": self.display_name,
+                "blocked": self.blocked, "reason": self.reason}
+
+
+@dataclass
+class GroupLockout:
+    id: str
+    name: str
+    devices: list[dict]
+    blocked: bool
+    reason: str
+    kids: list[KidState] = field(default_factory=list)
+
+
+@dataclass
+class LockoutPlan:
+    groups: list[GroupLockout] = field(default_factory=list)
+
+    @property
+    def blocked_devices(self) -> list[tuple[str, str]]:
+        """(address, description) of every device in a blocked group."""
+        out = []
+        for group in self.groups:
+            if group.blocked:
+                for device in group.devices:
+                    label = f"{group.name} - {device['name']}" if device["name"] else group.name
+                    out.append((device["address"], f"ChoreQuest: {label}"))
+        return out
+
+
+@dataclass
+class Resolution:
+    """Where a device is right now: its IPs (or FQDN), or why it can't be found."""
+    targets: list[str] = field(default_factory=list)
+    note: str = ""
+
+
 async def compute_lockout(
     db: AsyncSession, config: dict, now: datetime | None = None
 ) -> LockoutPlan:
-    """Work out which kids' devices should be offline right now.
+    """Work out which device groups should be offline right now.
 
     ``now`` is *local* time (``datetime.now()``) — the window and "today"
     are family calendar concepts, never UTC.
@@ -164,20 +240,18 @@ async def compute_lockout(
 
     now = now or datetime.now()
     today: date = now.date()
-    devices = clean_devices(config.get("devices"))
+    groups = clean_groups(config.get("groups"))
     start = parse_hhmm(config.get("block_start") or "00:00", "Lockout window start")
     end = parse_hhmm(config.get("block_end") or "00:00", "Lockout window end")
     window_open = in_window(now.time(), start, end)
+    verified_mode = config.get("unlock_on") == UNLOCK_ON_VERIFIED
 
     blocking = [AssignmentStatus.pending]
-    if config.get("unlock_on") == UNLOCK_ON_VERIFIED:
+    if verified_mode:
         blocking.append(AssignmentStatus.completed)
 
     kids = (
-        await db.execute(
-            select(User).where(User.role == UserRole.kid, User.is_active == True)
-            .order_by(User.display_name)
-        )
+        await db.execute(select(User).where(User.role == UserRole.kid, User.is_active == True))
     ).scalars().all()
 
     # Optional bounty quests never lock anyone out.
@@ -197,28 +271,45 @@ async def compute_lockout(
         ).all()
     )
 
-    plan = LockoutPlan()
+    kid_states: dict[int, KidState] = {}
     for kid in kids:
-        ips = devices.get(str(kid.id), [])
         outstanding = counts.get(kid.id, 0)
-        if not ips:
-            blocked, reason = False, "No devices configured"
-        elif not window_open:
-            blocked, reason = False, "Outside lockout window"
-        elif await is_vacation_day(db, today, user_id=kid.id):
-            blocked, reason = False, "On vacation"
+        if await is_vacation_day(db, today, user_id=kid.id):
+            state = KidState(kid.id, kid.display_name, False, "on vacation")
         elif outstanding:
-            blocked = True
-            waiting = "approval" if config.get("unlock_on") == UNLOCK_ON_VERIFIED else "submission"
-            reason = f"{outstanding} quest{'s' if outstanding != 1 else ''} awaiting {waiting}"
+            quests = f"{outstanding} quest{'s' if outstanding != 1 else ''}"
+            reason = f"{quests} not approved yet" if verified_mode else f"{quests} left to do"
+            state = KidState(kid.id, kid.display_name, True, reason)
         else:
-            blocked, reason = False, "All quests done"
-        plan.kids.append(KidLockout(kid.id, kid.display_name, ips, blocked, reason, outstanding))
+            state = KidState(kid.id, kid.display_name, False, "all quests done")
+        kid_states[kid.id] = state
+
+    plan = LockoutPlan()
+    for group in groups:
+        members = [kid_states[k] for k in group["kid_ids"] if k in kid_states]
+        if not members:
+            blocked, reason = False, "No kids picked for this group"
+        elif not group["devices"]:
+            blocked, reason = False, "No devices in this group"
+        elif not window_open:
+            blocked, reason = False, "Outside the lockout window"
+        else:
+            waiting_on = [k for k in members if k.blocked]
+            blocked = bool(waiting_on)
+            if blocked:
+                reason = "; ".join(f"{k.display_name}: {k.reason}" for k in waiting_on)
+            elif len(members) == 1:
+                reason = f"{members[0].display_name}: {members[0].reason}"
+            else:
+                reason = "Everyone is done"
+        plan.groups.append(GroupLockout(
+            group["id"], group["name"], group["devices"], blocked, reason, members,
+        ))
     return plan
 
 
 class InternetLockoutPlugin(Plugin):
-    """Base for router plugins: block kids' devices until quests are done."""
+    """Base for router plugins: block device groups until quests are done."""
 
     category = "Internet control"
     router_fields: list[ConfigField] = []
@@ -230,18 +321,66 @@ class InternetLockoutPlugin(Plugin):
     def validate(self, config: dict) -> dict:
         return validate_lockout_config(super().validate(config))
 
+    async def resolve_addresses(self, config: dict, devices: list[dict]) -> dict[str, Resolution]:
+        """Map each device address to what the router should block.
+
+        The default handles IP addresses only; routers that can see their
+        DHCP leases override this to find MAC addresses and device names.
+        """
+        out = {}
+        for device in devices:
+            if device["kind"] == KIND_IP:
+                out[device["address"]] = Resolution([device["address"]])
+            else:
+                out[device["address"]] = Resolution(note="This router only supports IP addresses")
+        return out
+
     async def apply_blocklist(self, config: dict, entries: list[tuple[str, str]]) -> str:
-        """Make the router block exactly ``entries`` (ip, description).
+        """Make the router block exactly ``entries`` (address, description).
 
         Return a short summary of what changed. Must be idempotent.
         """
         raise NotImplementedError
 
+    async def health_warnings(self, config: dict) -> list[str]:
+        """Problems that stop blocking from working (e.g. missing rules)."""
+        return []
+
     async def sync(self, db: AsyncSession, config: dict) -> dict:
         plan = await compute_lockout(db, config)
-        entries = plan.blocked_entries
-        message = await self.apply_blocklist(config, entries)
-        return {"message": message, "details": {"kids": [k.to_dict() for k in plan.kids]}}
+        all_devices = [d for g in plan.groups for d in g.devices]
+        resolved = await self.resolve_addresses(config, all_devices) if all_devices else {}
+
+        entries: dict[str, str] = {}
+        for address, descr in plan.blocked_devices:
+            for target in resolved.get(address, Resolution()).targets:
+                entries.setdefault(target, descr)
+        message = await self.apply_blocklist(config, sorted(entries.items()))
+
+        warnings = await self.health_warnings(config)
+        details = {
+            "warnings": warnings,
+            "groups": [
+                {
+                    "id": g.id,
+                    "name": g.name,
+                    "blocked": g.blocked,
+                    "reason": g.reason,
+                    "devices": [
+                        {
+                            "name": d["name"],
+                            "address": d["address"],
+                            "kind": d["kind"],
+                            "targets": resolved.get(d["address"], Resolution()).targets,
+                            "note": resolved.get(d["address"], Resolution()).note,
+                        }
+                        for d in g.devices
+                    ],
+                }
+                for g in plan.groups
+            ],
+        }
+        return {"message": message, "details": details, "ok": not warnings}
 
     async def disable(self, config: dict) -> None:
         await self.apply_blocklist(config, [])

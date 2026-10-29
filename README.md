@@ -255,40 +255,49 @@ Every plugin is off until a parent turns it on.
 
 ### pfSense Internet Lockout
 
-Blocks each kid's devices at a pfSense firewall until all of today's quests are
-submitted (or, optionally, approved), then unblocks them automatically —
-usually within a few seconds of the last quest being submitted.
+Turns off the internet on kids' devices at a pfSense firewall until all of
+today's quests are submitted (or, optionally, approved), then turns it back on
+automatically — usually within a few seconds of the last quest.
 
-How it works: ChoreQuest owns one pfSense **Host alias** (default
-`ChoreQuest_Blocked`) and keeps it filled with the IPs of kids who still have
-quests to do. You add the firewall rules that use the alias once; ChoreQuest
-never edits rules.
+**Device groups.** Make a group for each kid, or for shared things like the
+living-room TV, and pick which kids it waits for. A group stays offline until
+*every* kid picked for it has finished. Add devices by picking them from the
+list of devices pfSense can see, or by typing an IP address, MAC address or
+device name. Devices picked from the list are remembered by MAC address, so
+they stay blocked when their IP changes.
 
 Setup:
 
 1. Install the community [pfSense REST API package](https://github.com/jaredhendrickson13/pfsense-api)
    (v2) and create an API key (**System → REST API → Keys**).
-2. Give each kid device a static DHCP mapping and turn off private/random
-   Wi-Fi MAC addresses on it, so its IP never changes.
-3. In ChoreQuest, open **Plugins → pfSense Internet Lockout**, enter the
-   pfSense URL and API key, each kid's device IPs, and press **Test connection**.
-   Turn it on and save — the alias is created on pfSense.
-4. On pfSense, add two LAN rules **above** the default allow rule:
-   - **Pass** — source `ChoreQuest_Blocked`, destination = the ChoreQuest
-     server's IP (so kids can still open ChoreQuest to submit quests)
-   - **Reject** — source `ChoreQuest_Blocked`, destination any
+2. In ChoreQuest, open **Family Settings → Plugins → pfSense Internet Lockout**,
+   enter the pfSense address and API key, and press **Test connection**.
+3. Press **One group per kid** and **Pick from network** to add each kid's devices.
+4. Turn the plugin on, **Save**, then press **Set up firewall rules** (once).
 
-Options: unlock on *submitted* or *approved*, a daily lockout window (e.g.
-15:00–21:00, local time), and cutting off open connections when a device is
-blocked. Bounty quests never lock anyone out, and vacation days are respected.
-Turning the plugin off empties the alias, unblocking everyone. If ChoreQuest
-is down, the alias keeps its last contents.
+**Set up firewall rules** adds three rules at the top of the pfSense rule list
+for the alias `ChoreQuest_Blocked`: blocked devices may still use DNS and open
+ChoreQuest (so kids can submit quests), and everything else is rejected.
+Pressing it again repairs the rules instead of duplicating them. Apart from
+this button, ChoreQuest only ever changes the alias's contents.
+
+Options: unlock on *submitted* or *approved*, and a daily lockout window
+(e.g. 15:00–21:00, local time). Advanced settings cover certificate checking,
+cutting off open connections when a device is blocked, the alias name and the
+network interface. Bounty quests never lock anyone out, and vacation days are
+respected. Turning the plugin off empties the alias, unblocking everyone. If
+ChoreQuest is down, the alias keeps its last contents.
+
+Phones and tablets use a "private Wi-Fi address" by default. That's fine as
+long as it stays the same on your network; if a device keeps showing up as
+new, turn the setting off for your home Wi-Fi.
 
 ### Writing a plugin
 
 Subclass `Plugin` in `backend/plugins/base.py` (or `InternetLockoutPlugin` in
-`backend/plugins/internet_lockout.py` for another router — only
-`apply_blocklist()` is needed) and add it to `PLUGINS` in
+`backend/plugins/internet_lockout.py` for another router — implement
+`apply_blocklist()`, and `resolve_addresses()` / `list_network_devices()` if
+the router can look up MAC addresses and names) and add it to `PLUGINS` in
 `backend/plugins/__init__.py`. The Plugins page renders its settings from the
 `fields` you declare.
 
