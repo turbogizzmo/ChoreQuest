@@ -138,3 +138,51 @@ async def sync_plugin(
     if not enabled:
         raise HTTPException(status_code=400, detail="Enable the plugin first")
     return await manager.run_plugin(plugin, config)
+
+
+@router.post("/{key}/network-devices")
+async def list_network_devices(
+    key: str,
+    body: PluginTestRequest,
+    db: AsyncSession = Depends(get_db),
+    _parent: User = Depends(require_parent),
+):
+    """Devices the router can see, for the "pick from network" list.
+
+    Accepts unsaved settings so the picker works before the first save.
+    """
+    plugin = _plugin_or_404(key)
+    _enabled, saved = await manager.load_plugin(db, plugin)
+    config = _merge(plugin, saved, body.config)
+    try:
+        return {"devices": await plugin.list_network_devices(config)}
+    except PluginError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/{key}/actions/{action}")
+async def run_plugin_action(
+    key: str,
+    action: str,
+    body: PluginTestRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    parent: User = Depends(require_parent),
+):
+    plugin = _plugin_or_404(key)
+    if action not in {a["key"] for a in plugin.actions}:
+        raise HTTPException(status_code=404, detail="Unknown action")
+    _enabled, saved = await manager.load_plugin(db, plugin)
+    config = _merge(plugin, saved, body.config)
+    try:
+        message = await plugin.run_action(action, plugin.validate(config))
+    except PluginError as exc:
+        return {"ok": False, "message": str(exc)}
+    db.add(AuditLog(
+        user_id=parent.id,
+        action=f"plugin_action:{key}:{action}"[:100],
+        details={"plugin": key, "action": action},
+        ip_address=request.client.host if request.client else None,
+    ))
+    await db.commit()
+    return {"ok": True, "message": message}
