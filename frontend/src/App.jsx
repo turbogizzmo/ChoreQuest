@@ -19,6 +19,7 @@ const Profile = lazy(() => import('./pages/Profile'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Leaderboard = lazy(() => import('./pages/Leaderboard'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Plugins = lazy(() => import('./pages/Plugins'));
 const Events = lazy(() => import('./pages/Events'));
 const KidQuests = lazy(() => import('./pages/KidQuests'));
 const Party = lazy(() => import('./pages/Party'));
@@ -204,6 +205,7 @@ export default function App() {
             <Route path="/kids/:kidId" element={<Page pageKey="kid-quests"><KidQuests /></Page>} />
             <Route path="/bounty" element={<Page pageKey="bounty"><BountyBoard /></Page>} />
             <Route path="/settings" element={<Page pageKey="settings"><Settings /></Page>} />
+            <Route path="/plugins" element={<Page pageKey="plugins"><Plugins /></Page>} />
             <Route path="/adventure" element={<Page pageKey="adventure"><AdventureMode /></Page>} />
             {user.role === 'admin' && <Route path="/admin" element={<Page pageKey="admin"><AdminDashboard /></Page>} />}
             <Route path="*" element={<Navigate to="/" replace />} />
