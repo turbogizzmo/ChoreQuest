@@ -71,10 +71,17 @@ function Toggle({ enabled, onChange, label }) {
   );
 }
 
+const REMEMBER_BY = [
+  { key: 'mac', label: 'Device ID', help: 'Recommended. Keeps working when the device gets a new IP. (Uses its MAC address.)' },
+  { key: 'ip', label: 'IP address', help: 'Best for devices with a fixed IP set up on pfSense.' },
+  { key: 'hostname', label: 'Name', help: "Uses the name the device gives itself on your network. Devices without one use their Device ID." },
+];
+
 function NetworkPicker({ pluginKey, draft, existing, onPick, onClose }) {
   const [devices, setDevices] = useState(null);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
+  const [rememberBy, setRememberBy] = useState('mac');
 
   useEffect(() => {
     api(`/api/plugins/${pluginKey}/network-devices`, { method: 'POST', body: { config: draft } })
@@ -89,6 +96,8 @@ function NetworkPicker({ pluginKey, draft, existing, onPick, onClose }) {
     return (devices || []).filter((d) =>
       !q || `${d.name} ${d.ip} ${d.mac}`.toLowerCase().includes(q));
   }, [devices, query]);
+
+  const addressFor = (d) => d[rememberBy] || d.mac;
 
   return (
     <div className="rounded-md border border-accent/30 bg-surface-raised/40 p-3 space-y-2">
@@ -106,6 +115,26 @@ function NetworkPicker({ pluginKey, draft, existing, onPick, onClose }) {
           <X size={16} />
         </button>
       </div>
+      <div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] text-muted">Remember by</span>
+          {REMEMBER_BY.map((opt) => (
+            <button
+              type="button"
+              key={opt.key}
+              onClick={() => setRememberBy(opt.key)}
+              className={`text-[11px] px-2 py-0.5 rounded-full border transition-colors ${
+                rememberBy === opt.key ? 'bg-accent/20 border-accent/50 text-cream' : 'border-border text-muted hover:text-cream'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted/80 mt-1 leading-relaxed">
+          {REMEMBER_BY.find((o) => o.key === rememberBy).help}
+        </p>
+      </div>
       {error && <p className="text-crimson text-xs">{error}</p>}
       {!devices && !error && (
         <div className="flex justify-center py-3"><Loader2 size={16} className="text-accent animate-spin" /></div>
@@ -113,19 +142,29 @@ function NetworkPicker({ pluginKey, draft, existing, onPick, onClose }) {
       {devices && shown.length === 0 && <p className="text-muted text-xs py-2">No devices found.</p>}
       <div className="max-h-64 overflow-y-auto divide-y divide-border/50">
         {shown.map((d) => {
-          const added = existing.has(d.mac);
+          const added = [d.mac, d.ip, d.hostname].some((a) => a && existing.has(a.toLowerCase()));
+          const address = addressFor(d);
           return (
             <button
               type="button"
               key={d.mac}
               disabled={added}
-              onClick={() => onPick({ id: newId(), name: d.name || d.ip, address: d.mac })}
+              onClick={() => onPick({ id: newId(), name: d.name || d.ip, address })}
               className="w-full flex items-center gap-2 py-2 text-left disabled:opacity-40 hover:bg-accent/5"
             >
               <span className={`h-2 w-2 rounded-full flex-shrink-0 ${d.online ? 'bg-emerald' : 'bg-muted/40'}`} />
               <span className="min-w-0 flex-1">
                 <span className="block text-xs text-cream truncate">{d.name || 'Unnamed device'}</span>
-                <span className="block text-[10px] text-muted font-mono truncate">{d.ip} · {d.mac}</span>
+                <span className="block text-[10px] text-muted font-mono truncate">
+                  {/* What will be saved comes first, highlighted */}
+                  {[address, ...[d.ip, d.mac].filter((part) => part && part !== address)]
+                    .map((part, i) => (
+                      <span key={part}>
+                        {i > 0 && ' · '}
+                        <span className={part === address ? 'text-accent' : ''}>{part}</span>
+                      </span>
+                    ))}
+                </span>
               </span>
               {added ? <CheckCircle2 size={14} className="text-emerald" /> : <Plus size={14} className="text-accent" />}
             </button>

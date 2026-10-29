@@ -331,8 +331,10 @@ async def test_network_device_list_merges_sources(fake_pfsense):
     devices = await PfSensePlugin().list_network_devices(PF_CONFIG)
     by_mac = {d["mac"]: d for d in devices}
     assert by_mac["aa:bb:cc:00:00:01"] == {"name": "Alices-iPad", "ip": "192.168.1.23",
-                                         "mac": "aa:bb:cc:00:00:01", "online": True}
+                                         "mac": "aa:bb:cc:00:00:01", "hostname": "Alices-iPad",
+                                         "online": True}
     assert by_mac["aa:bb:cc:00:00:02"]["name"] == "Living room TV"
+    assert by_mac["aa:bb:cc:00:00:02"]["hostname"] == ""  # a description, not a network name
     assert by_mac["aa:bb:cc:00:00:03"]["online"] is True
     assert devices[-1]["mac"] == "aa:bb:cc:00:00:02"  # offline devices last
 
