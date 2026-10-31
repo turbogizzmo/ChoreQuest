@@ -53,36 +53,50 @@ For setup and day-to-day usage, see [AI-Assisted Quest & Reward Drafting](#-ai-a
 
 ## 🚀 Quick Start
 
-### Requirements
+> **Not technical, or setting up on a Windows PC or Synology NAS?** Follow the step-by-step guide at **[turbogizzmo.github.io/ChoreQuest](https://turbogizzmo.github.io/ChoreQuest/)**.
 
-- Docker + Docker Compose
+### Run the prebuilt image (recommended)
 
-### Run
+Images are published to `ghcr.io/turbogizzmo/chorequest` for `amd64` and `arm64` after every green build on `main`. Create a `docker-compose.yml`:
 
-```bash
-git clone https://github.com/turbogizzmo/ChoreQuest.git
-cd ChoreQuest
+```yaml
+services:
+  chorequest:
+    image: ghcr.io/turbogizzmo/chorequest:latest
+    ports:
+      - "8122:8122"
+    environment:
+      - TZ=America/Chicago
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
 ```
 
-Create a `.env` file:
-
-```env
-SECRET_KEY=your-secret-key-min-16-chars
-TZ=America/Chicago
-```
-
-Start the app:
-
 ```bash
-docker-compose up -d --build
+docker compose up -d
 ```
 
 App runs on port **8122**. The first user to register becomes admin. After that, new accounts require an invite code (generate from the Admin dashboard).
 
-### Updating
+No `SECRET_KEY` is needed: if it isn't set, ChoreQuest generates one on first start and saves it to `data/.secret_key`. Keep that file with your backups, because it signs logins and encrypts saved AI provider keys. Setting `SECRET_KEY` yourself still works and takes precedence.
+
+To update: `docker compose pull && docker compose up -d`.
+
+### Build from source
+
+Requires Docker + Docker Compose.
 
 ```bash
-git pull && docker-compose up -d --build
+git clone https://github.com/turbogizzmo/ChoreQuest.git
+cd ChoreQuest
+cp .env.example .env   # set TZ; SECRET_KEY is optional
+docker compose up -d --build
+```
+
+### Updating a source build
+
+```bash
+git pull && docker compose up -d --build
 ```
 
 Your data (`./data`) is preserved across rebuilds. The Admin Dashboard shows a banner when a newer version is available on GitHub.
@@ -121,7 +135,7 @@ When triggered, `watchdog.sh` runs `deploy.sh` which does `git pull` + `docker c
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SECRET_KEY` | *required* | JWT signing key, min 16 characters |
+| `SECRET_KEY` | *auto-generated* | JWT signing key, min 16 characters. Generated and saved to `data/.secret_key` when unset |
 | `TZ` | `Europe/London` | Container timezone |
 | `REGISTRATION_ENABLED` | `false` | Allow public self-registration |
 | `DATABASE_URL` | `sqlite+aiosqlite:////app/data/chores_os.db` | Database path |
@@ -145,6 +159,7 @@ When triggered, `watchdog.sh` runs `deploy.sh` which does `git pull` + `docker c
 All data lives in `./data`:
 - `chores_os.db` — SQLite database
 - `uploads/` — photo proof files
+- `.secret_key` — generated signing key (only when `SECRET_KEY` isn't set)
 
 Back up this directory to preserve everything.
 
