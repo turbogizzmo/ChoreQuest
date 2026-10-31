@@ -58,6 +58,12 @@ export async function ensureToken() {
 
 let refreshPromise = null;
 
+const NO_REFRESH_PATHS = new Set([
+  '/api/auth/login',
+  '/api/auth/pin-login',
+  '/api/auth/register',
+]);
+
 export async function api(path, options = {}) {
   const { body, method = 'GET', headers = {}, raw = false } = options;
 
@@ -80,8 +86,10 @@ export async function api(path, options = {}) {
 
   let res = await fetch(path, config);
 
-  // If 401, try refreshing token and retry once
-  if (res.status === 401 && !options._retried) {
+  // If 401, try refreshing token and retry once. A 401 from a credential
+  // endpoint means wrong username/password/PIN, not an expired session, so
+  // let its own error message through.
+  if (res.status === 401 && !options._retried && !NO_REFRESH_PATHS.has(path)) {
     try {
       await ensureToken();
       config.headers['Authorization'] = `Bearer ${accessToken}`;
