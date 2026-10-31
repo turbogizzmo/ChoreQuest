@@ -93,6 +93,19 @@ async def _issue_tokens(
     )
 
 
+async def find_user_by_username(db: AsyncSession, username: str) -> User | None:
+    """Match usernames ignoring case, since phones often capitalise the first
+    letter. An exact match wins if older accounts differ only by case."""
+    result = await db.execute(
+        select(User).where(func.lower(User.username) == username.lower())
+    )
+    matches = result.scalars().all()
+    for user in matches:
+        if user.username == username:
+            return user
+    return matches[0] if len(matches) == 1 else None
+
+
 # ---------- POST /register ----------
 @router.post("/register", response_model=AuthResponse)
 async def register(
@@ -135,8 +148,10 @@ async def register(
         role = invite.role
         invite.times_used += 1
 
-    # Check duplicate username
-    result = await db.execute(select(User).where(User.username == body.username))
+    # Check duplicate username (case-insensitive, so "dad" can't sit beside "Dad")
+    result = await db.execute(
+        select(User.id).where(func.lower(User.username) == body.username.lower()).limit(1)
+    )
     if result.scalar_one_or_none() is not None:
         raise HTTPException(status_code=409, detail="Username already taken")
 
@@ -178,8 +193,7 @@ async def login(
 ):
     rate_limiter.check(f"login:{request.client.host}", 10, 300)
 
-    result = await db.execute(select(User).where(User.username == body.username))
-    user = result.scalar_one_or_none()
+    user = await find_user_by_username(db, body.username)
 
     if user is None or not await asyncio.to_thread(verify_password, body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid username or password")
@@ -210,8 +224,7 @@ async def pin_login(
 ):
     rate_limiter.check(f"pin:{request.client.host}", 5, 900)
 
-    result = await db.execute(select(User).where(User.username == body.username))
-    user = result.scalar_one_or_none()
+    user = await find_user_by_username(db, body.username)
 
     if user is None or user.pin_hash is None or not await asyncio.to_thread(verify_pin, body.pin, user.pin_hash):
         raise HTTPException(status_code=401, detail="Invalid username or PIN")
