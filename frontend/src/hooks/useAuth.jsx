@@ -75,8 +75,8 @@ export function AuthProvider({ children }) {
     return data.user;
   }, []);
 
-  const register = useCallback(async (username, password, display_name, role, invite_code) => {
-    const body = { username, password, display_name, role };
+  const register = useCallback(async (username, password, display_name, invite_code) => {
+    const body = { username, password, display_name };
     if (invite_code) body.invite_code = invite_code;
     const data = await api('/api/auth/register', { method: 'POST', body });
     setAccessToken(data.access_token);

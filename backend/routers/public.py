@@ -4,16 +4,18 @@ The share token is stored in AppSetting with key ``dashboard_share_token``.
 A parent generates it via POST /api/admin/settings/dashboard-token.
 """
 
+import hmac
 from datetime import date, timedelta
 
 from backend.utils import utc_iso
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from backend.database import get_db
+from backend.rate_limit import rate_limiter
 from backend.models import (
     AppSetting,
     AssignmentStatus,
@@ -30,23 +32,29 @@ router = APIRouter(prefix="/api/public", tags=["public"])
 _TOKEN_KEY = "dashboard_share_token"
 
 
-async def _resolve_token(token: str, db: AsyncSession) -> None:
-    """Raise 403 if the provided token does not match the stored one."""
+async def _resolve_token(token: str, db: AsyncSession, request: Request) -> None:
+    """Raise 403 if the provided token does not match the stored one.
+    Wrong guesses are rate limited per client so the token can't be brute-forced."""
     result = await db.execute(
         select(AppSetting).where(AppSetting.key == _TOKEN_KEY)
     )
     setting = result.scalar_one_or_none()
-    if not setting or not setting.value or setting.value != token:
+    if not setting or not setting.value or not hmac.compare_digest(
+        setting.value.encode(), token.encode()
+    ):
+        host = request.client.host if request.client else "unknown"
+        rate_limiter.check(f"public-token:{host}", 20, 300)
         raise HTTPException(status_code=403, detail="Invalid or missing dashboard token")
 
 
 @router.get("/dashboard")
 async def public_dashboard(
+    request: Request,
     token: str = Query(..., description="Dashboard share token"),
     db: AsyncSession = Depends(get_db),
 ):
     """Read-only family overview. No authentication — gated by share token only."""
-    await _resolve_token(token, db)
+    await _resolve_token(token, db, request)
 
     today = date.today()
     monday = today - timedelta(days=today.weekday())

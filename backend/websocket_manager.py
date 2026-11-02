@@ -24,6 +24,14 @@ class WebSocketManager:
         if not conns:
             self.active_connections.pop(user_id, None)
 
+    async def close_user(self, user_id: int, code: int = 4001):
+        """Close every open socket for a user, e.g. after their sessions are revoked."""
+        for ws in list(self.active_connections.pop(user_id, ())):
+            try:
+                await asyncio.wait_for(ws.close(code=code), SEND_TIMEOUT_SECONDS)
+            except Exception:
+                pass
+
     async def _send(self, websocket: WebSocket, user_id: int, data: str):
         try:
             await asyncio.wait_for(websocket.send_text(data), SEND_TIMEOUT_SECONDS)

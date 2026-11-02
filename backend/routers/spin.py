@@ -17,7 +17,7 @@ from backend.models import (
     PointType,
 )
 from backend.schemas import SpinResultResponse, SpinAvailabilityResponse
-from backend.dependencies import get_current_user
+from backend.dependencies import get_current_user, require_feature
 from backend.achievements import check_achievements
 from backend.websocket_manager import ws_manager
 from backend.services.balance import credit_points
@@ -194,7 +194,11 @@ async def check_availability(
 
 
 # ---------- POST /spin ----------
-@router.post("/spin", response_model=SpinResultResponse)
+@router.post(
+    "/spin",
+    response_model=SpinResultResponse,
+    dependencies=[Depends(require_feature("spin_wheel_enabled"))],
+)
 async def execute_spin(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),

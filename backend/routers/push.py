@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_db
 from backend.dependencies import get_current_user, require_parent
 from backend.models import PushSubscription
-from backend.services.push import get_vapid_public_key, send_push_to_user
+from backend.services.push import get_vapid_public_key, is_safe_push_endpoint, send_push_to_user
 
 router = APIRouter(prefix="/api/push", tags=["push"])
 
@@ -35,6 +35,8 @@ async def subscribe(
     user=Depends(get_current_user),
 ):
     """Register a push subscription for the current user."""
+    if not is_safe_push_endpoint(body.endpoint):
+        raise HTTPException(status_code=400, detail="Push endpoint must be a public https URL")
     p256dh = body.keys.get("p256dh")
     auth = body.keys.get("auth")
     if not p256dh or not auth:

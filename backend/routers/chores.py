@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from datetime import datetime, date, timezone, timedelta
 
@@ -58,6 +59,8 @@ from backend.services.recurrence import should_create_on_day
 from backend.services.rotation import get_rotation_kid_for_day
 from backend.services.verification import award_verified_assignment, finish_verification
 from backend.services.balance import deduct_points_floor_zero
+from backend.routers import uploads as uploads_router
+from backend.routers.uploads import sniff_image_ext
 from backend.routers._chores_helpers import (
     get_chore_or_404 as _get_chore_or_404,
     reload_chore_with_category as _reload_chore_with_category,
@@ -996,13 +999,16 @@ async def complete_chore(
         allowed_types = {"image/jpeg", "image/png", "image/gif", "image/webp"}
         if file.content_type not in allowed_types:
             raise HTTPException(status_code=400, detail="Invalid file type. Allowed: JPEG, PNG, GIF, WebP")
-        contents = await file.read()
         max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+        contents = await file.read(max_size + 1)  # never pull more than the cap into memory
         if len(contents) > max_size:
             raise HTTPException(status_code=400, detail=f"File too large. Max {settings.MAX_UPLOAD_SIZE_MB}MB")
-        upload_dir = "/app/data/uploads"
+        # Extension comes from the image bytes, never the client filename
+        ext = sniff_image_ext(contents)
+        if ext is None:
+            raise HTTPException(status_code=400, detail="Invalid file type. Allowed: JPEG, PNG, GIF, WebP")
+        upload_dir = uploads_router.UPLOAD_DIR
         os.makedirs(upload_dir, exist_ok=True)
-        ext = os.path.splitext(file.filename or "photo.jpg")[1] or ".jpg"
         filename = f"{uuid.uuid4().hex}{ext}"
         filepath = os.path.join(upload_dir, filename)
         with open(filepath, "wb") as f:

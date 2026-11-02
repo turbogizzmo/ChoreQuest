@@ -121,14 +121,16 @@ async def register(
     user_count = count_result.scalar()
     is_first_user = user_count == 0
 
-    # Determine role
+    # Determine role. The client never picks its own role: self-registration
+    # creates a kid, and only an invite code can grant parent/admin.
     if is_first_user:
         role = UserRole.admin
     else:
-        role = body.role
+        role = UserRole.kid
 
-    # Check invite code requirement for non-first users
-    if not is_first_user and not settings.REGISTRATION_ENABLED:
+    # Invite code is required when registration is closed, and honoured
+    # (for its role) whenever one is supplied
+    if not is_first_user and (body.invite_code or not settings.REGISTRATION_ENABLED):
         if not body.invite_code:
             raise HTTPException(
                 status_code=400,

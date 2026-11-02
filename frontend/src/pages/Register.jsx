@@ -10,7 +10,6 @@ export default function Register() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [role, setRole] = useState('kid');
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -46,7 +45,6 @@ export default function Register() {
         username.trim(),
         password,
         displayName.trim(),
-        role,
         inviteCode.trim() || undefined
       );
       navigate('/');
@@ -124,28 +122,6 @@ export default function Register() {
             autoComplete="off"
             className="field-input"
           />
-        </div>
-
-        {/* Role */}
-        <div className="mb-3">
-          <label className="block text-cream text-sm font-medium mb-1">
-            Role
-          </label>
-          <div className="relative">
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="field-input appearance-none cursor-pointer pr-10"
-            >
-              <option value="kid">Adventurer (Kid)</option>
-              <option value="parent">Leader (Parent)</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted">
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 16 16">
-                <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2" />
-              </svg>
-            </div>
-          </div>
         </div>
 
         {/* Invite Code */}

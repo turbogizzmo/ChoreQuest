@@ -18,6 +18,21 @@ MIME_TO_EXT = {
     "image/gif": {".gif"},
     "image/webp": {".webp"},
 }
+SERVABLE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+
+
+def sniff_image_ext(contents: bytes) -> str | None:
+    """Return the file extension for an allowed image type, judged by its
+    magic bytes rather than the client's filename or Content-Type, or None."""
+    if contents.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if contents.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if contents[:6] in (b"GIF87a", b"GIF89a"):
+        return ".gif"
+    if contents[:4] == b"RIFF" and contents[8:12] == b"WEBP":
+        return ".webp"
+    return None
 
 
 @router.post("")
@@ -28,15 +43,14 @@ async def upload_file(
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Invalid file type. Allowed: JPEG, PNG, GIF, WebP")
 
-    contents = await file.read()
     max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    contents = await file.read(max_size + 1)  # never pull more than the cap into memory
     if len(contents) > max_size:
         raise HTTPException(status_code=400, detail=f"File too large. Max {settings.MAX_UPLOAD_SIZE_MB}MB")
 
-    ext = os.path.splitext(file.filename or "upload.jpg")[1].lower() or ".jpg"
-    allowed_exts = MIME_TO_EXT.get(file.content_type, set())
-    if ext not in allowed_exts:
-        ext = next(iter(allowed_exts), ".jpg")
+    ext = sniff_image_ext(contents)
+    if ext is None:
+        raise HTTPException(status_code=400, detail="Invalid file type. Allowed: JPEG, PNG, GIF, WebP")
     filename = f"{uuid.uuid4().hex}{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
 
@@ -51,7 +65,8 @@ async def upload_file(
 async def get_upload(filename: str):
     safe_name = os.path.basename(filename)
     filepath = os.path.join(UPLOAD_DIR, safe_name)
-    if not os.path.isfile(filepath):
+    # Only ever serve images, so a stray .html/.js/.svg can't run same-origin
+    if os.path.splitext(safe_name)[1].lower() not in SERVABLE_EXTS or not os.path.isfile(filepath):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(filepath)
 

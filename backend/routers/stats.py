@@ -23,7 +23,7 @@ from backend.models import (
     NotificationType,
 )
 from backend.schemas import UserResponse, AchievementResponse, AchievementUpdate
-from backend.dependencies import get_current_user, require_parent
+from backend.dependencies import get_current_user, require_feature, require_parent
 from backend.services.assignment_generator import auto_generate_week_assignments
 from backend.services.stats_helpers import completion_rate
 from backend.services.ranks import get_rank
@@ -365,7 +365,7 @@ async def get_family_stats(
     return family_list
 
 
-@router.get("/leaderboard")
+@router.get("/leaderboard", dependencies=[Depends(require_feature("leaderboard_enabled"))])
 async def get_leaderboard(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

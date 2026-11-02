@@ -11,6 +11,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Job 1 — Backend unit tests (pytest, in-memory SQLite, ~10 s)
 # Runs independently of the e2e suite so a Python bug surfaces fast.
@@ -25,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install ShellCheck
         run: sudo apt-get install -y shellcheck
@@ -57,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Run pattern audit
         run: bash scripts/audit-patterns.sh
@@ -67,10 +70,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
           cache: pip
@@ -80,6 +83,12 @@ jobs:
 
       - name: Install backend dependencies
         run: pip install -r requirements.txt
+
+      - name: Lint for undefined names
+        # Catches NameErrors like a missing import before they reach users
+        run: |
+          pip install ruff==0.17.3
+          ruff check --select F821,F822,F823 backend tests/unit
 
       - name: Install test dependencies
         # requirements-test.txt lands with PR #57 — gracefully skip if not merged yet
@@ -110,11 +119,11 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # ── Python / backend ───────────────────────────────────────────────────
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
           cache: pip
@@ -125,7 +134,7 @@ jobs:
 
       # ── Node / frontend + Playwright ───────────────────────────────────────
       - name: Set up Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           cache: npm
@@ -155,7 +164,7 @@ jobs:
       # ── Artifacts ─────────────────────────────────────────────────────────
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-report-${{ github.run_id }}
           path: playwright-report/
@@ -163,7 +172,7 @@ jobs:
 
       - name: Upload test traces (failures only)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-traces-${{ github.run_id }}
           path: test-results/

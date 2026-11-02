@@ -24,6 +24,7 @@ from backend.schemas import BountyResponse, BountyClaimResponse, CategoryRespons
 from backend.dependencies import get_current_user, require_parent
 from backend.websocket_manager import ws_manager
 from backend.services.balance import credit_points
+from backend.routers.uploads import sniff_image_ext
 
 import os, uuid, logging
 
@@ -330,14 +331,14 @@ async def complete_bounty(
 
     # Handle photo upload
     if file and file.filename:
-        content = await file.read()
+        content = await file.read(10 * 1024 * 1024 + 1)  # never pull more than the cap into memory
         if len(content) > 10 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="Photo must be under 10 MB")
         allowed_mime = {"image/jpeg", "image/png", "image/gif", "image/webp"}
         if file.content_type not in allowed_mime:
             raise HTTPException(status_code=400, detail="Invalid file type")
-        ext = os.path.splitext(file.filename)[1].lower()
-        if ext not in (".jpg", ".jpeg", ".png", ".gif", ".webp"):
+        ext = sniff_image_ext(content)
+        if ext is None:
             raise HTTPException(status_code=400, detail="Invalid file type")
         os.makedirs(UPLOAD_DIR, exist_ok=True)
         filename = f"bounty_{claim.id}_{uuid.uuid4().hex}{ext}"

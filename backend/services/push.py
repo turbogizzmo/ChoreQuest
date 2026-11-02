@@ -5,6 +5,7 @@ starts even if these packages are not installed.
 """
 
 import base64
+import ipaddress
 import json
 import logging
 from urllib.parse import urlparse
@@ -215,6 +216,26 @@ def _build_vapid_token(private_key, public_key_b64: str, aud: str, sub: str) -> 
     return {"Authorization": f"vapid t={token},k={public_key_b64}"}
 
 
+def is_safe_push_endpoint(endpoint: str) -> bool:
+    """Push endpoints come from the client, so only allow public https URLs.
+    Blocks the obvious LAN/loopback/link-local targets (SSRF); DNS names that
+    resolve to private addresses are not checked here."""
+    try:
+        url = urlparse(endpoint)
+    except ValueError:
+        return False
+    host = (url.hostname or "").lower()
+    if url.scheme != "https" or not host or url.username or url.password:
+        return False
+    if host == "localhost" or host.endswith((".localhost", ".local", ".lan", ".internal", ".home.arpa")):
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return "." in host  # a public DNS name
+    return ip.is_global
+
+
 def _send_one(
     subscription_info: dict,
     payload: str,
@@ -226,6 +247,9 @@ def _send_one(
 
     Returns "ok", "gone" (endpoint dead — safe to delete), or "error".
     """
+    if not is_safe_push_endpoint(subscription_info.get("endpoint", "")):
+        logger.warning("Dropping push subscription with a non-public endpoint")
+        return "gone"
     if not _ensure_pywebpush():
         return "error"
 
