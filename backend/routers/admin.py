@@ -8,11 +8,11 @@ from datetime import datetime, timezone
 from backend.utils import utc_iso
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.models import User, ApiKey, InviteCode, AuditLog, AppSetting
+from backend.models import User, ApiKey, InviteCode, AuditLog, AppSetting, RefreshToken
 from backend.schemas import (
     UserResponse,
     AdminUserUpdate,
@@ -35,8 +35,18 @@ from backend.services.ai_provider import (
     list_models_for_request,
 )
 from backend.services.secure_settings import SENSITIVE_SETTING_KEYS
+from backend.websocket_manager import ws_manager
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+async def _revoke_sessions(db: AsyncSession, user_id: int) -> None:
+    """Revoke a user's refresh tokens so they must sign in again."""
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.user_id == user_id, RefreshToken.is_revoked == False)
+        .values(is_revoked=True)
+    )
 
 
 # ============================================================
@@ -69,13 +79,19 @@ async def update_user(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # A role change or deactivation ends the user's existing sessions
+    revoke = (body.role is not None and body.role != user.role) or body.is_active is False
     if body.role is not None:
         user.role = body.role
     if body.is_active is not None:
         user.is_active = body.is_active
 
     user.updated_at = datetime.now(timezone.utc)
+    if revoke:
+        await _revoke_sessions(db, user.id)
     await db.commit()
+    if revoke:
+        await ws_manager.close_user(user.id)
     await db.refresh(user)
     return UserResponse.model_validate(user)
 
@@ -95,7 +111,9 @@ async def deactivate_user(
 
     user.is_active = False
     user.updated_at = datetime.now(timezone.utc)
+    await _revoke_sessions(db, user.id)
     await db.commit()
+    await ws_manager.close_user(user.id)
     return {"detail": "User deactivated"}
 
 
@@ -115,7 +133,9 @@ async def reset_user_password(
 
     user.password_hash = await asyncio.to_thread(hash_password, body.new_password)
     user.updated_at = datetime.now(timezone.utc)
+    await _revoke_sessions(db, user.id)
     await db.commit()
+    await ws_manager.close_user(user.id)
     return {"detail": f"Password reset for {user.username}"}
 
 
@@ -432,7 +452,7 @@ async def generate_dashboard_token(
     _parent: User = Depends(require_parent),
 ):
     """Generate (or replace) the dashboard share token. Returns the new token."""
-    new_token = secrets.token_urlsafe(6)
+    new_token = secrets.token_urlsafe(16)  # 128 bits; it grants read access without login
     result = await db.execute(
         select(AppSetting).where(AppSetting.key == _DASHBOARD_TOKEN_KEY)
     )

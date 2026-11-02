@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from backend.utils import utc_iso
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,7 +21,7 @@ from backend.models import (
     Recurrence,
 )
 from backend.schemas import TradeRequest
-from backend.dependencies import get_current_user, require_parent
+from backend.dependencies import get_current_user, require_feature, require_parent
 from backend.websocket_manager import ws_manager
 from backend.services.assignment_generator import auto_generate_week_assignments
 
@@ -206,7 +206,7 @@ async def _get_trade_assignment_or_404(
     return assignment
 
 
-@router.post("/trade")
+@router.post("/trade", dependencies=[Depends(require_feature("chore_trading_enabled"))])
 async def propose_trade(
     data: TradeRequest,
     current_user: User = Depends(get_current_user),
@@ -271,7 +271,10 @@ async def propose_trade(
     return {"message": "Trade proposed", "notification_id": notification.id}
 
 
-@router.post("/trade/{notification_id}/accept")
+@router.post(
+    "/trade/{notification_id}/accept",
+    dependencies=[Depends(require_feature("chore_trading_enabled"))],
+)
 async def accept_trade(
     notification_id: int,
     current_user: User = Depends(get_current_user),
@@ -283,11 +286,24 @@ async def accept_trade(
 
     if assignment.status != AssignmentStatus.pending:
         raise HTTPException(status_code=400, detail="Assignment is no longer pending")
+    # A proposal is single-use: once one is accepted, the others for the same
+    # assignment are closed, so a later accept can't take it from the new owner
+    if notification.is_read or assignment.user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="This trade is no longer available")
 
     proposer_id = assignment.user_id
 
     # Reassign to the accepting kid
     assignment.user_id = current_user.id
+    await db.execute(
+        update(Notification)
+        .where(
+            Notification.type == NotificationType.trade_proposed,
+            Notification.reference_type == "trade",
+            Notification.reference_id == assignment.id,
+        )
+        .values(is_read=True)
+    )
     notification.is_read = True
 
     chore_title = assignment.chore.title if assignment.chore else "a chore"

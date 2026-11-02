@@ -38,7 +38,18 @@ log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
+# The container can write to data/, and this script may run as root, so never
+# write through a symlink planted there: remove the link first.
+no_symlink() {  # no_symlink <file>...
+  local f
+  for f in "$@"; do
+    [ -L "$f" ] && rm -f "$f"
+  done
+  return 0
+}
+
 heartbeat() {
+  no_symlink "$HEARTBEAT_FILE"
   date -u +"%Y-%m-%dT%H:%M:%SZ" > "$HEARTBEAT_FILE"
 }
 
@@ -55,6 +66,7 @@ json_escape() {
 write_status() {  # write_status <state> <message>
   local now
   now="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  no_symlink "$STATUS_FILE.tmp"
   printf '{"state":"%s","message":"%s","updated_at":"%s"}\n' \
     "$1" "$(json_escape "$2")" "$now" > "$STATUS_FILE.tmp" && mv "$STATUS_FILE.tmp" "$STATUS_FILE"
 }
@@ -83,6 +95,7 @@ deploy() {
   fi
 
   log "Update flag detected. Starting deploy..."
+  no_symlink "$LOCK_FILE" "$DEPLOY_LOG" "$DATA_DIR/deploy-history.log"
   echo $$ > "$LOCK_FILE"
   rm -f "$FLAG_FILE"
   write_status "running" "Pulling latest code and rebuilding…"

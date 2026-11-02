@@ -123,7 +123,7 @@ When triggered, `watchdog.sh` runs `deploy.sh` which does `git pull` + `docker c
 |----------|---------|-------------|
 | `SECRET_KEY` | *required* | JWT signing key, min 16 characters |
 | `TZ` | `Europe/London` | Container timezone |
-| `REGISTRATION_ENABLED` | `false` | Allow public self-registration |
+| `REGISTRATION_ENABLED` | `false` | Allow public self-registration (new accounts are kids; parent and admin roles need an invite code) |
 | `DATABASE_URL` | `sqlite+aiosqlite:////app/data/chores_os.db` | Database path |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | Access token lifetime |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `30` | Refresh token lifetime |

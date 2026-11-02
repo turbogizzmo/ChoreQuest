@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.auth import decode_access_token
-from backend.models import ApiKey, User, UserRole
+from backend.models import ApiKey, AppSetting, User, UserRole
 
 
 async def get_current_user(request: Request, db: AsyncSession = Depends(get_db)) -> User:
@@ -79,3 +79,13 @@ async def require_kid(user: User = Depends(get_current_user)) -> User:
     if user.role != UserRole.kid:
         raise HTTPException(status_code=403, detail="Kid role required")
     return user
+
+
+def require_feature(setting_key: str):
+    """Route dependency that returns 403 while a feature toggle is off.
+    Toggles default to on, matching the frontend (only "false" disables)."""
+    async def _check(db: AsyncSession = Depends(get_db)) -> None:
+        value = await db.scalar(select(AppSetting.value).where(AppSetting.key == setting_key))
+        if value is not None and value.strip().lower() == "false":
+            raise HTTPException(status_code=403, detail="This feature is turned off")
+    return _check

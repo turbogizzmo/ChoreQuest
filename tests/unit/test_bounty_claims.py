@@ -32,8 +32,8 @@ class _FakeUpload:
         self.content_type = content_type
         self._content = content
 
-    async def read(self) -> bytes:
-        return self._content
+    async def read(self, size: int = -1) -> bytes:
+        return self._content if size < 0 else self._content[:size]
 
 
 async def make_bounty_chore(

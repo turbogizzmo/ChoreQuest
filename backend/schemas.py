@@ -21,7 +21,6 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=2, max_length=50)
     password: str = Field(min_length=6)
     display_name: str = Field(min_length=1, max_length=10)
-    role: UserRole = UserRole.kid
     invite_code: str | None = None
 
 

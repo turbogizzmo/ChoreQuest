@@ -258,6 +258,13 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int):
         await websocket.close(code=4001)
         return
 
+    # A deactivated user's still-unexpired access token must not reconnect
+    async with async_session() as db:
+        active = await db.scalar(select(User.id).where(User.id == user_id, User.is_active == True))
+    if active is None:
+        await websocket.close(code=4001)
+        return
+
     await ws_manager.connect(websocket, user_id)
     try:
         while True:
