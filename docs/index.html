@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChoreQuest Setup</title>
+<meta name="description" content="Set up ChoreQuest, the gamified family chore app, on a Windows PC, a Synology NAS or any Docker host.">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<style>
+:root {
+  --bg: #f7f5fb;
+  --surface: #ffffff;
+  --surface-2: #efebf7;
+  --text: #1d1a26;
+  --muted: #5d586b;
+  --border: #ddd6ea;
+  --accent: #6d3fd1;
+  --accent-ink: #ffffff;
+  --gold: #b7791f;
+  --ok: #1f7a4d;
+  --warn-bg: #fff6e0;
+  --warn-border: #e8c46a;
+  --code-bg: #1e1b29;
+  --code-text: #ece8f6;
+  --shadow: 0 1px 2px rgba(30, 20, 60, .06), 0 4px 16px rgba(30, 20, 60, .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14121b;
+    --surface: #1d1a27;
+    --surface-2: #262235;
+    --text: #ece8f6;
+    --muted: #a7a1b8;
+    --border: #363049;
+    --accent: #a585ff;
+    --accent-ink: #14121b;
+    --gold: #f2c14e;
+    --ok: #5fd39a;
+    --warn-bg: #2d2615;
+    --warn-border: #6b5622;
+    --code-bg: #0f0d15;
+    --code-text: #ece8f6;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14121b; --surface: #1d1a27; --surface-2: #262235; --text: #ece8f6; --muted: #a7a1b8;
+  --border: #363049; --accent: #a585ff; --accent-ink: #14121b; --gold: #f2c14e; --ok: #5fd39a;
+  --warn-bg: #2d2615; --warn-border: #6b5622; --code-bg: #0f0d15; --code-text: #ece8f6; --shadow: none;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+a { color: var(--accent); }
+img { max-width: 100%; display: block; }
+code { font-family: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace; font-size: .9em; background: var(--surface-2); padding: .1em .35em; border-radius: 4px; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+
+header.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+header.top .wrap { display: flex; align-items: center; gap: 16px; height: 56px; }
+header.top .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; text-decoration: none; color: var(--text); }
+header.top .brand img { width: 26px; height: 26px; }
+header.top nav { margin-left: auto; display: flex; gap: 16px; font-size: 14px; }
+header.top nav a { color: var(--muted); text-decoration: none; }
+header.top nav a:hover { color: var(--text); }
+@media (max-width: 640px) { header.top nav a.opt { display: none; } }
+
+.hero { padding: 56px 0 32px; text-align: center; }
+.hero h1 { font-size: clamp(2rem, 5vw, 3rem); line-height: 1.15; margin: 0 0 12px; letter-spacing: -.02em; }
+.hero p.lead { font-size: 1.15rem; color: var(--muted); max-width: 640px; margin: 0 auto 24px; }
+.btn {
+  display: inline-block; padding: 10px 18px; border-radius: 8px; font-weight: 600; text-decoration: none;
+  background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent);
+}
+.btn.ghost { background: transparent; color: var(--text); border-color: var(--border); }
+.btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+.shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 40px 0 8px; }
+.shots img { border-radius: 10px; border: 1px solid var(--border); box-shadow: var(--shadow); aspect-ratio: 16 / 9; object-fit: cover; object-position: top; width: 100%; }
+@media (max-width: 640px) { .shots { grid-template-columns: 1fr; } .shots img:nth-child(n+4) { display: none; } }
+
+section { padding: 40px 0; border-top: 1px solid var(--border); }
+section h2 { font-size: 1.75rem; margin: 0 0 8px; letter-spacing: -.01em; }
+section > .wrap > p.sub { color: var(--muted); margin: 0 0 24px; }
+h3 { margin: 28px 0 8px; font-size: 1.15rem; }
+
+.paths { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.path {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px;
+  box-shadow: var(--shadow); text-decoration: none; color: var(--text); display: flex; flex-direction: column; gap: 6px;
+}
+a.path:hover { border-color: var(--accent); }
+.path .icon { font-size: 26px; line-height: 1; }
+.path strong { font-size: 1.05rem; }
+.path span.desc { color: var(--muted); font-size: 14px; }
+.tag { align-self: flex-start; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted); }
+.tag.now { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
+.tag.easy { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 50%, transparent); }
+
+ol.steps { list-style: none; counter-reset: step; padding: 0; margin: 0; }
+ol.steps > li { counter-increment: step; position: relative; padding: 0 0 24px 48px; }
+ol.steps > li::before {
+  content: counter(step); position: absolute; left: 0; top: 0; width: 32px; height: 32px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink); font-weight: 700; display: grid; place-items: center;
+}
+ol.steps > li > h3 { margin-top: 2px; }
+ol.steps ul { padding-left: 20px; }
+
+.code { position: relative; margin: 12px 0; }
+.code pre {
+  margin: 0; background: var(--code-bg); color: var(--code-text); padding: 14px 16px; border-radius: 10px;
+  overflow-x: auto; font: 13px/1.5 ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+}
+.code pre.tall { max-height: 260px; }
+.copy {
+  position: absolute; top: 8px; right: 8px; font: 600 12px system-ui, sans-serif; padding: 5px 10px; border-radius: 6px;
+  border: 1px solid #4a4360; background: #2b2639; color: #ece8f6; cursor: pointer;
+}
+.copy:hover { background: #3a3350; }
+
+.note { background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 10px; padding: 12px 14px; margin: 12px 0; font-size: 15px; }
+.note.info { background: var(--surface-2); border-color: var(--border); }
+
+.field { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 12px 0; }
+.field label { font-weight: 600; }
+select, input[type="text"] {
+  font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); max-width: 100%;
+}
+
+details { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0 16px; margin: 10px 0; }
+details > summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+details[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+details > *:last-child { margin-bottom: 14px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.table-scroll { overflow-x: auto; }
+
+footer { padding: 32px 0 48px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#"><img src="assets/icon.svg" alt="">ChoreQuest</a>
+    <nav>
+      <a href="#choose">Setup</a>
+      <a class="opt" href="#first-run">First run</a>
+      <a class="opt" href="#faq">Help</a>
+      <a class="opt" href="#roadmap">Roadmap</a>
+      <a href="https://github.com/turbogizzmo/ChoreQuest">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <h1>Turn chores into quests,<br>kids into heroes.</h1>
+    <p class="lead">ChoreQuest is a family chore app that runs on a computer in your home. Kids earn XP, level up pets and spend rewards. Parents set the quests. Your family's data stays in your house.</p>
+    <div class="btn-row">
+      <a class="btn" href="#choose">Set it up</a>
+      <a class="btn ghost" href="https://github.com/turbogizzmo/ChoreQuest#-features">See all features</a>
+    </div>
+    <div class="shots">
+      <img src="assets/kid-dashboard.png" alt="Kid dashboard with today's quests" loading="lazy">
+      <img src="assets/avatar-shop.png" alt="Avatar shop" loading="lazy">
+      <img src="assets/calendar.png" alt="Parent calendar view" loading="lazy">
+      <img src="assets/parent-dashboard.png" alt="Parent dashboard" loading="lazy">
+      <img src="assets/leaderboard.png" alt="Family leaderboard" loading="lazy">
+      <img src="assets/party.png" alt="Party page" loading="lazy">
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────────── Choose ───────────────────────── -->
+<section id="choose">
+  <div class="wrap">
+    <h2>Where will ChoreQuest live?</h2>
+    <p class="sub">Pick the computer that stays on in your house. Everyone else (phones, tablets, the kitchen TV) just opens it in a web browser.</p>
+    <div class="paths">
+      <a class="path" href="#windows">
+        <span class="icon">🪟</span><strong>Windows PC</strong>
+        <span class="desc">The family desktop or a spare laptop. Install one free program, paste one command.</span>
+        <span class="tag easy">Easiest · ~20 min</span>
+      </a>
+      <a class="path" href="#synology">
+        <span class="icon">🗄️</span><strong>Synology NAS</strong>
+        <span class="desc">Runs 24/7 without a PC left on. Uses Synology's Container Manager app.</span>
+        <span class="tag now">Available now</span>
+      </a>
+      <a class="path" href="#docker">
+        <span class="icon">🐳</span><strong>Mac, Linux or another NAS</strong>
+        <span class="desc">Anything that runs Docker: Mac, Raspberry Pi 4/5, Ubuntu, Unraid, TrueNAS SCALE, QNAP.</span>
+        <span class="tag now">Available now</span>
+      </a>
+      <a class="path" href="#roadmap">
+        <span class="icon">☁️</span><strong>Cloud</strong>
+        <span class="desc">One-click hosting with nothing running at home. On the roadmap.</span>
+        <span class="tag">Planned</span>
+      </a>
+    </div>
+    <div class="note info" style="margin-top:20px">
+      <strong>What you need on any option:</strong> a computer that stays on while your family uses the app. If it sleeps or shuts down, ChoreQuest pauses until it wakes. Nothing is lost.
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── Windows ───────────────────────── -->
+<section id="windows">
+  <div class="wrap">
+    <h2>🪟 Windows PC</h2>
+    <p class="sub">Works on Windows 10 (version 22H2) and Windows 11. You don't need to know any programming. You'll copy and paste one block of text.</p>
+
+    <ol class="steps">
+      <li>
+        <h3>Install Docker Desktop</h3>
+        <p>Docker Desktop is a free program that runs ChoreQuest in its own sealed box, so it can't mess with the rest of your PC.</p>
+        <ul>
+          <li>Download it from <a href="https://www.docker.com/products/docker-desktop/">docker.com/products/docker-desktop</a> and run the installer. Keep the default options.</li>
+          <li>Restart your PC if it asks.</li>
+          <li>Open <strong>Docker Desktop</strong> from the Start menu. Accept the agreement, then skip the sign-in (you don't need an account).</li>
+          <li>Wait until the bottom-left corner says <strong>Engine running</strong>.</li>
+        </ul>
+        <details>
+          <summary>Docker says "virtualization" or "WSL" needs fixing</summary>
+          <p>Docker needs a Windows feature called WSL. Usually it installs it for you. If it doesn't:</p>
+          <ol>
+            <li>Right-click the Start button and choose <strong>Terminal (Admin)</strong> or <strong>Windows PowerShell (Admin)</strong>.</li>
+            <li>Type <code>wsl --install</code>, press Enter, then restart your PC.</li>
+          </ol>
+          <p>If Docker still complains about <em>virtualization</em>, it has to be switched on in your PC's BIOS settings. Search the web for your PC model plus "enable virtualization". It's usually called <em>Intel VT-x</em>, <em>Intel Virtualization Technology</em> or <em>AMD SVM</em>.</p>
+        </details>
+      </li>
+
+      <li>
+        <h3>Paste the install command</h3>
+        <p>Check that your timezone is right. ChoreQuest uses it to know when "today" starts for your family.</p>
+        <div class="field">
+          <label for="tz">Your timezone</label>
+          <select id="tz"></select>
+        </div>
+        <p>Next, open PowerShell: click Start, type <strong>PowerShell</strong>, and open <strong>Windows PowerShell</strong> (you don't need the Admin version). Copy the block below, right-click inside the PowerShell window to paste it, then press <strong>Enter</strong>.</p>
+        <div class="code">
+          <button class="copy" data-copy="ps-install">Copy</button>
+          <pre class="tall" id="ps-install"></pre>
+        </div>
+        <p>The command:</p>
+        <ul>
+          <li>makes a <code>ChoreQuest</code> folder inside your user folder</li>
+          <li>downloads the ready-made ChoreQuest app and starts it (usually <strong>1–3 minutes</strong>)</li>
+          <li>puts a <strong>ChoreQuest</strong> shortcut on your desktop and opens the app in your browser</li>
+        </ul>
+        <p>When it finishes, it prints the address phones and tablets should use, like <code>http://192.168.1.23:8122</code>.</p>
+      </li>
+
+      <li>
+        <h3>Create the parent account</h3>
+        <p>The browser opens <code>http://localhost:8122</code>. The <strong>first account you create becomes the admin</strong>, so do this yourself before anyone else. Then see <a href="#first-run">First run</a> to add your kids.</p>
+      </li>
+
+      <li>
+        <h3>Open it on phones and tablets</h3>
+        <ul>
+          <li>On a phone on the <strong>same Wi-Fi</strong>, open the address the installer printed (for example <code>http://192.168.1.23:8122</code>).</li>
+          <li>Add it to the home screen. On iPhone: <em>Share → Add to Home Screen</em>. On Android: <em>⋮ → Add to Home screen</em>.</li>
+          <li>Doesn't load? See <a href="#faq-phone">Phones can't connect</a>.</li>
+        </ul>
+      </li>
+
+      <li>
+        <h3>Keep it running</h3>
+        <ul>
+          <li>In Docker Desktop, open <strong>Settings (⚙️) → General</strong> and turn on <strong>Start Docker Desktop when you sign in</strong>. ChoreQuest restarts with it on its own.</li>
+          <li>Stop the PC from sleeping. Open <strong>Settings → System → Power</strong> and set <em>Sleep</em> to <strong>Never</strong> when plugged in. On a laptop, also choose <em>Do nothing</em> for closing the lid.</li>
+          <li>After a Windows Update restart, somebody has to sign in to Windows before Docker (and ChoreQuest) starts.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <h3 id="windows-update">Updating on Windows</h3>
+    <p>When the app says an update is available, paste the <strong>same install command</strong> again. It downloads the new version and restarts ChoreQuest, and your family's data stays as it is. The <em>Apply Update</em> button in Settings doesn't work on Windows yet.</p>
+
+    <h3 id="windows-backup">Backing up on Windows</h3>
+    <p>Everything (accounts, quests, XP, photos, and the login key) lives in one folder: <code>%USERPROFILE%\ChoreQuest\data</code>.</p>
+    <ol>
+      <li>In Docker Desktop, go to <strong>Containers</strong> and click ⏹ <strong>Stop</strong> next to <em>chorequest</em>.</li>
+      <li>Copy the <code>data</code> folder to a USB drive, OneDrive or anywhere safe.</li>
+      <li>Click ▶ <strong>Start</strong> again.</li>
+    </ol>
+    <p>To restore, stop the container, put the copied <code>data</code> folder back in place, then start it.</p>
+
+    <details>
+      <summary>Uninstalling</summary>
+      <p>Paste this into PowerShell. It stops ChoreQuest and removes the app but <strong>keeps</strong> your <code>data</code> folder. Delete that folder yourself if you want everything gone.</p>
+      <div class="code">
+        <button class="copy" data-copy="ps-uninstall">Copy</button>
+<pre id="ps-uninstall">Set-Location "$env:USERPROFILE\ChoreQuest"; docker compose down --rmi all</pre>
+      </div>
+    </details>
+  </div>
+</section>
+
+<!-- ───────────────────────── Synology ───────────────────────── -->
+<section id="synology">
+  <div class="wrap">
+    <h2>🗄️ Synology NAS</h2>
+    <p class="sub">For DSM 7.2 or newer, on a model that supports Container Manager. That includes most "+" models and many "j" and "value" models with an Intel, AMD or 64-bit ARM processor. Everything is done in the DSM web interface, and there are no files to upload.</p>
+
+    <ol class="steps">
+      <li>
+        <h3>Install Container Manager</h3>
+        <p>Open <strong>Package Center</strong>, search for <strong>Container Manager</strong> and install it.</p>
+      </li>
+      <li>
+        <h3>Make a folder</h3>
+        <p>Open <strong>File Station</strong>. Inside the <code>docker</code> shared folder (Container Manager creates it), make a folder called <code>chorequest</code>, and inside that a folder called <code>data</code>.</p>
+      </li>
+      <li>
+        <h3>Create the project</h3>
+        <ul>
+          <li>In Container Manager, open <strong>Project → Create</strong>.</li>
+          <li>Project name: <code>chorequest</code>. Path: <code>docker/chorequest</code>. Source: <strong>Create docker-compose.yml</strong>.</li>
+          <li>Pick your timezone below, copy the text, and paste it into the editor box.</li>
+        </ul>
+        <div class="field">
+          <label for="tz-syn">Your timezone</label>
+          <select id="tz-syn"></select>
+        </div>
+        <div class="code">
+          <button class="copy" data-copy="syn-compose">Copy</button>
+          <pre id="syn-compose"></pre>
+        </div>
+        <ul>
+          <li>Click <strong>Next</strong>, skip the web portal step, then click <strong>Done</strong>. It downloads and starts in a minute or two.</li>
+        </ul>
+      </li>
+      <li>
+        <h3>Open it</h3>
+        <p>Go to <code>http://YOUR-NAS-IP:8122</code> (the same address you use for DSM, with <code>:8122</code> on the end instead of <code>:5000</code>). Create the parent account first, then go to <a href="#first-run">First run</a>.</p>
+      </li>
+    </ol>
+
+    <h3>Updating on Synology</h3>
+    <ol>
+      <li>Open <strong>Container Manager → Project</strong>, select <em>chorequest</em>, and click <strong>Action → Stop</strong>.</li>
+      <li>Go to <strong>Image</strong>, select <em>ghcr.io/turbogizzmo/chorequest</em>, and click <strong>Delete</strong>.</li>
+      <li>Back in <strong>Project</strong>, select <em>chorequest</em> and click <strong>Action → Build</strong>. It downloads the newest version and starts it.</li>
+    </ol>
+    <p>The <code>data</code> folder is never touched, so nothing is lost.</p>
+
+    <h3>Backing up on Synology</h3>
+    <p>Add <code>docker/chorequest/data</code> to <strong>Hyper Backup</strong> or a <strong>Snapshot Replication</strong> schedule. That folder has everything.</p>
+  </div>
+</section>
+
+<!-- ───────────────────────── Docker ───────────────────────── -->
+<section id="docker">
+  <div class="wrap">
+    <h2>🐳 Mac, Linux, Raspberry Pi or another NAS</h2>
+    <p class="sub">Any machine with Docker on an Intel/AMD or 64-bit ARM processor. That includes Docker Desktop on Mac, a Raspberry Pi 4/5 running the <strong>64-bit</strong> Raspberry Pi OS, Ubuntu or Debian servers, and NAS systems that run containers.</p>
+
+    <h3>With Docker Compose</h3>
+    <div class="field">
+      <label for="tz-dk">Your timezone</label>
+      <select id="tz-dk"></select>
+    </div>
+    <div class="code">
+      <button class="copy" data-copy="sh-install">Copy</button>
+      <pre id="sh-install"></pre>
+    </div>
+    <p>Then open <code>http://THIS-MACHINE-IP:8122</code>. To update, run <code>docker compose pull &amp;&amp; docker compose up -d</code> in the same folder. Your data in <code>./data</code> stays put.</p>
+
+    <details>
+      <summary>Unraid</summary>
+      <ol>
+        <li>Go to the <strong>Docker</strong> tab and click <strong>Add Container</strong>.</li>
+        <li>Name: <code>chorequest</code>. Repository: <code>ghcr.io/turbogizzmo/chorequest:latest</code>.</li>
+        <li><strong>Add another Path, Port, Variable…</strong> three times:
+          <ul>
+            <li>Port: container <code>8122</code>, host <code>8122</code></li>
+            <li>Path: container <code>/app/data</code>, host <code>/mnt/user/appdata/chorequest</code></li>
+            <li>Variable: key <code>TZ</code>, value your timezone (for example <code>America/Chicago</code>)</li>
+          </ul>
+        </li>
+        <li>Click <strong>Apply</strong>. To update later, click the ChoreQuest icon and choose <strong>Check for updates</strong>.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>TrueNAS SCALE</summary>
+      <ol>
+        <li>Go to <strong>Apps → Discover Apps → Custom App</strong>.</li>
+        <li>Image repository: <code>ghcr.io/turbogizzmo/chorequest</code>, tag <code>latest</code>.</li>
+        <li>Add an environment variable <code>TZ</code> with your timezone.</li>
+        <li>Under ports, map container port <code>8122</code> to node port <code>8122</code>.</li>
+        <li>Under storage, add a <strong>Host Path</strong> (a dataset you made, like <code>/mnt/tank/apps/chorequest</code>) mounted at <code>/app/data</code>.</li>
+        <li>Click <strong>Install</strong>.</li>
+      </ol>
+    </details>
+    <details>
+      <summary>QNAP, CasaOS, Portainer and others</summary>
+      <p>Any tool that accepts a compose file works. Paste the <code>services:</code> part of the block above into its "create stack" or "custom app" screen. What ChoreQuest needs:</p>
+      <ul>
+        <li>image <code>ghcr.io/turbogizzmo/chorequest:latest</code></li>
+        <li>port <code>8122</code></li>
+        <li>a folder mounted at <code>/app/data</code></li>
+        <li>a <code>TZ</code> environment variable</li>
+      </ul>
+    </details>
+
+    <p>Settings like push notifications and HTTPS are covered in the <a href="https://github.com/turbogizzmo/ChoreQuest#%EF%B8%8F-configuration">README's configuration section</a>, along with building from source.</p>
+  </div>
+</section>
+
+<!-- ───────────────────────── First run ───────────────────────── -->
+<section id="first-run">
+  <div class="wrap">
+    <h2>First run: set up your family</h2>
+    <p class="sub">About ten minutes, whichever setup you picked.</p>
+    <ol class="steps">
+      <li><h3>Create your parent account</h3><p>The first account becomes the <strong>admin</strong>. After that, nobody can sign up without an invite code you make, so strangers can't join.</p></li>
+      <li><h3>Add the other parent and the kids</h3><p>Go to <strong>Admin → Invite codes</strong>, make a code for each person, and sign them up on their own device. Younger kids can use a short PIN instead of a password.</p></li>
+      <li><h3>Create quests</h3><p>Open <strong>Quests → New Quest Scroll</strong>. Pick an XP value, who it's for, and how often it repeats (daily, certain weekdays, or rotating between kids).</p></li>
+      <li><h3>Stock the Treasure Shop</h3><p>Add rewards the kids can buy with XP: screen time, picking dinner, a trip for ice cream.</p></li>
+      <li><h3>Optional extras</h3><p>A kitchen wall display (<strong>Settings → Family Dashboard</strong>), AI quest drafting, and push notifications. The <a href="https://github.com/turbogizzmo/ChoreQuest/wiki">wiki</a> covers each one.</p></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ───────────────────────── FAQ ───────────────────────── -->
+<section id="faq">
+  <div class="wrap">
+    <h2>Help &amp; common questions</h2>
+
+    <details id="faq-phone">
+      <summary>Phones can't connect, but it works on the PC</summary>
+      <ul>
+        <li>Make sure the phone is on the <strong>same Wi-Fi</strong>, not mobile data or a guest network.</li>
+        <li>On Windows, your Wi-Fi has to be set to <strong>Private</strong>: <em>Settings → Network &amp; internet → Wi-Fi → (your network) → Private network</em>.</li>
+        <li>Windows Firewall may be blocking it. Right-click Start, open <strong>Terminal (Admin)</strong>, and paste:</li>
+      </ul>
+      <div class="code">
+        <button class="copy" data-copy="ps-fw">Copy</button>
+<pre id="ps-fw">New-NetFirewallRule -DisplayName "ChoreQuest" -Direction Inbound -Protocol TCP -LocalPort 8122 -Action Allow -Profile Private</pre>
+      </div>
+      <p>This only opens ChoreQuest's port, and only on networks marked Private.</p>
+    </details>
+
+    <details>
+      <summary>The PC's address changed and the phones lost the app</summary>
+      <p>Your router hands out addresses and sometimes changes them. In your router's settings, look for <em>DHCP reservation</em> or <em>static IP</em> and reserve the current address for this PC or NAS. It's usually under LAN or DHCP settings.</p>
+    </details>
+
+    <details>
+      <summary>Can we use it away from home?</summary>
+      <p>Yes, and you don't have to open ports on your router. The simplest way is <a href="https://tailscale.com/">Tailscale</a> (free for families): install it on the ChoreQuest computer and on each phone, then use the Tailscale address. For a public web address with HTTPS, see <a href="https://github.com/turbogizzmo/ChoreQuest#-external-access">Cloudflare Tunnel in the README</a>.</p>
+      <p>Push notifications need HTTPS, so they only work with the Cloudflare option.</p>
+    </details>
+
+    <details>
+      <summary>The install command shows red errors</summary>
+      <ul>
+        <li><strong>"Docker Desktop is not installed / not running"</strong>: open Docker Desktop and wait for <em>Engine running</em>, then paste again.</li>
+        <li><strong>"port is already allocated"</strong>: another program is using port 8122. Restart the PC and try again.</li>
+        <li><strong>A download failed or timed out</strong>: usually a network hiccup. Paste the command again, it picks up where it left off.</li>
+        <li>Still stuck? <a href="https://github.com/turbogizzmo/ChoreQuest/issues/new">Open an issue</a> and paste the last 30 or so lines from the PowerShell window.</li>
+      </ul>
+    </details>
+
+    <details>
+      <summary>Does this send our family's data anywhere?</summary>
+      <p>No. Everything is stored on your own computer. ChoreQuest only connects to the internet to check GitHub for updates and, if you turn it on, to send AI quest-drafting requests to the provider you choose (never your saved chore list).</p>
+    </details>
+
+    <details>
+      <summary>How much power or resources does it use?</summary>
+      <p>Very little: around 100–200 MB of memory and almost no CPU while idle. Docker Desktop itself uses more, about 1–2 GB of memory on Windows.</p>
+    </details>
+
+    <p>More answers in the <a href="https://github.com/turbogizzmo/ChoreQuest/wiki/Troubleshooting">Troubleshooting wiki page</a>.</p>
+  </div>
+</section>
+
+<!-- ───────────────────────── Roadmap ───────────────────────── -->
+<section id="roadmap">
+  <div class="wrap">
+    <h2>Packaging roadmap</h2>
+    <p class="sub">Coming next to make setup simpler. Want one sooner? <a href="https://github.com/turbogizzmo/ChoreQuest/issues">Say so in an issue</a>.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Option</th><th>What it changes</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Ready-made Docker image</td><td>Docker downloads a finished image for Intel/AMD and 64-bit ARM. No code to download and no build to wait for.</td><td>Available</td></tr>
+          <tr><td>Auto-generated secret key</td><td>No <code>.env</code> file or secret to paste. ChoreQuest creates one on first start.</td><td>Available</td></tr>
+          <tr><td>Synology: paste-in project</td><td>A short compose snippet pasted into Container Manager. No files to upload.</td><td>Available</td></tr>
+          <tr><td>One-click updates for image installs</td><td>Makes the <em>Apply Update</em> button work on Windows, Synology and other image installs.</td><td>Planned</td></tr>
+          <tr><td>Unraid Community Apps</td><td>Search "ChoreQuest" in the Apps tab and click Install. Until then, use the <a href="#docker">manual Unraid steps</a>.</td><td>Planned</td></tr>
+          <tr><td>TrueNAS SCALE / CasaOS / Umbrel app stores</td><td>One-click install from each system's app store.</td><td>Planned</td></tr>
+          <tr><td>Windows installer (no Docker)</td><td>A normal <code>ChoreQuest-Setup.exe</code> that installs and starts with Windows. Docker Desktop not needed.</td><td>Exploring</td></tr>
+          <tr><td>One-click cloud hosting</td><td>Deploy to a hosting service (Fly.io, Railway, Render) with a persistent disk. Includes HTTPS, works away from home, and push notifications work. Costs about $3–7/month.</td><td>Exploring</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    ChoreQuest is open source. <a href="https://github.com/turbogizzmo/ChoreQuest">Source on GitHub</a> · <a href="https://github.com/turbogizzmo/ChoreQuest/wiki">Wiki</a> ·
+    Forked from <a href="https://github.com/finalbillybong/ChoreQuest">finalbillybong/ChoreQuest</a>.
+  </div>
+</footer>
+
+<script>
+(function () {
+  var IMAGE = 'ghcr.io/turbogizzmo/chorequest:latest';
+
+  // The one compose file every install path uses. __TZ__ comes from the picker.
+  var COMPOSE = [
+    "services:",
+    "  chorequest:",
+    "    image: " + IMAGE,
+    "    ports:",
+    "      - \"8122:8122\"",
+    "    environment:",
+    "      - TZ=__TZ__",
+    "    volumes:",
+    "      - ./data:/app/data",
+    "    restart: unless-stopped"
+  ];
+
+  // Windows install/update script. Re-running it pulls the newest image;
+  // ./data (database, uploads, generated secret key) is left alone.
+  var PS_INSTALL = [
+    "& {",
+    "  $dir = Join-Path $env:USERPROFILE 'ChoreQuest'",
+    "",
+    "  if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Write-Host 'Docker Desktop is not installed yet. Do step 1 first.' -ForegroundColor Red; return }",
+    "  cmd /c 'docker info >nul 2>&1'",
+    "  if ($LASTEXITCODE -ne 0) { Write-Host 'Docker Desktop is not running. Open it, wait for \"Engine running\", then paste this again.' -ForegroundColor Red; return }",
+    "",
+    "  New-Item -ItemType Directory -Force (Join-Path $dir 'data') | Out-Null",
+    "  Set-Location $dir",
+    "  $compose = @(",
+    COMPOSE.map(function (l) { return "    '" + l + "'"; }).join('\n'),
+    "  ) -join \"`n\"",
+    "  [IO.File]::WriteAllText((Join-Path $dir 'docker-compose.yml'), $compose + \"`n\")",
+    "",
+    "  Write-Host 'Downloading and starting ChoreQuest...' -ForegroundColor Cyan",
+    "  docker compose pull",
+    "  docker compose up -d",
+    "  if ($LASTEXITCODE -ne 0) { Write-Host 'Docker could not start ChoreQuest. Scroll up for the error.' -ForegroundColor Red; return }",
+    "",
+    "  foreach ($i in 1..60) {",
+    "    try { Invoke-WebRequest http://localhost:8122/api/health -UseBasicParsing -TimeoutSec 3 | Out-Null; break } catch { Start-Sleep 2 }",
+    "  }",
+    "  $desktop = [Environment]::GetFolderPath('Desktop')",
+    "  [IO.File]::WriteAllText((Join-Path $desktop 'ChoreQuest.url'), \"[InternetShortcut]`r`nURL=http://localhost:8122`r`n\")",
+    "  $ip = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |",
+    "    Where-Object { $_.IPAddress -notmatch '^(127|169\\.254)\\.' -and $_.InterfaceAlias -notmatch 'vEthernet|WSL|Loopback|Docker' } |",
+    "    Select-Object -First 1 -ExpandProperty IPAddress",
+    "  Write-Host ''",
+    "  Write-Host 'ChoreQuest is running!' -ForegroundColor Green",
+    "  Write-Host '  On this PC:              http://localhost:8122'",
+    "  if ($ip) { Write-Host \"  On phones (same Wi-Fi):  http://${ip}:8122\" }",
+    "  Start-Process 'http://localhost:8122'",
+    "}"
+  ].join('\n');
+
+  var SH_INSTALL = [
+    "mkdir -p chorequest/data && cd chorequest",
+    "cat > docker-compose.yml <<'EOF'",
+    COMPOSE.join('\n'),
+    "EOF",
+    "docker compose up -d"
+  ].join('\n');
+
+  function zones() {
+    try { if (Intl.supportedValuesOf) return Intl.supportedValuesOf('timeZone'); } catch (e) {}
+    return ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix', 'America/Los_Angeles',
+      'America/Anchorage', 'Pacific/Honolulu', 'America/Toronto', 'America/Vancouver', 'Europe/London',
+      'Europe/Dublin', 'Europe/Paris', 'Europe/Berlin', 'Australia/Sydney', 'Australia/Perth', 'Pacific/Auckland', 'UTC'];
+  }
+  var detected = 'UTC';
+  try { detected = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) {}
+  var list = zones();
+  if (list.indexOf(detected) === -1) list.unshift(detected);
+
+  var renders = {
+    'tz':     function (tz) { document.getElementById('ps-install').textContent = PS_INSTALL.replace('__TZ__', tz); },
+    'tz-syn': function (tz) { document.getElementById('syn-compose').textContent = COMPOSE.join('\n').replace('__TZ__', tz); },
+    'tz-dk':  function (tz) { document.getElementById('sh-install').textContent = SH_INSTALL.replace('__TZ__', tz); }
+  };
+
+  Object.keys(renders).forEach(function (id) {
+    var sel = document.getElementById(id);
+    list.forEach(function (z) {
+      var o = document.createElement('option');
+      o.value = o.textContent = z;
+      if (z === detected) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function () { renders[id](sel.value); });
+    renders[id](detected);
+  });
+
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = document.getElementById(btn.dataset.copy).textContent;
+      var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(done, function () { fallback(text); done(); });
+      } else { fallback(text); done(); }
+    });
+  });
+  function fallback(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+  }
+})();
+</script>
+</body>
+</html>
